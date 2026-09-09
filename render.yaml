@@ -12,5 +12,11 @@ services:
         value: https://seedenv.com
       - key: NEXTAUTH_URL
         value: https://seedenv.com
+      - key: NEXTAUTH_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
       - key: SUPABASE_PROOF_BUCKET
         value: proof-screenshots

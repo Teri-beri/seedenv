@@ -49,3 +49,16 @@ Open `https://seedenv.com` in production or your local development URL while run
 ## Notes
 
 SeedEnv uses NextAuth email magic links through Resend. The current preview fallback still uses seeded SeedEnv users when no session is present; set `SEEDENV_PREVIEW_USER_ID` to force a specific preview identity.
+
+## Render Environment
+
+Render does not receive local `.env` values. Set these in the Render dashboard before relying on protected routes:
+
+- `DATABASE_URL`
+- `NEXT_PUBLIC_APP_URL=https://seedenv.com`
+- `NEXTAUTH_URL=https://seedenv.com`
+- `NEXTAUTH_SECRET`
+- `RESEND_API_KEY`
+- `SUPABASE_PROOF_BUCKET=proof-screenshots`
+
+If `NEXTAUTH_SECRET` is missing, NextAuth will return `NO_SECRET` and protected routes will fail in production.
