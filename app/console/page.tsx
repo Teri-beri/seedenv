@@ -1,5 +1,9 @@
 import { SubmissionStatus } from "@prisma/client";
 import { ArrowUpRight } from "lucide-react";
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import AuthCheck from "@/components/auth-check";
 import { DeveloperStudio } from "@/components/developer-studio";
 import { DeveloperHeader } from "@/components/navigation";
 import { ensurePreviewData } from "@/lib/preview-data";
@@ -8,6 +12,10 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 
 export default async function ConsolePage() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) redirect("/auth/signin");
+  if (session.user.role !== "DEVELOPER") redirect("/");
+
   await ensurePreviewData();
   const [pendingSubmissions, approvedAssets, campaigns] = await Promise.all([
     prisma.submission.findMany({
@@ -30,6 +38,7 @@ export default async function ConsolePage() {
   ]);
 
   return (
+    <AuthCheck role="DEVELOPER">
     <main className="terminal-grid min-h-screen bg-[radial-gradient(circle_at_12%_0%,rgba(109,40,217,0.2),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_50%,#090A0F_100%)] pb-16 text-white">
       <DeveloperHeader />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -67,5 +76,6 @@ export default async function ConsolePage() {
         <DeveloperStudio submissions={pendingSubmissions} assets={approvedAssets} />
       </div>
     </main>
+    </AuthCheck>
   );
 }

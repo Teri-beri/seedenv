@@ -1,6 +1,10 @@
 import { CampaignStatus } from "@prisma/client";
 import { ArrowUpRight, Crown, Flame, Radar, Trophy, WalletCards } from "lucide-react";
+import { getServerSession } from "next-auth";
 import Image from "next/image";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import AuthCheck from "@/components/auth-check";
 import { MissionExperience } from "@/components/mission-experience";
 import { RoleSwitcher, TesterBottomNav } from "@/components/navigation";
 import { getCurrentUser } from "@/lib/auth";
@@ -12,6 +16,10 @@ import { formatCents } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) redirect("/auth/signin");
+  if (session.user.role !== "TESTER") redirect("/");
+
   await ensurePreviewData();
   const [tester, missions, leaderboard] = await Promise.all([
     getCurrentUser("TESTER"),
@@ -25,6 +33,7 @@ export default async function DashboardPage() {
   const progress = rankProgress(tester.rankTier, tester.xpPoints);
 
   return (
+    <AuthCheck role="TESTER">
     <main className="terminal-grid min-h-screen bg-[radial-gradient(circle_at_16%_0%,rgba(109,40,217,0.18),transparent_30%),radial-gradient(circle_at_86%_10%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_48%,#090A0F_100%)] pb-24 text-white lg:pb-12">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
@@ -106,6 +115,7 @@ export default async function DashboardPage() {
       </div>
       <TesterBottomNav />
     </main>
+    </AuthCheck>
   );
 }
 
