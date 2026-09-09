@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: seedenv
+    runtime: node
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.x
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://seedenv.com
+      - key: NEXTAUTH_URL
+        value: https://seedenv.com
+      - key: SUPABASE_PROOF_BUCKET
+        value: proof-screenshots
