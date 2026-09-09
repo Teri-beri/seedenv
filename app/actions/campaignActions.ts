@@ -74,7 +74,7 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
 
   if (!process.env.STRIPE_SECRET_KEY) {
     if (process.env.NODE_ENV === "production") throw new Error("Stripe is required in production.");
-    return { campaignId: campaign.id, checkoutUrl: `/developer?previewEscrow=${campaign.id}`, escrowTotalCents };
+    return { campaignId: campaign.id, checkoutUrl: `/console?previewEscrow=${campaign.id}`, escrowTotalCents };
   }
 
   const stripe = getStripe();
@@ -94,8 +94,8 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
         },
       },
     ],
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/developer?escrow=success&campaign=${campaign.id}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/developer?escrow=cancelled&campaign=${campaign.id}`,
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=success&campaign=${campaign.id}`,
+    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=cancelled&campaign=${campaign.id}`,
     metadata: {
       type: "SEEDENV_CAMPAIGN_ESCROW",
       campaignId: campaign.id,

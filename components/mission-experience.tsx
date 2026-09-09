@@ -154,7 +154,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.06 }}
-                className="luxury-panel rounded-3xl p-5 ring-1 ring-white/5"
+                className="luxury-panel rounded-2xl bg-[#0E1017]/80 p-5 backdrop-blur-md transition-all hover:border-violet-500/30"
               >
                 <div className="flex items-start gap-4">
                   <div className="relative size-16 overflow-hidden rounded-2xl bg-royal/20">
@@ -166,7 +166,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
                     <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/62">{mission.description}</p>
                   </div>
                 </div>
-                <div className="mt-5 rounded-2xl border border-aurum/20 bg-aurum/8 p-4">
+                <div className="mt-5 rounded-2xl border border-[#1F2430] bg-[#090A0F]/45 p-4 backdrop-blur-md transition-all hover:border-violet-500/30">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-mono text-lg font-black gold-text">{formatCents(Math.round(mission.bountyPerTaskUsd * 100))} CASH</span>
                     <span className="font-mono text-violet-200">+ {Math.max(75, Math.round(mission.bountyPerTaskUsd * 32))} XP</span>
@@ -193,16 +193,16 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
                 <p className="text-xs uppercase tracking-[0.24em] text-aurum">Active Mission</p>
                 <h2 className="mt-1 text-2xl font-black">{activeMission.title}</h2>
               </div>
-              <div className="rounded-2xl border border-aurum/30 bg-aurum/10 px-3 py-2 font-mono text-aurum">
+              <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 font-mono text-amber-500">
                 <Clock3 className="mr-1 inline size-4" /> <Countdown expiresAt={expiresAt} />
               </div>
             </div>
-            <a href={activeMission.appUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-royal/40 bg-royal/15 px-4 py-3 text-sm font-bold text-white">
+            <a href={activeMission.appUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-3 text-sm font-bold text-white backdrop-blur-md transition-all hover:border-violet-500/30">
               Open App / TestFlight <ArrowUpRight className="size-4" />
             </a>
             <ol className="space-y-3">
               {activeMission.instructions.map((instruction) => (
-                <li key={instruction.id} className="rounded-2xl border border-stroke bg-white/[0.03] p-4">
+                <li key={instruction.id} className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 backdrop-blur-md transition-all hover:border-violet-500/30">
                   <div className="flex items-center gap-3">
                     <span className="flex size-8 items-center justify-center rounded-full bg-aurum text-sm font-black text-obsidian">{instruction.stepNumber}</span>
                     <div>
@@ -214,7 +214,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
                 </li>
               ))}
             </ol>
-            <label className="block cursor-pointer rounded-3xl border border-dashed border-aurum/38 bg-aurum/8 p-5 text-center">
+            <label className="block cursor-pointer rounded-2xl border border-dashed border-amber-400/30 bg-[#0E1017]/80 p-5 text-center backdrop-blur-md transition-all hover:border-violet-500/30">
               <input className="hidden" type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void handleFile(event.target.files?.[0] || null)} />
               {preview ? <Image src={preview} alt="Proof preview" width={640} height={420} className="max-h-56 w-full rounded-2xl object-cover" /> : <UploadCloud className="mx-auto size-10 text-aurum" />}
               <p className="mt-3 font-semibold text-white">Upload proof screenshot</p>

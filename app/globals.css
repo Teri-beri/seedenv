@@ -49,14 +49,21 @@ select {
 .luxury-panel {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(38, 42, 54, 0.92);
+  border: 1px solid #1f2430;
+  border-radius: 1rem;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
     radial-gradient(circle at 18% 0%, rgba(109, 40, 217, 0.18), transparent 34%),
-    linear-gradient(145deg, rgba(14, 16, 23, 0.96), rgba(9, 10, 15, 0.98));
+    rgba(14, 16, 23, 0.8);
+  backdrop-filter: blur(14px);
+  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
   box-shadow:
     0 24px 80px rgba(0, 0, 0, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.luxury-panel:hover {
+  border-color: rgba(139, 92, 246, 0.3);
 }
 
 .luxury-panel::before {
@@ -92,7 +99,7 @@ select {
 
 @media (min-width: 1024px) and (max-height: 720px) {
   .hero-title {
-    font-size: clamp(2.75rem, 4.6vw, 4rem);
+    font-size: clamp(2.5rem, 4.2vw, 3.5rem);
     line-height: 0.98;
   }
 }

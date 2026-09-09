@@ -103,15 +103,15 @@ export function DeveloperStudio({ submissions, assets }: { submissions: ReviewSu
   return (
     <section className="space-y-8">
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="luxury-panel rounded-3xl p-6">
+        <div className="luxury-panel rounded-2xl p-6 transition-all hover:border-violet-500/30">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-aurum">New Drop / Campaign</p>
               <h2 className="mt-2 text-3xl font-black">Launch Wizard</h2>
             </div>
-            <div className="flex rounded-full border border-stroke bg-white/5 p-1">
+            <div className="flex rounded-full border border-[#1F2430] bg-[#0E1017]/80 p-1 backdrop-blur-md">
               {[1, 2, 3].map((item) => (
-                <button key={item} className={`size-9 rounded-full font-mono text-sm font-black ${step === item ? "bg-aurum text-obsidian" : "text-white/48"}`} onClick={() => setStep(item)} type="button">
+                <button key={item} className={`size-9 rounded-full font-mono text-sm font-black transition-all ${step === item ? "bg-gradient-to-r from-amber-500 to-amber-600 text-neutral-950 shadow-lg shadow-amber-500/10" : "text-white/48"}`} onClick={() => setStep(item)} type="button">
                   {item}
                 </button>
               ))}
@@ -147,7 +147,7 @@ export function DeveloperStudio({ submissions, assets }: { submissions: ReviewSu
           {step === 2 && (
             <div className="mt-6 space-y-3">
               {form.instructions.map((task, index) => (
-                <motion.div key={index} layout className="rounded-3xl border border-stroke bg-white/[0.03] p-4">
+                <motion.div key={index} layout className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 backdrop-blur-md transition-all hover:border-violet-500/30">
                   <div className="mb-3 flex items-center justify-between">
                     <span className="font-mono text-sm text-aurum">STEP {index + 1}</span>
                     <div className="flex gap-2">
@@ -214,7 +214,7 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
 
 function Slider({ label, min, max, step = 1, value, onChange }: { label: string; min: number; max: number; step?: number; value: number; onChange: (value: number) => void }) {
   return (
-    <label className="block rounded-3xl border border-stroke bg-white/[0.03] p-4">
+    <label className="block rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 backdrop-blur-md transition-all hover:border-violet-500/30">
       <div className="mb-3 flex items-center justify-between text-sm font-bold">
         <span className="text-white/72">{label}</span>
         <span className="font-mono text-aurum">{value}</span>
@@ -226,7 +226,7 @@ function Slider({ label, min, max, step = 1, value, onChange }: { label: string;
 
 function Metric({ label, value, gold = false }: { label: string; value: string; gold?: boolean }) {
   return (
-    <div className="rounded-3xl border border-stroke bg-black/22 p-4">
+    <div className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 backdrop-blur-md transition-all hover:border-violet-500/30">
       <p className="text-xs uppercase tracking-[0.18em] text-white/42">{label}</p>
       <p className={`mt-2 font-mono text-2xl font-black ${gold ? "gold-text" : "text-white"}`}>{value}</p>
     </div>
@@ -234,13 +234,13 @@ function Metric({ label, value, gold = false }: { label: string; value: string; 
 }
 
 function IconButton({ label, icon, onClick }: { label: string; icon: React.ReactNode; onClick: () => void }) {
-  return <button aria-label={label} type="button" onClick={onClick} className="rounded-xl border border-stroke bg-white/5 p-2 text-white/72 hover:text-white">{icon}</button>;
+  return <button aria-label={label} type="button" onClick={onClick} className="rounded-xl border border-[#1F2430] bg-[#0E1017]/80 p-2 text-white/72 backdrop-blur-md transition-all hover:border-violet-500/30 hover:text-white">{icon}</button>;
 }
 
 function ReviewDeck({ submissions, onReview, isPending }: { submissions: ReviewSubmission[]; onReview: (id: string, action: "approve" | "reject", reason?: string) => void; isPending: boolean }) {
   const active = submissions[0];
   return (
-    <div className="luxury-panel rounded-3xl p-6">
+    <div className="luxury-panel rounded-2xl p-6 transition-all hover:border-violet-500/30">
       <p className="text-xs uppercase tracking-[0.28em] text-aurum">Review Deck</p>
       <h2 className="mt-2 text-3xl font-black">Proof grading</h2>
       {active ? (
@@ -248,17 +248,17 @@ function ReviewDeck({ submissions, onReview, isPending }: { submissions: ReviewS
           <div className="space-y-3">
             <h3 className="text-xl font-bold">{active.campaign.title}</h3>
             {active.campaign.instructions.map((item) => (
-              <div key={item.stepNumber} className="rounded-2xl border border-stroke bg-white/[0.03] p-3">
+              <div key={item.stepNumber} className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-3 backdrop-blur-md transition-all hover:border-violet-500/30">
                 <p className="font-semibold">{item.stepNumber}. {item.instructionTitle}</p>
                 <p className="mt-1 text-sm text-white/54">{item.instructionDetail}</p>
               </div>
             ))}
           </div>
           <div className="space-y-4">
-            <div className="relative min-h-72 overflow-hidden rounded-3xl border border-stroke bg-black/24">
+            <div className="relative min-h-72 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 backdrop-blur-md transition-all hover:border-violet-500/30">
               {active.proofImageUrl ? <Image src={active.proofImageUrl} alt="Tester proof" fill sizes="(min-width: 1536px) 50vw, (min-width: 1024px) 100vw, 100vw" className="object-cover" /> : <ImageIcon className="m-16 size-16 text-white/20" />}
             </div>
-            <div className="rounded-2xl border border-stroke bg-black/22 p-4">
+            <div className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 backdrop-blur-md transition-all hover:border-violet-500/30">
               <p className="text-sm font-bold text-violet-200">{active.tester.username}</p>
               <p className="mt-2 text-sm leading-6 text-white/62">{active.feedbackText || "No feedback submitted yet."}</p>
             </div>
@@ -268,14 +268,14 @@ function ReviewDeck({ submissions, onReview, isPending }: { submissions: ReviewS
             </div>
           </div>
         </div>
-      ) : <p className="mt-8 rounded-3xl border border-stroke bg-white/[0.03] p-8 text-center text-white/54">No pending submissions in the deck.</p>}
+      ) : <p className="mt-8 rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-8 text-center text-white/54 backdrop-blur-md transition-all hover:border-violet-500/30">No pending submissions in the deck.</p>}
     </div>
   );
 }
 
 function AssetVault({ assets }: { assets: Asset[] }) {
   return (
-    <div className="luxury-panel rounded-3xl p-6">
+    <div className="luxury-panel rounded-2xl p-6 transition-all hover:border-violet-500/30">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-aurum">Asset Vault</p>
@@ -285,7 +285,7 @@ function AssetVault({ assets }: { assets: Asset[] }) {
       </div>
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {assets.map((asset) => (
-          <article key={asset.id} className="overflow-hidden rounded-3xl border border-stroke bg-white/[0.03]">
+          <article key={asset.id} className="overflow-hidden rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 backdrop-blur-md transition-all hover:border-violet-500/30">
             <div className="relative h-44 bg-black/28">{asset.proofImageUrl && <Image src={asset.proofImageUrl} alt="Approved asset" fill sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" className="object-cover" />}</div>
             <div className="p-4">
               <p className="font-bold">{asset.campaign.title}</p>
@@ -293,7 +293,7 @@ function AssetVault({ assets }: { assets: Asset[] }) {
             </div>
           </article>
         ))}
-        {assets.length === 0 && <p className="rounded-3xl border border-stroke bg-white/[0.03] p-8 text-white/54">Approved screenshots will appear here.</p>}
+        {assets.length === 0 && <p className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-8 text-white/54 backdrop-blur-md transition-all hover:border-violet-500/30">Approved screenshots will appear here.</p>}
       </div>
     </div>
   );

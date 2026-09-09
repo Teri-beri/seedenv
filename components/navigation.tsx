@@ -2,6 +2,8 @@
 
 import { Boxes, CreditCard, Flame, Gamepad2, LayoutDashboard, Medal, PlusCircle, ShieldCheck, WalletCards } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -21,14 +23,19 @@ const developerItems = [
 ];
 
 export function RoleSwitcher() {
-  const [role, setRole] = useState<"tester" | "developer">("tester");
+  const pathname = usePathname();
+  const router = useRouter();
+  const [role, setRole] = useState<"tester" | "developer">(pathname.startsWith("/console") ? "developer" : "tester");
   return (
     <div className="flex rounded-full border border-stroke bg-surface/80 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
       {(["tester", "developer"] as const).map((nextRole) => (
         <button
           key={nextRole}
           className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] transition ${role === nextRole ? "bg-aurum text-obsidian shadow-[0_10px_24px_rgba(245,158,11,0.18)]" : "text-muted hover:text-white"}`}
-          onClick={() => setRole(nextRole)}
+          onClick={() => {
+            setRole(nextRole);
+            router.push(nextRole === "developer" ? "/console" : "/dashboard");
+          }}
           type="button"
         >
           {nextRole}
@@ -53,11 +60,16 @@ export function DeveloperHeader() {
         </div>
         <nav className="flex items-center gap-2">
           {developerItems.map(({ label, icon: Icon }) => (
-            <Button key={label} variant="ghost" size="sm">
-              <Icon className="size-4" />
-              {label}
+            <Button key={label} variant="ghost" size="sm" asChild>
+              <Link href="/console">
+                <Icon className="size-4" />
+                {label}
+              </Link>
             </Button>
           ))}
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/dashboard">Tester Dashboard</Link>
+          </Button>
         </nav>
       </div>
     </header>
@@ -69,10 +81,10 @@ export function TesterBottomNav() {
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-stroke bg-obsidian/94 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
       <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
         {testerItems.map(({ label, icon: Icon }, index) => (
-          <button key={label} className={`rounded-2xl px-2 py-2 text-[10px] font-semibold ${index === 0 ? "bg-royal text-white shadow-[0_10px_24px_rgba(109,40,217,0.22)]" : "text-muted"}`} type="button">
+          <Link key={label} className={`rounded-2xl px-2 py-2 text-center text-[10px] font-semibold ${index === 0 ? "bg-royal text-white shadow-[0_10px_24px_rgba(109,40,217,0.22)]" : "text-muted"}`} href="/dashboard">
             <Icon className="mx-auto mb-1 size-4" />
             {label}
-          </button>
+          </Link>
         ))}
       </div>
     </nav>
