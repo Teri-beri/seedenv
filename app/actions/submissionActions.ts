@@ -21,14 +21,14 @@ export async function claimTaskSlot(campaignId: string) {
 
   return prisma.$transaction(async (tx) => {
     const campaign = await tx.appCampaign.findUnique({ where: { id: campaignId } });
-    if (!campaign || campaign.status !== CampaignStatus.ACTIVE) throw new Error("This wave is not accepting testers.");
-    if (campaign.claimedSlots >= campaign.totalSlots) throw new Error("This wave is fully claimed.");
+    if (!campaign || campaign.status !== CampaignStatus.ACTIVE) throw new Error("This mission is not accepting testers.");
+    if (campaign.claimedSlots >= campaign.totalSlots) throw new Error("This mission is fully claimed.");
 
     const existing = await tx.submission.findUnique({
       where: { campaignId_testerId: { campaignId, testerId: tester.id } },
     });
     if (existing && existing.status === SubmissionStatus.PENDING) return existing;
-    if (existing && existing.status === SubmissionStatus.APPROVED) throw new Error("You already completed this wave.");
+    if (existing && existing.status === SubmissionStatus.APPROVED) throw new Error("You already completed this mission.");
 
     await tx.appCampaign.update({
       where: { id: campaignId },

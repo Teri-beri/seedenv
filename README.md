@@ -37,7 +37,7 @@ Open `https://seedenv.com` in production or your local development URL while run
 ## Core Flows
 
 - Developers create campaigns in `ESCROW_PENDING`, fund tester payout pool plus 20% SeedEnv fee, then Stripe webhook activates the campaign.
-- Testers claim active waves atomically. A pending submission locks one slot for 30 minutes.
+- Testers claim active seed missions atomically. A pending submission locks one slot for 30 minutes.
 - Proof submission validates feedback, client-side SHA-256 hashes screenshots, rejects duplicate hashes, uploads proof media, and leaves proof pending for review.
 - Approvals credit tester wallet balance, award XP, update rank tier, and write a completed wallet transaction.
 - Rejections return the claimed slot to the public pool.

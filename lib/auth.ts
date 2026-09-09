@@ -13,7 +13,7 @@ export async function getCurrentUser(roleHint: UserRole = "TESTER") {
     update: { role: roleHint },
     create: {
       email: roleHint === "DEVELOPER" ? "preview.developer@seedenv.dev" : "preview.tester@seedenv.dev",
-      username: roleHint === "DEVELOPER" ? "PreviewBuilder" : "PreviewRider",
+      username: roleHint === "DEVELOPER" ? "PreviewBuilder" : "PreviewSeeder",
       role: roleHint,
     },
   });

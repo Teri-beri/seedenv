@@ -6,8 +6,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
 const testerItems = [
-  { label: "Wave Drops", icon: Gamepad2 },
-  { label: "Active Quests", icon: Flame },
+  { label: "Seed Missions", icon: Gamepad2 },
+  { label: "Active Missions", icon: Flame },
   { label: "Leaderboard", icon: Medal },
   { label: "Vault", icon: WalletCards },
 ];

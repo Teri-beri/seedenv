@@ -17,12 +17,12 @@ async function main() {
     prisma.user.create({
       data: {
         email: "maya.tester@seedenv.dev",
-        username: "MayaWave",
+        username: "MayaSeeder",
         role: UserRole.TESTER,
         avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=160&h=160&fit=crop&crop=faces",
         walletBalanceCents: 2850,
         xpPoints: 1340,
-        rankTier: RankTier.WAVE_CHASER,
+        rankTier: RankTier.ALPHA_SEEDER,
         streakDays: 8,
       },
     }),
@@ -42,7 +42,7 @@ async function main() {
         username: "SeedEnvOps",
         role: UserRole.ADMIN,
         xpPoints: 9000,
-        rankTier: RankTier.TSUNAMI_LEGEND,
+        rankTier: RankTier.APEX_ARCHITECT,
       },
     }),
   ]);

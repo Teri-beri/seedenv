@@ -92,7 +92,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
         setSubmissionId(submission.id);
         setExpiresAt(new Date(submission.expiresAt));
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Could not claim this wave.");
+        setMessage(error instanceof Error ? error.message : "Could not claim this mission.");
       }
     });
   }
@@ -138,7 +138,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
     <section className="grid gap-6 lg:grid-cols-[1fr_420px]">
       <div className="space-y-4">
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {["All Waves", "Social & UGC", "Quick Drops (<5m)", "High Bounty ($5+)"].map((filter, index) => (
+          {["All Missions", "Social & UGC", "Quick Tasks (<5m)", "High Bounty ($5+)"].map((filter, index) => (
             <button key={filter} className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold ${index === 0 ? "border-aurum bg-aurum text-obsidian" : "border-stroke bg-white/5 text-white/72"}`} type="button">
               {filter}
             </button>
@@ -177,7 +177,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
                   <p className="mt-2 text-xs text-white/50">{spotsLeft} / {mission.totalSlots} spots left</p>
                 </div>
                 <Button className="mt-5 w-full" onClick={() => handleClaim(mission)} disabled={isPending || spotsLeft <= 0}>
-                  <Zap className="size-4" /> Catch This Wave
+                  <Zap className="size-4" /> Claim Mission
                 </Button>
               </motion.article>
             );
@@ -190,7 +190,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
           <div className="space-y-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-aurum">Active Quest</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-aurum">Active Mission</p>
                 <h2 className="mt-1 text-2xl font-black">{activeMission.title}</h2>
               </div>
               <div className="rounded-2xl border border-aurum/30 bg-aurum/10 px-3 py-2 font-mono text-aurum">
@@ -228,7 +228,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
             <div className="rounded-3xl border border-royal/30 bg-royal/10 p-4">
               <Gift className="size-6 text-aurum" />
               <p className="mt-2 text-sm font-bold">Mystery Crate armed</p>
-              <p className="text-xs text-white/50">Approved quests can roll bonus XP after review.</p>
+              <p className="text-xs text-white/50">Approved missions can roll bonus XP after review.</p>
             </div>
           </div>
         ) : (
@@ -236,8 +236,8 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
             <div className="rounded-full border border-aurum/30 bg-aurum/10 p-5">
               <Lock className="size-9 text-aurum" />
             </div>
-            <h2 className="mt-5 text-2xl font-black">No active quest</h2>
-            <p className="mt-2 max-w-xs text-sm leading-6 text-white/56">Claim a wave to start the 30-minute execution lock, unlock the stepper, and queue a cash bounty.</p>
+            <h2 className="mt-5 text-2xl font-black">No active mission</h2>
+            <p className="mt-2 max-w-xs text-sm leading-6 text-white/56">Claim a seed task to initialize validation, start the 30-minute execution lock, and queue a cash bounty.</p>
             <ImagePlus className="mt-8 size-14 text-royal/60" />
           </div>
         )}

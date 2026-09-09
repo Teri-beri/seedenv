@@ -14,10 +14,9 @@ enum UserRole {
 }
 
 enum RankTier {
-  ROOKIE_RIDER
-  WAVE_CHASER
-  REEF_HUNTER
-  TSUNAMI_LEGEND
+  ALPHA_SEEDER
+  CORE_VALIDATOR
+  APEX_ARCHITECT
 }
 
 enum PlatformType {
@@ -68,7 +67,7 @@ model User {
   avatarUrl              String?
   walletBalanceCents     Int                 @default(0)
   xpPoints               Int                 @default(0)
-  rankTier               RankTier            @default(ROOKIE_RIDER)
+  rankTier               RankTier            @default(ALPHA_SEEDER)
   streakDays             Int                 @default(1)
   lastActiveDate         DateTime            @default(now())
   stripeCustomerId       String?

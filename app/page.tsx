@@ -22,8 +22,8 @@ async function ensurePreviewData() {
   });
   await prisma.user.upsert({
     where: { email: "preview.tester@seedenv.dev" },
-    update: { walletBalanceCents: 1825, xpPoints: 1240, rankTier: "WAVE_CHASER", streakDays: 6 },
-    create: { email: "preview.tester@seedenv.dev", username: "PreviewRider", role: "TESTER", walletBalanceCents: 1825, xpPoints: 1240, rankTier: "WAVE_CHASER", streakDays: 6 },
+    update: { walletBalanceCents: 1825, xpPoints: 1240, rankTier: "ALPHA_SEEDER", streakDays: 6 },
+    create: { email: "preview.tester@seedenv.dev", username: "PreviewSeeder", role: "TESTER", walletBalanceCents: 1825, xpPoints: 1240, rankTier: "ALPHA_SEEDER", streakDays: 6 },
   });
 
   const campaigns = [
@@ -100,7 +100,7 @@ export default async function Home() {
               Launch data infrastructure for app teams.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-white/64">
-              Indie app builders fund authentic early missions. Testers claim timed quests, seed real community data, submit proof, and earn cash plus XP when developers approve the work.
+              Indie app builders fund authentic early missions. Testers claim timed validations, seed real community data, submit proof, and earn cash plus XP when developers approve the work.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <RoleSwitcher />
@@ -141,7 +141,7 @@ export default async function Home() {
           <div className="flex items-end justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-aurum">Tester Hub</p>
-              <h2 className="mt-2 text-4xl font-black">Wave Drops</h2>
+              <h2 className="mt-2 text-4xl font-black">Seed Missions</h2>
             </div>
             <div className="hidden gap-3 md:flex">
               {leaderboard.map((user, index) => (
