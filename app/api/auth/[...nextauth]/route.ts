@@ -13,7 +13,7 @@ const seedenvLogo = `
       <stop offset="0%" stop-color="#14563C" />
       <stop offset="45%" stop-color="#0E241B" />
       <stop offset="100%" stop-color="#090A0F" />
-    </linearGradient>
+    </radialGradient>
     <linearGradient id="seed" x1="17" y1="7" x2="29" y2="27" gradientUnits="userSpaceOnUse">
       <stop stop-color="#F8E8D4" />
       <stop offset="0.45" stop-color="#B98348" />
