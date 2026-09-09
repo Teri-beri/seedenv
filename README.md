@@ -30,6 +30,8 @@ Open `https://seedenv.com` in production or your local development URL while run
 - `DATABASE_URL`: PostgreSQL connection string.
 - `NEXT_PUBLIC_APP_URL`: public app URL for Stripe redirects, usually `https://seedenv.com`.
 - `NEXTAUTH_URL`: canonical auth URL if NextAuth is enabled, usually `https://seedenv.com`.
+- `NEXTAUTH_SECRET`: random secret generated with `openssl rand -base64 32`.
+- `RESEND_API_KEY`: Resend key used for SeedEnv magic-link email authentication from `auth@mail.seedenv.com`.
 - `STRIPE_SECRET_KEY`: Stripe secret key for escrow checkout.
 - `STRIPE_WEBHOOK_SECRET`: Stripe webhook signing secret for `/api/stripe/webhook`.
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROOF_BUCKET`: proof screenshot storage.
@@ -46,4 +48,4 @@ Open `https://seedenv.com` in production or your local development URL while run
 
 ## Notes
 
-The current preview auth uses seeded SeedEnv users so the application can run before a real auth provider is connected. Set `SEEDENV_PREVIEW_USER_ID` to force a specific preview identity.
+SeedEnv uses NextAuth email magic links through Resend. The current preview fallback still uses seeded SeedEnv users when no session is present; set `SEEDENV_PREVIEW_USER_ID` to force a specific preview identity.

@@ -1,7 +1,15 @@
 import { UserRole } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 
 export async function getCurrentUser(roleHint: UserRole = "TESTER") {
+  const session = await getServerSession(authOptions);
+  if (session?.user?.id) {
+    const authenticatedUser = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (authenticatedUser) return authenticatedUser;
+  }
+
   const configuredUserId = process.env.SEEDENV_PREVIEW_USER_ID;
   if (configuredUserId) {
     const user = await prisma.user.findUnique({ where: { id: configuredUserId } });
