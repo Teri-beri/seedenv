@@ -8,10 +8,6 @@ export async function getCurrentUser(roleHint: UserRole = "TESTER") {
     if (user) return user;
   }
 
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("Authentication provider is not configured. Set SEEDENV_PREVIEW_USER_ID only for previews.");
-  }
-
   return prisma.user.upsert({
     where: { email: roleHint === "DEVELOPER" ? "preview.developer@seedenv.dev" : "preview.tester@seedenv.dev" },
     update: { role: roleHint },

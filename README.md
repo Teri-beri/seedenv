@@ -46,4 +46,4 @@ Open `https://seedenv.com` in production or your local development URL while run
 
 ## Notes
 
-The default development auth uses preview users so the application can run before a real auth provider is connected. Production intentionally throws if auth is not configured through `SEEDENV_PREVIEW_USER_ID` or a future provider integration.
+The current preview auth uses seeded SeedEnv users so the application can run before a real auth provider is connected. Set `SEEDENV_PREVIEW_USER_ID` to force a specific preview identity.
