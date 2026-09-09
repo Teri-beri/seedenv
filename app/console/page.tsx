@@ -3,7 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import AuthCheck from "@/components/auth-check";
+import AuthCheck from "@/components/AuthCheck";
 import { DeveloperStudio } from "@/components/developer-studio";
 import { DeveloperHeader } from "@/components/navigation";
 import { ensurePreviewData } from "@/lib/preview-data";

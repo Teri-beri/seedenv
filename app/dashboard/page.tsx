@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import AuthCheck from "@/components/auth-check";
+import AuthCheck from "@/components/AuthCheck";
 import { MissionExperience } from "@/components/mission-experience";
 import { RoleSwitcher, TesterBottomNav } from "@/components/navigation";
 import { getCurrentUser } from "@/lib/auth";
