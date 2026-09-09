@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  TESTER
+  DEVELOPER
+  ADMIN
+}
+
+enum RankTier {
+  ROOKIE_RIDER
+  WAVE_CHASER
+  REEF_HUNTER
+  TSUNAMI_LEGEND
+}
+
+enum PlatformType {
+  TESTFLIGHT
+  WEB_STAGING
+  PLAY_STORE
+}
+
+enum CampaignStatus {
+  DRAFT
+  ESCROW_PENDING
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum TaskProofType {
+  SCREENSHOT
+  TEXT_FEEDBACK
+  ACTION_LINK
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum TransactionType {
+  ESCROW_DEPOSIT
+  BOUNTY_PAYOUT
+  PLATFORM_FEE
+  WITHDRAWAL
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id                     String              @id @default(cuid())
+  email                  String              @unique
+  role                   UserRole            @default(TESTER)
+  username               String
+  avatarUrl              String?
+  walletBalanceCents     Int                 @default(0)
+  xpPoints               Int                 @default(0)
+  rankTier               RankTier            @default(ROOKIE_RIDER)
+  streakDays             Int                 @default(1)
+  lastActiveDate         DateTime            @default(now())
+  stripeCustomerId       String?
+  stripeConnectAccountId String?
+  campaigns              AppCampaign[]       @relation("DeveloperCampaigns")
+  submissions            Submission[]        @relation("TesterSubmissions")
+  transactions           WalletTransaction[]
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  @@index([role])
+  @@index([rankTier, xpPoints])
+}
+
+model AppCampaign {
+  id               String            @id @default(cuid())
+  developerId      String
+  developer        User              @relation("DeveloperCampaigns", fields: [developerId], references: [id], onDelete: Cascade)
+  title            String
+  platform         PlatformType
+  appUrl           String
+  iconUrl          String?
+  targetVibe       String
+  description      String
+  totalBudgetUsd   Float
+  bountyPerTaskUsd Float
+  platformFeeUsd   Float
+  totalSlots       Int
+  claimedSlots     Int               @default(0)
+  completedSlots   Int               @default(0)
+  status           CampaignStatus    @default(DRAFT)
+  instructions     TaskInstruction[]
+  submissions      Submission[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  expiresAt        DateTime
+
+  @@index([developerId, status])
+  @@index([status, expiresAt])
+  @@index([platform])
+}
+
+model TaskInstruction {
+  id                String        @id @default(cuid())
+  campaignId        String
+  campaign          AppCampaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  stepNumber        Int
+  instructionTitle  String
+  instructionDetail String
+  proofType         TaskProofType
+
+  @@unique([campaignId, stepNumber])
+  @@index([campaignId])
+}
+
+model Submission {
+  id              String           @id @default(cuid())
+  campaignId      String
+  campaign        AppCampaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  testerId        String
+  tester          User             @relation("TesterSubmissions", fields: [testerId], references: [id], onDelete: Cascade)
+  proofImageUrl   String?
+  proofImageHash  String?
+  feedbackText    String?
+  status          SubmissionStatus @default(PENDING)
+  rejectionReason String?
+  payoutCents     Int
+  claimedAt       DateTime         @default(now())
+  expiresAt       DateTime
+  reviewedAt      DateTime?
+  createdAt       DateTime         @default(now())
+
+  @@unique([campaignId, testerId])
+  @@index([campaignId, status])
+  @@index([testerId, status])
+  @@index([proofImageHash])
+  @@index([expiresAt, status])
+}
+
+model WalletTransaction {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountCents     Int
+  type            TransactionType
+  status          TransactionStatus @default(PENDING)
+  stripePaymentId String?
+  description     String
+  createdAt       DateTime          @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type, status])
+  @@index([stripePaymentId])
+}

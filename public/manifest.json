@@ -1,0 +1,20 @@
+{
+  "name": "SeedEnv",
+  "short_name": "SeedEnv",
+  "id": "https://seedenv.com",
+  "description": "Seed authentic beta communities. Get paid for real launch feedback.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090314",
+  "theme_color": "#090314",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/seedenv-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SeedEnv
 
-## Getting Started
+SeedEnv is a production-grade dark-mode marketplace connecting indie app developers with paid early-access beta testers.
 
-First, run the development server:
+## Stack
+
+- Next.js App Router with Server Actions and Route Handlers
+- TypeScript strict mode
+- PostgreSQL + Prisma ORM
+- Tailwind CSS with SeedEnv obsidian, royal purple, and gold tokens
+- Radix primitives, Lucide icons, Framer Motion, canvas-confetti
+- Stripe Checkout / Connect-ready escrow flow
+- Supabase Storage-compatible proof screenshot uploads
+
+## Local Setup
 
 ```bash
+cp .env.example .env
+npm install
+npx prisma generate
+npx prisma migrate dev --name init
+npm run prisma:seed
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `https://seedenv.com` in production or your local development URL while running `npm run dev`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Required Production Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `DATABASE_URL`: PostgreSQL connection string.
+- `NEXT_PUBLIC_APP_URL`: public app URL for Stripe redirects, usually `https://seedenv.com`.
+- `NEXTAUTH_URL`: canonical auth URL if NextAuth is enabled, usually `https://seedenv.com`.
+- `STRIPE_SECRET_KEY`: Stripe secret key for escrow checkout.
+- `STRIPE_WEBHOOK_SECRET`: Stripe webhook signing secret for `/api/stripe/webhook`.
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROOF_BUCKET`: proof screenshot storage.
 
-## Learn More
+## Core Flows
 
-To learn more about Next.js, take a look at the following resources:
+- Developers create campaigns in `ESCROW_PENDING`, fund tester payout pool plus 20% SeedEnv fee, then Stripe webhook activates the campaign.
+- Testers claim active waves atomically. A pending submission locks one slot for 30 minutes.
+- Proof submission validates feedback, client-side SHA-256 hashes screenshots, rejects duplicate hashes, uploads proof media, and leaves proof pending for review.
+- Approvals credit tester wallet balance, award XP, update rank tier, and write a completed wallet transaction.
+- Rejections return the claimed slot to the public pool.
+- `/api/cron/expire-slots` expires abandoned 30-minute locks.
+- `/api/assets/download?campaignId=...` exports approved proof media and a manifest as a zip.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Notes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The default development auth uses preview users so the application can run before a real auth provider is connected. Production intentionally throws if auth is not configured through `SEEDENV_PREVIEW_USER_ID` or a future provider integration.

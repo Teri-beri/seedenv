@@ -1,69 +1,175 @@
+import { CampaignStatus, SubmissionStatus } from "@prisma/client";
+import { ArrowUpRight, Crown, Flame, Radar, Trophy, WalletCards } from "lucide-react";
 import Image from "next/image";
+import { DeveloperStudio } from "@/components/developer-studio";
+import { MissionExperience } from "@/components/mission-experience";
+import { DeveloperHeader, RoleSwitcher, TesterBottomNav } from "@/components/navigation";
+import { getCurrentUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { rankProgress } from "@/lib/rank";
+import { formatCents } from "@/lib/utils";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+async function ensurePreviewData() {
+  const campaignCount = await prisma.appCampaign.count();
+  if (campaignCount > 0) return;
+
+  const developer = await prisma.user.upsert({
+    where: { email: "preview.developer@seedenv.dev" },
+    update: { role: "DEVELOPER" },
+    create: { email: "preview.developer@seedenv.dev", username: "PreviewBuilder", role: "DEVELOPER" },
+  });
+  await prisma.user.upsert({
+    where: { email: "preview.tester@seedenv.dev" },
+    update: { walletBalanceCents: 1825, xpPoints: 1240, rankTier: "WAVE_CHASER", streakDays: 6 },
+    create: { email: "preview.tester@seedenv.dev", username: "PreviewRider", role: "TESTER", walletBalanceCents: 1825, xpPoints: 1240, rankTier: "WAVE_CHASER", streakDays: 6 },
+  });
+
+  const campaigns = [
+    ["PulseRoom Social Beta", "TESTFLIGHT", "Social & UGC", 3.5, 25, 7, "Seed a private social room with authentic intro posts, reactions, and one crisp friction report.", "https://testflight.apple.com/join/pulseroom-seed", "https://images.unsplash.com/photo-1611162618071-b39a2ec055fb?w=256&h=256&fit=crop"],
+    ["FlexTrail Habit Tracker", "PLAY_STORE", "Fitness & Wellness", 5, 40, 16, "Create a weekly plan, log one workout, and evaluate whether the streak loop motivates another session.", "https://play.google.com/apps/testing/flextrail", "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=256&h=256&fit=crop"],
+    ["NestSwap Marketplace Launch", "WEB_STAGING", "Niche Marketplace", 4.25, 30, 12, "Populate a local-goods marketplace with believable listings, saved searches, and checkout trust feedback.", "https://seedenv.com/demo/nestswap", "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=256&h=256&fit=crop"],
+  ] as const;
+
+  for (const [title, platform, vibe, bounty, totalSlots, claimedSlots, description, appUrl, iconUrl] of campaigns) {
+    await prisma.appCampaign.create({
+      data: {
+        developerId: developer.id,
+        title,
+        platform,
+        targetVibe: vibe,
+        bountyPerTaskUsd: bounty,
+        totalBudgetUsd: bounty * totalSlots,
+        platformFeeUsd: bounty * totalSlots * 0.2,
+        totalSlots,
+        claimedSlots,
+        completedSlots: Math.floor(claimedSlots / 2),
+        description,
+        appUrl,
+        iconUrl,
+        status: CampaignStatus.ACTIVE,
+        expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        instructions: {
+          create: [
+            { stepNumber: 1, instructionTitle: "Open the beta", instructionDetail: "Install or open the staging app and complete the first-run experience.", proofType: "SCREENSHOT" },
+            { stepNumber: 2, instructionTitle: "Seed authentic data", instructionDetail: "Perform the core action with realistic content that would help a launch community feel alive.", proofType: "ACTION_LINK" },
+            { stepNumber: 3, instructionTitle: "Submit usability feedback", instructionDetail: "Write one specific friction point, one trust concern, and one thing that felt ready to ship.", proofType: "TEXT_FEEDBACK" },
+          ],
+        },
+      },
+    });
+  }
+}
+
+export default async function Home() {
+  await ensurePreviewData();
+  const [tester, missions, pendingSubmissions, approvedAssets, leaderboard] = await Promise.all([
+    getCurrentUser("TESTER"),
+    prisma.appCampaign.findMany({
+      where: { status: CampaignStatus.ACTIVE, expiresAt: { gt: new Date() } },
+      include: { instructions: { orderBy: { stepNumber: "asc" } } },
+      orderBy: [{ bountyPerTaskUsd: "desc" }, { createdAt: "desc" }],
+    }),
+    prisma.submission.findMany({
+      where: { status: SubmissionStatus.PENDING, proofImageUrl: { not: null } },
+      include: { tester: true, campaign: { include: { instructions: { orderBy: { stepNumber: "asc" } } } } },
+      take: 5,
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.submission.findMany({
+      where: { status: SubmissionStatus.APPROVED },
+      include: { tester: true, campaign: true },
+      take: 12,
+      orderBy: { reviewedAt: "desc" },
+    }),
+    prisma.user.findMany({ where: { role: "TESTER" }, orderBy: { xpPoints: "desc" }, take: 4 }),
+  ]);
+  const progress = rankProgress(tester.rankTier, tester.xpPoints);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <main className="min-h-screen bg-[radial-gradient(circle_at_15%_0%,rgba(139,92,246,0.22),transparent_30%),radial-gradient(circle_at_85%_8%,rgba(255,215,0,0.16),transparent_24%),linear-gradient(180deg,#090314_0%,#12071F_48%,#090314_100%)] pb-24 text-white lg:pb-0">
+      <DeveloperHeader />
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <section className="grid min-h-[78vh] items-end gap-8 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:py-14">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-aurum/24 bg-aurum/10 px-4 py-2 text-sm font-bold text-amber-100">
+              <Radar className="size-4 text-aurum" /> Seed authentic beta communities. Get paid. Fuel the launch.
+            </div>
+            <h1 className="mt-6 max-w-4xl text-5xl font-black leading-[0.98] tracking-tight text-white sm:text-7xl">
+              SeedEnv turns beta testing into paid launch momentum.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-white/64">
+              Indie app builders fund authentic early missions. Testers claim timed quests, seed real community data, submit proof, and earn cash plus XP when developers approve the work.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <RoleSwitcher />
+              <a className="inline-flex items-center gap-2 rounded-full border border-stroke bg-white/5 px-5 py-3 text-sm font-bold text-white/72" href="#developer-studio">
+                Open Developer Studio <ArrowUpRight className="size-4" />
+              </a>
+            </div>
+          </div>
+          <section className="luxury-panel rounded-[2rem] p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.28em] text-aurum">Tester HUD</p>
+                <h2 className="mt-2 text-2xl font-black">{tester.username}</h2>
+              </div>
+              <div className="relative size-16 overflow-hidden rounded-3xl border border-aurum/28 bg-royal/20">
+                {tester.avatarUrl ? <Image src={tester.avatarUrl} alt="" fill sizes="64px" className="object-cover" /> : <Crown className="m-5 size-6 text-aurum" />}
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              <HudMetric icon={<WalletCards className="size-5" />} label="Cash" value={formatCents(tester.walletBalanceCents)} gold />
+              <HudMetric icon={<Trophy className="size-5" />} label="XP" value={tester.xpPoints.toLocaleString()} />
+              <HudMetric icon={<Flame className="size-5" />} label="Streak" value={`${tester.streakDays}d`} />
+            </div>
+            <div className="mt-5 rounded-3xl border border-stroke bg-black/24 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm font-bold text-violet-100">{progress.label}</span>
+                <span className="font-mono text-xs text-white/48">{progress.remainingXp} XP to {progress.nextLabel}</span>
+              </div>
+              <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/8">
+                <div className="h-full rounded-full bg-gradient-to-r from-royal to-aurum shadow-[0_0_24px_rgba(255,215,0,0.32)]" style={{ width: `${progress.percent}%` }} />
+              </div>
+              <p className="mt-3 text-xs text-white/46">Daily streak multiplier: {(1 + Math.min(tester.streakDays, 14) * 0.03).toFixed(2)}x XP</p>
+            </div>
+          </section>
+        </section>
+
+        <section className="space-y-5" id="tester-hub">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-[0.28em] text-aurum">Tester Hub</p>
+              <h2 className="mt-2 text-4xl font-black">Wave Drops</h2>
+            </div>
+            <div className="hidden gap-3 md:flex">
+              {leaderboard.map((user, index) => (
+                <div key={user.id} className="rounded-2xl border border-stroke bg-white/5 px-4 py-3">
+                  <p className="font-mono text-xs text-aurum">#{index + 1}</p>
+                  <p className="text-sm font-bold">{user.username}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <MissionExperience missions={missions} />
+        </section>
+
+        <section className="mt-12" id="developer-studio">
+          <DeveloperStudio submissions={pendingSubmissions} assets={approvedAssets} />
+        </section>
+      </div>
+      <TesterBottomNav />
+    </main>
+  );
+}
+
+function HudMetric({ icon, label, value, gold = false }: { icon: React.ReactNode; label: string; value: string; gold?: boolean }) {
+  return (
+    <div className="rounded-3xl border border-stroke bg-white/[0.035] p-4">
+      <div className={gold ? "text-aurum" : "text-violet-200"}>{icon}</div>
+      <p className="mt-3 text-xs uppercase tracking-[0.18em] text-white/40">{label}</p>
+      <p className={`mt-1 font-mono text-lg font-black ${gold ? "gold-text" : "text-white"}`}>{value}</p>
     </div>
   );
 }
