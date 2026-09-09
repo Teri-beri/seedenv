@@ -9,22 +9,30 @@ const prisma = new PrismaClient();
 const seedenvLogo = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
   <defs>
-    <linearGradient id="seGrad" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FBBF24" />
-      <stop offset="50%" stop-color="#D97706" />
-      <stop offset="100%" stop-color="#7C3AED" />
+    <radialGradient id="bgGlow" cx="50%" cy="34%" r="72%">
+      <stop offset="0%" stop-color="#14563C" />
+      <stop offset="45%" stop-color="#0E241B" />
+      <stop offset="100%" stop-color="#090A0F" />
     </linearGradient>
-    <radialGradient id="seGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.25" />
-      <stop offset="100%" stop-color="#090A0F" stop-opacity="0" />
-    </radialGradient>
+    <linearGradient id="seed" x1="17" y1="7" x2="29" y2="27" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8E8D4" />
+      <stop offset="0.45" stop-color="#B98348" />
+      <stop offset="1" stop-color="#3C231A" />
+    </linearGradient>
+    <linearGradient id="root" x1="24" y1="22" x2="23" y2="42" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF7E8" />
+      <stop offset="1" stop-color="#D8D1C2" />
+    </linearGradient>
   </defs>
-  <rect x="2" y="2" width="44" height="44" rx="12" fill="#0E1017" stroke="#262A36" stroke-width="1.5" />
-  <circle cx="24" cy="24" r="16" fill="url(#seGlow)" />
-  <path d="M24 10C24 10 32 16 32 24C32 29.5 27.5 34 22 34C16.5 34 13 29.5 13 25C13 18 20 13 24 10Z" fill="url(#seGrad)" />
-  <path d="M24 10C26 15 28 20 28 24C28 27.3 25.3 30 22 30C18.7 30 16.5 27.5 16.5 25C16.5 21 21 16 24 10Z" fill="#0E1017" />
-  <circle cx="24" cy="18" r="2.5" fill="#FDE68A" />
-  <circle cx="34" cy="34" r="2" fill="#A78BFA" />
+  <rect width="48" height="48" rx="10" fill="url(#bgGlow)" />
+  <path d="M0 25C6 21 11 20 15 21C19 22 21 25 25 24C30 23 33 20 38 21C42 22 45 24 48 23V48H0V25Z" fill="#120F12" />
+  <path d="M25 5C31 11 33 16 31 21C30 25 26 28 22 27C18 26 16 22 17 18C18 13 21 9 25 5Z" fill="url(#seed)" />
+  <path d="M20 18C22 13 25 9 29 7" stroke="#FFF1DC" stroke-width="2.6" stroke-linecap="round" />
+  <path d="M24 24C22 29 19 31 15 32" stroke="url(#root)" stroke-width="2.7" stroke-linecap="round" />
+  <path d="M24 24C23 30 23 36 24 43" stroke="url(#root)" stroke-width="2.7" stroke-linecap="round" />
+  <path d="M25 24C28 29 32 32 38 33" stroke="url(#root)" stroke-width="2.7" stroke-linecap="round" />
+  <path d="M21 30C18 35 14 38 9 39" stroke="url(#root)" stroke-width="1.9" stroke-linecap="round" />
+  <path d="M27 31C31 36 35 39 40 40" stroke="url(#root)" stroke-width="1.9" stroke-linecap="round" />
 </svg>`;
 
 export const authOptions: NextAuthOptions = {
