@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm ci && prisma generate && next build",
+    "build": "npm install && prisma generate && next build",
     "build:local": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
