@@ -6,7 +6,7 @@ import { ReactNode, useEffect } from "react";
 
 interface AuthCheckProps {
   children: ReactNode;
-  role?: "TESTER" | "DEVELOPER";
+  role?: "TESTER" | "DEVELOPER" | "ADMIN";
 }
 
 export default function AuthCheck({ children, role }: AuthCheckProps) {
