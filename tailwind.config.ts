@@ -9,21 +9,24 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        obsidian: "#090314",
-        surface: "#130924",
-        stroke: "#2D1B4E",
-        royal: "#8B5CF6",
-        royalDeep: "#7C3AED",
-        aurum: "#FFD700",
-        amberGold: "#F59E0B",
+        obsidian: "#090A0F",
+        surface: "#0E1017",
+        surfaceRaised: "#121521",
+        stroke: "#262A36",
+        strokeStrong: "#3B314D",
+        royal: "#6D28D9",
+        royalDeep: "#4C1D95",
+        aurum: "#F59E0B",
+        amberGold: "#D97706",
+        muted: "#94A3B8",
       },
       boxShadow: {
-        neon: "0 0 36px rgba(139, 92, 246, 0.32)",
-        gold: "0 0 34px rgba(255, 215, 0, 0.22)",
+        neon: "0 0 36px rgba(109, 40, 217, 0.28)",
+        gold: "0 0 34px rgba(245, 158, 11, 0.18)",
       },
       backgroundImage: {
         "obsidian-radial":
-          "radial-gradient(circle at 20% 0%, rgba(139,92,246,0.24), transparent 32%), radial-gradient(circle at 82% 12%, rgba(245,158,11,0.18), transparent 28%), linear-gradient(180deg, #090314 0%, #0D061A 58%, #090314 100%)",
+          "radial-gradient(circle at 18% 0%, rgba(109,40,217,0.2), transparent 32%), radial-gradient(circle at 82% 12%, rgba(245,158,11,0.14), transparent 26%), linear-gradient(180deg, #090A0F 0%, #10121A 58%, #090A0F 100%)",
       },
       animation: {
         pulseGlow: "pulseGlow 2.8s ease-in-out infinite",

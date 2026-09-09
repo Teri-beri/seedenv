@@ -6,12 +6,12 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#090314",
-  "theme_color": "#090314",
+  "background_color": "#090A0F",
+  "theme_color": "#090A0F",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/seedenv-icon.svg",
+      "src": "/seedenv-logo.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

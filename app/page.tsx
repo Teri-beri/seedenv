@@ -88,29 +88,29 @@ export default async function Home() {
   const progress = rankProgress(tester.rankTier, tester.xpPoints);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_15%_0%,rgba(139,92,246,0.22),transparent_30%),radial-gradient(circle_at_85%_8%,rgba(255,215,0,0.16),transparent_24%),linear-gradient(180deg,#090314_0%,#12071F_48%,#090314_100%)] pb-24 text-white lg:pb-0">
+    <main className="terminal-grid min-h-screen bg-[radial-gradient(circle_at_16%_0%,rgba(109,40,217,0.18),transparent_30%),radial-gradient(circle_at_86%_10%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_48%,#090A0F_100%)] pb-24 text-white lg:pb-0">
       <DeveloperHeader />
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <section className="grid min-h-[78vh] items-end gap-8 py-8 lg:grid-cols-[1.05fr_0.95fr] lg:py-14">
+        <section className="grid min-h-[calc(100vh-96px)] items-center gap-8 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:py-14">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-aurum/24 bg-aurum/10 px-4 py-2 text-sm font-bold text-amber-100">
+            <div className="inline-flex items-center gap-2 rounded-full border border-aurum/20 bg-aurum/8 px-4 py-2 text-sm font-bold text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
               <Radar className="size-4 text-aurum" /> Seed authentic beta communities. Get paid. Fuel the launch.
             </div>
-            <h1 className="mt-6 max-w-4xl text-5xl font-black leading-[0.98] tracking-tight text-white sm:text-7xl">
-              SeedEnv turns beta testing into paid launch momentum.
+            <h1 className="hero-title mt-6 max-w-4xl text-5xl font-black leading-[0.96] tracking-tight text-white sm:text-6xl xl:text-7xl">
+              Launch data infrastructure for app teams.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-white/64">
               Indie app builders fund authentic early missions. Testers claim timed quests, seed real community data, submit proof, and earn cash plus XP when developers approve the work.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <RoleSwitcher />
-              <a className="inline-flex items-center gap-2 rounded-full border border-stroke bg-white/5 px-5 py-3 text-sm font-bold text-white/72" href="#developer-studio">
+              <a className="inline-flex items-center gap-2 rounded-full border border-stroke bg-surface/70 px-5 py-3 text-sm font-bold text-white/72 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:text-white" href="#developer-studio">
                 Open Developer Studio <ArrowUpRight className="size-4" />
               </a>
             </div>
           </div>
           <section className="luxury-panel rounded-[2rem] p-5">
-            <div className="flex items-center justify-between">
+            <div className="panel-content flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.28em] text-aurum">Tester HUD</p>
                 <h2 className="mt-2 text-2xl font-black">{tester.username}</h2>
@@ -119,18 +119,18 @@ export default async function Home() {
                 {tester.avatarUrl ? <Image src={tester.avatarUrl} alt="" fill sizes="64px" className="object-cover" /> : <Crown className="m-5 size-6 text-aurum" />}
               </div>
             </div>
-            <div className="mt-5 grid grid-cols-3 gap-3">
+            <div className="panel-content mt-5 grid grid-cols-3 gap-3">
               <HudMetric icon={<WalletCards className="size-5" />} label="Cash" value={formatCents(tester.walletBalanceCents)} gold />
               <HudMetric icon={<Trophy className="size-5" />} label="XP" value={tester.xpPoints.toLocaleString()} />
               <HudMetric icon={<Flame className="size-5" />} label="Streak" value={`${tester.streakDays}d`} />
             </div>
-            <div className="mt-5 rounded-3xl border border-stroke bg-black/24 p-4">
+            <div className="panel-content mt-5 rounded-3xl border border-stroke bg-black/24 p-4">
               <div className="flex items-center justify-between gap-4">
                 <span className="text-sm font-bold text-violet-100">{progress.label}</span>
                 <span className="font-mono text-xs text-white/48">{progress.remainingXp} XP to {progress.nextLabel}</span>
               </div>
               <div className="mt-3 h-3 overflow-hidden rounded-full bg-white/8">
-                <div className="h-full rounded-full bg-gradient-to-r from-royal to-aurum shadow-[0_0_24px_rgba(255,215,0,0.32)]" style={{ width: `${progress.percent}%` }} />
+                <div className="h-full rounded-full bg-gradient-to-r from-royal to-aurum shadow-[0_0_24px_rgba(245,158,11,0.22)]" style={{ width: `${progress.percent}%` }} />
               </div>
               <p className="mt-3 text-xs text-white/46">Daily streak multiplier: {(1 + Math.min(tester.streakDays, 14) * 0.03).toFixed(2)}x XP</p>
             </div>
@@ -145,7 +145,7 @@ export default async function Home() {
             </div>
             <div className="hidden gap-3 md:flex">
               {leaderboard.map((user, index) => (
-                <div key={user.id} className="rounded-2xl border border-stroke bg-white/5 px-4 py-3">
+                <div key={user.id} className="rounded-2xl border border-stroke bg-surface/70 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                   <p className="font-mono text-xs text-aurum">#{index + 1}</p>
                   <p className="text-sm font-bold">{user.username}</p>
                 </div>
@@ -166,7 +166,7 @@ export default async function Home() {
 
 function HudMetric({ icon, label, value, gold = false }: { icon: React.ReactNode; label: string; value: string; gold?: boolean }) {
   return (
-    <div className="rounded-3xl border border-stroke bg-white/[0.035] p-4">
+    <div className="rounded-3xl border border-stroke bg-surfaceRaised/72 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
       <div className={gold ? "text-aurum" : "text-violet-200"}>{icon}</div>
       <p className="mt-3 text-xs uppercase tracking-[0.18em] text-white/40">{label}</p>
       <p className={`mt-1 font-mono text-lg font-black ${gold ? "gold-text" : "text-white"}`}>{value}</p>

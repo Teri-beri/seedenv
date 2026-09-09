@@ -1,14 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #090314;
-  --foreground: #fff7d6;
-  --surface: #130924;
-  --stroke: #2d1b4e;
-  --royal: #8b5cf6;
-  --royal-deep: #7c3aed;
-  --aurum: #ffd700;
-  --amber-gold: #f59e0b;
+  --background: #090a0f;
+  --foreground: #f8fafc;
+  --surface: #0e1017;
+  --surface-raised: #121521;
+  --stroke: #262a36;
+  --stroke-strong: #3b314d;
+  --royal: #6d28d9;
+  --royal-deep: #4c1d95;
+  --aurum: #f59e0b;
+  --amber-gold: #d97706;
+  --muted: #94a3b8;
 }
 
 @theme inline {
@@ -16,11 +19,14 @@
   --color-foreground: var(--foreground);
   --color-obsidian: var(--background);
   --color-surface: var(--surface);
+  --color-surfaceRaised: var(--surface-raised);
   --color-stroke: var(--stroke);
+  --color-strokeStrong: var(--stroke-strong);
   --color-royal: var(--royal);
   --color-royalDeep: var(--royal-deep);
   --color-aurum: var(--aurum);
   --color-amberGold: var(--amber-gold);
+  --color-muted: var(--muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -29,6 +35,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
+  text-rendering: geometricPrecision;
 }
 
 button,
@@ -40,14 +47,52 @@ select {
 }
 
 .luxury-panel {
-  border: 1px solid rgba(45, 27, 78, 0.95);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(38, 42, 54, 0.92);
   background:
-    linear-gradient(145deg, rgba(19, 9, 36, 0.94), rgba(12, 4, 24, 0.96)),
-    radial-gradient(circle at 20% 0%, rgba(139, 92, 246, 0.18), transparent 36%);
-  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.34);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+    radial-gradient(circle at 18% 0%, rgba(109, 40, 217, 0.18), transparent 34%),
+    linear-gradient(145deg, rgba(14, 16, 23, 0.96), rgba(9, 10, 15, 0.98));
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.luxury-panel::before {
+  pointer-events: none;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), transparent 28%, rgba(109, 40, 217, 0.1));
+  opacity: 0.72;
+}
+
+.luxury-panel > * {
+  position: relative;
+  z-index: 1;
 }
 
 .gold-text {
-  color: #ffd700;
-  text-shadow: 0 0 18px rgba(255, 215, 0, 0.24);
+  color: #f59e0b;
+  text-shadow: 0 0 18px rgba(245, 158, 11, 0.18);
+}
+
+.terminal-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.panel-content {
+  position: relative;
+  z-index: 1;
+}
+
+@media (min-width: 1024px) and (max-height: 720px) {
+  .hero-title {
+    font-size: clamp(2.75rem, 4.6vw, 4rem);
+    line-height: 0.98;
+  }
 }

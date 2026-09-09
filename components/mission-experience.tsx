@@ -109,7 +109,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
   }
 
   function celebrate() {
-    confetti({ particleCount: 180, spread: 82, origin: { y: 0.68 }, colors: ["#FFD700", "#8B5CF6", "#7C3AED", "#FFF7D6"] });
+    confetti({ particleCount: 180, spread: 82, origin: { y: 0.68 }, colors: ["#F59E0B", "#D97706", "#6D28D9", "#FDE68A"] });
     void animate(scope.current, { scale: [0.96, 1.04, 1], opacity: [0.6, 1] }, { duration: 0.7 });
   }
 

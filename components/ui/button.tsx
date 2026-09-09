@@ -4,13 +4,13 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-aurum disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 rounded-xl text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-aurum disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        primary: "bg-aurum text-obsidian shadow-[0_0_30px_rgba(255,215,0,0.22)] hover:bg-amberGold",
-        royal: "bg-royal text-white shadow-[0_0_30px_rgba(139,92,246,0.26)] hover:bg-royalDeep",
-        ghost: "border border-stroke bg-white/5 text-white hover:bg-white/10",
+        primary: "border border-amberGold/40 bg-gradient-to-b from-aurum to-amberGold text-obsidian shadow-[0_14px_34px_rgba(245,158,11,0.18)] hover:brightness-110",
+        royal: "border border-violet-400/20 bg-gradient-to-b from-royal to-royalDeep text-white shadow-[0_14px_34px_rgba(109,40,217,0.22)] hover:brightness-110",
+        ghost: "border border-stroke bg-white/[0.035] text-white/86 hover:border-strokeStrong hover:bg-white/[0.075]",
         danger: "bg-red-500/15 text-red-200 ring-1 ring-red-400/30 hover:bg-red-500/25",
       },
       size: {
