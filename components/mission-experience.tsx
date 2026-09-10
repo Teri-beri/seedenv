@@ -190,7 +190,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
                   <p className="mt-2 text-xs text-white/50">{spotsLeft} / {mission.totalSlots} spots left</p>
                 </div>
                 <Button className="mt-5 w-full" onClick={() => handleClaim(mission)} disabled={isPending || spotsLeft <= 0}>
-                  <Zap className="size-4" /> Claim Mission
+                  <Zap className="size-4" /> Plant Your Seed
                 </Button>
               </motion.article>
             );

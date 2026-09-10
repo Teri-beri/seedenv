@@ -78,7 +78,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
             </nav>
           ) : (
             <nav className="flex items-center gap-2 sm:gap-3">
-              <a className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" href="#missions">Explore Missions</a>
+              <a className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" href="#missions">New Drops</a>
               <a className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" href="#developers">
                 For Developers
               </a>
@@ -102,7 +102,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
             SeedEnv lets testers preview active missions, compare cash rewards, and authenticate only when they are ready to claim work or submit proof.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button onClick={() => goToProtectedAction("/dashboard", "Claiming missions")}>Claim a Mission</Button>
+            <Button onClick={() => goToProtectedAction("/dashboard", "Planting seeds")}>Plant Your Seed</Button>
             <Button variant="ghost" onClick={() => goToProtectedAction("/console?intent=new-drop", "Creating deployments")}>New Drop</Button>
           </div>
           {guestNotice ? <p className="mt-4 max-w-xl rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 text-sm leading-6 text-neutral-300">{guestNotice}</p> : null}
@@ -160,7 +160,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
                   <p className="mt-2 text-xs text-neutral-500">{spotsLeft} / {mission.totalSlots} spots left</p>
                 </div>
                 <Button className="mt-5 w-full" onClick={() => goToProtectedAction(`/dashboard?claim=${mission.id}`, `Claiming ${mission.title}`)} disabled={spotsLeft <= 0}>
-                  <Zap className="size-4" /> Claim Mission
+                  <Zap className="size-4" /> Plant Your Seed
                 </Button>
                 {index === 0 ? (
                   <button className="mt-3 flex w-full items-center justify-center gap-2 text-xs font-semibold text-neutral-500 transition-colors hover:text-neutral-300" onClick={() => goToProtectedAction(`/dashboard?claim=${mission.id}`, "Submitting proof")} type="button">
