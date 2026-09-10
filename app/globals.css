@@ -92,6 +92,14 @@ select {
   background-size: 44px 44px;
 }
 
+.seedenv-ambient-grid {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1px, transparent 0),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 22px 22px, 64px 64px, 64px 64px;
+}
+
 .panel-content {
   position: relative;
   z-index: 1;

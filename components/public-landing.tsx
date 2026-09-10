@@ -1,11 +1,11 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { LockKeyhole, Sparkles, Sprout, WalletCards, Zap } from "lucide-react";
+import { Coins, Gem, LockKeyhole, Radio, Sparkles, Sprout, Swords, WalletCards, Zap } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { CSSProperties, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatCents } from "@/lib/utils";
 
@@ -30,6 +30,30 @@ type Viewer = {
   image: string | null;
 } | null;
 
+type MissionTier = {
+  label: string;
+  className: string;
+};
+
+function missionTier(mission: Mission): MissionTier {
+  if (mission.bountyPerTaskUsd >= 5) {
+    return {
+      label: "Elite Bounty",
+      className: "border-amber-400/30 bg-amber-500/10 text-amber-200 shadow-[0_0_28px_rgba(245,158,11,0.12)]",
+    };
+  }
+  if (mission.totalSlots - mission.claimedSlots <= 12) {
+    return {
+      label: "Tier 2: Pioneer",
+      className: "border-violet-400/30 bg-violet-500/10 text-violet-200 shadow-[0_0_28px_rgba(139,92,246,0.12)]",
+    };
+  }
+  return {
+    label: "Tier 1: Scout",
+    className: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200 shadow-[0_0_28px_rgba(16,185,129,0.1)]",
+  };
+}
+
 export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewer: Viewer }) {
   const { status } = useSession();
   const router = useRouter();
@@ -51,7 +75,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
   }
 
   return (
-    <main className="terminal-grid min-h-screen bg-[radial-gradient(circle_at_16%_0%,rgba(109,40,217,0.18),transparent_30%),radial-gradient(circle_at_86%_10%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_48%,#090A0F_100%)] pb-16 text-white">
+    <main className="seedenv-ambient-grid min-h-screen bg-[radial-gradient(circle_at_16%_0%,rgba(109,40,217,0.2),transparent_30%),radial-gradient(circle_at_86%_10%,rgba(245,158,11,0.12),transparent_24%),radial-gradient(circle_at_50%_52%,rgba(16,185,129,0.055),transparent_32%),linear-gradient(180deg,#090A0F_0%,#10131C_48%,#090A0F_100%)] pb-16 text-white">
       <header className="sticky top-0 z-40 border-b border-[#1F2430] bg-[#090A0F]/86 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <Link className="flex items-center gap-3" href="/">
@@ -102,24 +126,24 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
             Seed authentic communities before launch day.
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-neutral-400">
-            SeedEnv lets testers preview active missions, compare cash rewards, and authenticate only when they are ready to claim work or submit proof.
+            SeedEnv lets testers preview active missions, compare loot rewards, and authenticate only when they are ready to join the board.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button onClick={() => goToProtectedAction("/dashboard", "Planting seeds")}>Plant Your Seed</Button>
+            <Button onClick={() => goToProtectedAction("/dashboard", "Claiming seed missions")}>Claim Seed</Button>
             <Button variant="ghost" onClick={() => goToProtectedAction("/console?intent=new-drop", "Creating deployments")}>New Drop</Button>
           </div>
           {guestNotice ? <p className="mt-4 max-w-xl rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 text-sm leading-6 text-neutral-300">{guestNotice}</p> : null}
         </div>
 
-        <aside className="luxury-panel rounded-2xl p-5">
-          <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Reward snapshot</p>
+        <aside className="luxury-panel rounded-2xl border-white/10 bg-zinc-900/80 p-5 backdrop-blur-md">
+          <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Loot snapshot</p>
           <div className="mt-5 grid gap-3">
             {missions.slice(0, 3).map((mission) => (
-              <div key={mission.id} className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 backdrop-blur-md transition-all hover:border-violet-500/30">
+              <div key={mission.id} className="rounded-2xl border border-white/10 bg-zinc-950/45 p-4 backdrop-blur-md transition-all hover:border-amber-500/50">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-semibold text-white">{mission.title}</p>
-                    <p className="mt-1 text-xs text-neutral-500">{mission.targetVibe}</p>
+                    <p className="mt-1 text-xs text-zinc-400">{mission.targetVibe}</p>
                   </div>
                   <p className="font-mono text-lg font-black text-amber-500">{formatCents(Math.round(mission.bountyPerTaskUsd * 100))}</p>
                 </div>
@@ -132,47 +156,26 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" id="missions">
         <div className="mb-5 flex items-end justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Public Browse</p>
-            <h2 className="mt-2 text-4xl font-black tracking-tight text-white">Active Seed Missions</h2>
+            <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Quest Board</p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <h2 className="text-4xl font-black tracking-tight text-white">Active Seed Missions</h2>
+              <span className="relative flex size-3">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                <span className="relative inline-flex size-3 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.75)]" />
+              </span>
+              <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-200">Live board</span>
+            </div>
           </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {missions.map((mission, index) => {
-            const spotsLeft = mission.totalSlots - mission.claimedSlots;
-            const claimedPercent = (mission.claimedSlots / mission.totalSlots) * 100;
-            return (
-              <article key={mission.id} className="luxury-panel rounded-2xl bg-[#0E1017]/80 p-5 backdrop-blur-md transition-all hover:border-violet-500/30">
-                <div className="flex items-start gap-4">
-                  <div className="relative size-16 overflow-hidden rounded-2xl bg-violet-950/60">
-                    {mission.iconUrl ? <Image src={mission.iconUrl} alt="" fill sizes="64px" className="object-cover" /> : <Sprout className="m-5 size-6 text-amber-500" />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="rounded-full bg-violet-950/50 px-3 py-1 text-xs font-bold text-violet-200">{mission.targetVibe}</span>
-                    <h3 className="mt-3 text-xl font-black text-white">{mission.title}</h3>
-                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-neutral-400">{mission.description}</p>
-                  </div>
-                </div>
-                <div className="mt-5 rounded-2xl border border-[#1F2430] bg-[#090A0F]/45 p-4 backdrop-blur-md transition-all hover:border-violet-500/30">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-mono text-lg font-black text-amber-500">{formatCents(Math.round(mission.bountyPerTaskUsd * 100))} CASH</span>
-                    <span className="font-mono text-violet-200">+ {Math.max(75, Math.round(mission.bountyPerTaskUsd * 32))} XP</span>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-                    <div className="h-full rounded-full bg-gradient-to-r from-violet-700 to-amber-500" style={{ width: `${claimedPercent}%` }} />
-                  </div>
-                  <p className="mt-2 text-xs text-neutral-500">{spotsLeft} / {mission.totalSlots} spots left</p>
-                </div>
-                <Button className="mt-5 w-full" onClick={() => goToProtectedAction(`/dashboard?claim=${mission.id}`, `Claiming ${mission.title}`)} disabled={spotsLeft <= 0}>
-                  <Zap className="size-4" /> Plant Your Seed
-                </Button>
-                {index === 0 ? (
-                  <button className="mt-3 flex w-full items-center justify-center gap-2 text-xs font-semibold text-neutral-500 transition-colors hover:text-neutral-300" onClick={() => goToProtectedAction(`/dashboard?claim=${mission.id}`, "Submitting proof")} type="button">
-                    <LockKeyhole className="size-3.5" /> Submit proof after authentication
-                  </button>
-                ) : null}
-              </article>
-            );
-          })}
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {missions.map((mission, index) => (
+            <QuestMissionCard
+              index={index}
+              key={mission.id}
+              mission={mission}
+              onProtectedAction={goToProtectedAction}
+            />
+          ))}
         </div>
       </section>
 
@@ -189,5 +192,94 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
         </div>
       </section>
     </main>
+  );
+}
+
+function QuestMissionCard({ index, mission, onProtectedAction }: {
+  index: number;
+  mission: Mission;
+  onProtectedAction: (callbackUrl: string, actionLabel: string) => void;
+}) {
+  const [spotlight, setSpotlight] = useState({ x: 50, y: 50 });
+  const spotsLeft = mission.totalSlots - mission.claimedSlots;
+  const claimedPercent = Math.min(100, Math.max(0, (mission.claimedSlots / mission.totalSlots) * 100));
+  const xpReward = Math.max(75, Math.round(mission.bountyPerTaskUsd * 32));
+  const tier = missionTier(mission);
+  const segmentCount = 12;
+  const filledSegments = Math.round((claimedPercent / 100) * segmentCount);
+
+  function moveSpotlight(event: React.MouseEvent<HTMLElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setSpotlight({
+      x: ((event.clientX - rect.left) / rect.width) * 100,
+      y: ((event.clientY - rect.top) / rect.height) * 100,
+    });
+  }
+
+  return (
+    <article
+      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/80 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-amber-500/50 hover:shadow-[0_24px_90px_rgba(245,158,11,0.13)]"
+      onMouseMove={moveSpotlight}
+      style={{ "--spotlight-x": `${spotlight.x}%`, "--spotlight-y": `${spotlight.y}%` } as CSSProperties}
+    >
+      <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: "radial-gradient(420px circle at var(--spotlight-x) var(--spotlight-y), rgba(245,158,11,0.16), transparent 42%)" }} />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.055),transparent_34%,rgba(109,40,217,0.08))]" />
+      <div className="relative z-10">
+        <div className="flex items-start gap-4">
+          <div className="relative size-16 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/70 shadow-inner">
+            {mission.iconUrl ? <Image src={mission.iconUrl} alt="" fill sizes="64px" className="object-cover transition-transform duration-300 group-hover:scale-105" /> : <Sprout className="m-5 size-6 text-amber-500" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ${tier.className}`}>{tier.label}</span>
+              <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] font-semibold text-zinc-400">{mission.targetVibe}</span>
+            </div>
+            <h3 className="mt-3 text-xl font-black tracking-tight text-white">{mission.title}</h3>
+            <p className="mt-2 line-clamp-2 text-sm leading-6 text-zinc-400">{mission.description}</p>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-white/10 bg-zinc-950/55 p-4 backdrop-blur-md">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">
+              <Swords className="size-3.5 text-amber-500" /> Loot Drops
+            </p>
+            <span className="font-mono text-xs text-zinc-500">Board #{index + 1}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <div className="flex items-center gap-2 text-xs font-semibold text-amber-200"><Coins className="size-4" /> Cash</div>
+              <p className="mt-2 font-mono text-lg font-black text-amber-500">{formatCents(Math.round(mission.bountyPerTaskUsd * 100))}</p>
+            </div>
+            <div className="rounded-xl border border-violet-400/20 bg-violet-500/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <div className="flex items-center gap-2 text-xs font-semibold text-violet-200"><Gem className="size-4" /> XP</div>
+              <p className="mt-2 font-mono text-lg font-black text-violet-200">+{xpReward}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-white/10 bg-zinc-950/45 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-400"><Radio className="size-3.5 text-emerald-400" /> Spots Claimed</p>
+            <p className="font-mono text-xs font-bold text-zinc-300">{mission.claimedSlots}/{mission.totalSlots} · {Math.round(claimedPercent)}%</p>
+          </div>
+          <div className="grid grid-cols-12 gap-1.5">
+            {Array.from({ length: segmentCount }).map((_, segment) => (
+              <span key={segment} className={`h-2 rounded-full ${segment < filledSegments ? "bg-gradient-to-r from-violet-600 to-amber-500 shadow-[0_0_14px_rgba(245,158,11,0.18)]" : "bg-white/10"}`} />
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-zinc-500">{spotsLeft} open validator slots remaining</p>
+        </div>
+
+        <Button className="mt-5 w-full border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_38px_rgba(245,158,11,0.12)] active:scale-[0.98]" onClick={() => onProtectedAction(`/dashboard?claim=${mission.id}`, `Claiming ${mission.title}`)} disabled={spotsLeft <= 0}>
+          <Zap className="size-4" /> Claim Seed
+        </Button>
+        {index === 0 ? (
+          <button className="mt-3 flex w-full items-center justify-center gap-2 text-xs font-semibold text-zinc-500 transition-colors hover:text-zinc-300" onClick={() => onProtectedAction(`/dashboard?claim=${mission.id}`, "Submitting proof")} type="button">
+            <LockKeyhole className="size-3.5" /> Submit proof after sign-in
+          </button>
+        ) : null}
+      </div>
+    </article>
   );
 }
