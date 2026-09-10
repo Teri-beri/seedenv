@@ -27,7 +27,7 @@ Open `https://seedenv.com` in production or your local development URL while run
 
 ## Install on Mobile
 
-SeedEnv is configured as an installable web app.
+SeedEnv is configured as an installable web app. Installed sessions open at `/dashboard`; unauthenticated users are routed to sign in first.
 
 On iPhone:
 
