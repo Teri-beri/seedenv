@@ -25,6 +25,23 @@ npm run dev
 
 Open `https://seedenv.com` in production or your local development URL while running `npm run dev`.
 
+## Install on Mobile
+
+SeedEnv is configured as an installable web app.
+
+On iPhone:
+
+1. Open `https://seedenv.com` in Safari.
+2. Tap the Share button.
+3. Tap **Add to Home Screen**.
+4. Confirm the name `SeedEnv`.
+
+On Android:
+
+1. Open `https://seedenv.com` in Chrome.
+2. Tap the menu button.
+3. Tap **Add to Home screen** or **Install app**.
+
 ## Required Production Environment
 
 - `DATABASE_URL`: PostgreSQL connection string.
