@@ -4,7 +4,8 @@ import confetti from "canvas-confetti";
 import { motion, useAnimate } from "framer-motion";
 import { ArrowUpRight, CheckCircle2, Clock3, Gift, ImagePlus, Lock, Sparkles, UploadCloud, Zap } from "lucide-react";
 import Image from "next/image";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { claimTaskSlot, submitTaskProof } from "@/app/actions/submissionActions";
 import { Button } from "@/components/ui/button";
 import { formatCents } from "@/lib/utils";
@@ -67,6 +68,7 @@ function Countdown({ expiresAt }: { expiresAt: Date | null }) {
 }
 
 export function MissionExperience({ missions }: { missions: Mission[] }) {
+  const searchParams = useSearchParams();
   const [activeMission, setActiveMission] = useState<Mission | null>(null);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
@@ -77,6 +79,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [scope, animate] = useAnimate();
+  const autoClaimedMission = useRef<string | null>(null);
 
   const payoutCents = activeMission ? Math.round(activeMission.bountyPerTaskUsd * 100) : 0;
   const xpGain = Math.max(75, Math.round((payoutCents / 100) * 32));
@@ -96,6 +99,16 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
       }
     });
   }
+
+  useEffect(() => {
+    const claimId = searchParams.get("claim");
+    if (!claimId || autoClaimedMission.current === claimId) return;
+    const mission = missions.find((item) => item.id === claimId);
+    if (!mission) return;
+    autoClaimedMission.current = claimId;
+    const timeout = window.setTimeout(() => void handleClaim(mission), 0);
+    return () => window.clearTimeout(timeout);
+  }, [missions, searchParams]);
 
   async function handleFile(file: File | null) {
     if (!file) return;
