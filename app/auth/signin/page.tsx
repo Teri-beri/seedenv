@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 
@@ -43,7 +44,7 @@ export default function SignInPage() {
         <div className="mb-10 text-center">
           <div className="mb-6 flex justify-center">
             <div className="relative size-20 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#090A0F] shadow-lg shadow-amber-500/10">
-              <Image src="/seedenv-logo.png" alt="SeedEnv" fill sizes="80px" className="object-contain" priority />
+              <Image src="/seedenv-logo.png" alt="SeedEnv" fill sizes="80px" className="scale-125 object-cover" priority />
             </div>
           </div>
           <h1 className="text-3xl font-bold text-amber-500">Welcome to SeedEnv</h1>
@@ -86,6 +87,9 @@ export default function SignInPage() {
             {loading ? "Sending link..." : "Authenticate (2FA)"}
           </button>
         </form>
+        <Link className="mt-6 block text-center text-sm font-semibold text-neutral-500 transition-colors hover:text-neutral-200" href="/">
+          Explore public site
+        </Link>
       </div>
     </div>
   );

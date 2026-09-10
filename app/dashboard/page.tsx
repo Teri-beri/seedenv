@@ -38,7 +38,7 @@ export default async function DashboardPage() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
           <div className="relative size-11 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
-            <Image src="/seedenv-logo.png" alt="SeedEnv" fill sizes="44px" className="object-contain" />
+            <Image src="/seedenv-logo.png" alt="SeedEnv" fill sizes="44px" className="scale-125 object-cover" />
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.32em] text-amber-500">SeedEnv</p>

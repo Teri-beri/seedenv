@@ -16,7 +16,7 @@ function getResendApiKey() {
 
 const authEmailFrom = cleanEnv(process.env.AUTH_EMAIL_FROM) || "SeedEnv Authentication <auth@mail.seedenv.com>";
 
-const seedenvLogo = `<img src="https://seedenv.com/seedenv-logo.png" alt="SeedEnv" width="72" height="78" style="display:block;width:72px;height:78px;border-radius:16px;margin:0 auto;" />`;
+const seedenvLogo = `<img src="https://seedenv.com/seedenv-logo.png" alt="SeedEnv" width="72" height="78" style="display:block;width:72px;height:78px;border-radius:16px;margin:0 auto;object-fit:cover;" />`;
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
