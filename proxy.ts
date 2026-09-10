@@ -8,6 +8,7 @@ const roleHome = {
 } as const;
 
 const protectedRoutes = [
+  { prefix: "/account", role: null, strictRole: false },
   { prefix: "/dashboard", role: "TESTER", strictRole: false },
   { prefix: "/console", role: "DEVELOPER", strictRole: false },
   { prefix: "/admin", role: "ADMIN", strictRole: true },
@@ -41,5 +42,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/console/:path*", "/admin/:path*"],
+  matcher: ["/account/:path*", "/dashboard/:path*", "/console/:path*", "/admin/:path*"],
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, CreditCard, Flame, Gamepad2, LayoutDashboard, Medal, PlusCircle, ShieldCheck, WalletCards } from "lucide-react";
+import { Boxes, CreditCard, Flame, Gamepad2, LayoutDashboard, Medal, PlusCircle, Settings, ShieldCheck, UserRound } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -11,7 +11,7 @@ const testerItems = [
   { label: "Seed Missions", icon: Gamepad2 },
   { label: "Active Missions", icon: Flame },
   { label: "Leaderboard", icon: Medal },
-  { label: "Vault", icon: WalletCards },
+  { label: "Account", icon: UserRound },
 ];
 
 const developerItems = [
@@ -70,6 +70,11 @@ export function DeveloperHeader() {
           <Button variant="ghost" size="sm" asChild>
             <Link href="/dashboard">Tester Dashboard</Link>
           </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/account">
+              <Settings className="size-4" /> Account
+            </Link>
+          </Button>
         </nav>
       </div>
     </header>
@@ -81,7 +86,7 @@ export function TesterBottomNav() {
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-stroke bg-obsidian/94 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
       <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
         {testerItems.map(({ label, icon: Icon }, index) => (
-          <Link key={label} className={`rounded-2xl px-2 py-2 text-center text-[10px] font-semibold ${index === 0 ? "bg-royal text-white shadow-[0_10px_24px_rgba(109,40,217,0.22)]" : "text-muted"}`} href="/dashboard">
+          <Link key={label} className={`rounded-2xl px-2 py-2 text-center text-[10px] font-semibold ${index === 0 ? "bg-royal text-white shadow-[0_10px_24px_rgba(109,40,217,0.22)]" : "text-muted"}`} href={label === "Account" ? "/account" : "/dashboard"}>
             <Icon className="mx-auto mb-1 size-4" />
             {label}
           </Link>

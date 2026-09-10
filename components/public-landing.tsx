@@ -69,6 +69,9 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
               <a className="hidden rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-violet-500/30 hover:text-white sm:inline-flex" href={dashboardHref}>
                 {viewer.role === "DEVELOPER" ? "Developer Console" : viewer.role === "ADMIN" ? "Admin" : "Tester Dashboard"}
               </a>
+              <a className="hidden rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-violet-500/30 hover:text-white sm:inline-flex" href="/account">
+                Account
+              </a>
               <div className="hidden items-center gap-2 rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-3 py-2 text-sm font-semibold text-amber-500 sm:flex">
                 <WalletCards className="size-4" /> {formatCents(viewer.walletBalanceCents)}
               </div>
