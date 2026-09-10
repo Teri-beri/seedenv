@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
+import { prepareSignupProfile } from "@/app/actions/signupActions";
 
 type SignupRole = "TESTER" | "DEVELOPER";
 
@@ -64,6 +65,12 @@ export function RoleSignInForm() {
   const requestedRole = searchParams.get("role");
   const [role, setRole] = useState<SignupRole>(() => inferInitialRole(requestedCallback, requestedRole));
   const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [bio, setBio] = useState("");
+  const [portfolioUrl, setPortfolioUrl] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [productUrl, setProductUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -76,9 +83,19 @@ export function RoleSignInForm() {
 
     try {
       const next = getSafeCallback(requestedCallback, role);
-      const callbackUrl = `/onboarding?role=${role}&next=${encodeURIComponent(next)}`;
-      const result = await signIn("email", {
+      const profile = await prepareSignupProfile({
+        role,
         email,
+        name,
+        username,
+        bio,
+        portfolioUrl,
+        companyName,
+        productUrl,
+      });
+      const callbackUrl = `/onboarding?${profile.onboardingParams}&next=${encodeURIComponent(next)}`;
+      const result = await signIn("email", {
+        email: profile.email,
         redirect: false,
         callbackUrl,
       });
@@ -153,6 +170,32 @@ export function RoleSignInForm() {
         )}
 
         <form onSubmit={handleSignIn} className="mt-6 space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm font-medium text-neutral-300" htmlFor="name">
+              Display Name
+              <input
+                className="mt-2 block w-full rounded-lg border border-[#2A2F3D] bg-[#0E1017] px-4 py-3 text-white placeholder-neutral-600 outline-none transition-all focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
+                id="name"
+                onChange={(event) => setName(event.target.value)}
+                placeholder={role === "DEVELOPER" ? "Studio lead name" : "Public tester name"}
+                required
+                value={name}
+              />
+            </label>
+            <label className="block text-sm font-medium text-neutral-300" htmlFor="username">
+              Username
+              <input
+                className="mt-2 block w-full rounded-lg border border-[#2A2F3D] bg-[#0E1017] px-4 py-3 text-white placeholder-neutral-600 outline-none transition-all focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
+                id="username"
+                onChange={(event) => setUsername(event.target.value)}
+                pattern="[A-Za-z0-9_]{3,32}"
+                placeholder={role === "DEVELOPER" ? "launch_studio" : "core_validator"}
+                required
+                value={username}
+              />
+            </label>
+          </div>
+
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-neutral-300">
               {selected.emailLabel}
@@ -167,6 +210,59 @@ export function RoleSignInForm() {
               className="mt-2 block w-full rounded-lg border border-[#2A2F3D] bg-[#0E1017] px-4 py-3 text-white placeholder-neutral-600 outline-none transition-all focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
             />
           </div>
+
+          <div>
+            <label htmlFor="bio" className="block text-sm font-medium text-neutral-300">
+              {role === "DEVELOPER" ? "Launch Goals" : "Tester Profile"}
+            </label>
+            <textarea
+              className="mt-2 block min-h-24 w-full rounded-lg border border-[#2A2F3D] bg-[#0E1017] px-4 py-3 text-white placeholder-neutral-600 outline-none transition-all focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
+              id="bio"
+              onChange={(event) => setBio(event.target.value)}
+              placeholder={role === "DEVELOPER" ? "What kind of product are you launching and what validation do you need?" : "What apps do you like testing, and what feedback are you best at giving?"}
+              required
+              value={bio}
+            />
+          </div>
+
+          {role === "DEVELOPER" ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm font-medium text-neutral-300" htmlFor="companyName">
+                Company / Studio
+                <input
+                  className="mt-2 block w-full rounded-lg border border-[#2A2F3D] bg-[#0E1017] px-4 py-3 text-white placeholder-neutral-600 outline-none transition-all focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
+                  id="companyName"
+                  onChange={(event) => setCompanyName(event.target.value)}
+                  placeholder="Seed Studio"
+                  required
+                  value={companyName}
+                />
+              </label>
+              <label className="block text-sm font-medium text-neutral-300" htmlFor="productUrl">
+                Product URL
+                <input
+                  className="mt-2 block w-full rounded-lg border border-[#2A2F3D] bg-[#0E1017] px-4 py-3 text-white placeholder-neutral-600 outline-none transition-all focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
+                  id="productUrl"
+                  onChange={(event) => setProductUrl(event.target.value)}
+                  placeholder="https://yourapp.com"
+                  type="url"
+                  value={productUrl}
+                />
+              </label>
+            </div>
+          ) : (
+            <label className="block text-sm font-medium text-neutral-300" htmlFor="portfolioUrl">
+              Portfolio / Social Proof URL
+              <input
+                className="mt-2 block w-full rounded-lg border border-[#2A2F3D] bg-[#0E1017] px-4 py-3 text-white placeholder-neutral-600 outline-none transition-all focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20"
+                id="portfolioUrl"
+                onChange={(event) => setPortfolioUrl(event.target.value)}
+                placeholder="https://yourprofile.com"
+                type="url"
+                value={portfolioUrl}
+              />
+            </label>
+          )}
 
           <button
             type="submit"

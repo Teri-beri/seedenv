@@ -8,6 +8,10 @@ const accountSettingsSchema = z.object({
   name: z.string().trim().max(80).optional(),
   username: z.string().trim().min(2).max(40),
   avatarUrl: z.string().trim().url().optional().or(z.literal("")),
+  bio: z.string().trim().max(240).optional(),
+  portfolioUrl: z.string().trim().url().optional().or(z.literal("")),
+  companyName: z.string().trim().max(100).optional(),
+  productUrl: z.string().trim().url().optional().or(z.literal("")),
 });
 
 export type AccountSettingsInput = z.infer<typeof accountSettingsSchema>;
@@ -23,6 +27,10 @@ export async function updateAccountSettings(data: AccountSettingsInput) {
       username: input.username,
       avatarUrl: input.avatarUrl || null,
       image: input.avatarUrl || user.image || null,
+      bio: input.bio || null,
+      portfolioUrl: input.portfolioUrl || null,
+      companyName: input.companyName || null,
+      productUrl: input.productUrl || null,
     },
     select: {
       id: true,

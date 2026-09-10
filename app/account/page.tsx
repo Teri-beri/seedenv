@@ -63,7 +63,7 @@ export default async function AccountPage() {
           </header>
 
           <section className="mt-10 grid gap-6 lg:grid-cols-[380px_1fr]">
-            <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, role: user.role }} />
+            <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, bio: user.bio, portfolioUrl: user.portfolioUrl, companyName: user.companyName, productUrl: user.productUrl, role: user.role }} />
 
             <div className="space-y-6">
               <section className="luxury-panel rounded-2xl p-6">

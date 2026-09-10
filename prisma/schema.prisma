@@ -68,6 +68,10 @@ model User {
   role                   UserRole            @default(TESTER)
   username               String              @default("SeedEnv Member")
   avatarUrl              String?
+  bio                    String?
+  portfolioUrl           String?
+  companyName            String?
+  productUrl             String?
   walletBalanceCents     Int                 @default(0)
   xpPoints               Int                 @default(0)
   rankTier               RankTier            @default(ALPHA_SEEDER)

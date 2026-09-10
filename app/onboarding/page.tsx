@@ -16,7 +16,22 @@ function cleanRequestedRole(value: string | undefined) {
   return null;
 }
 
-export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ role?: string; next?: string }> }) {
+function cleanText(value: string | undefined, fallback = "") {
+  return (value || fallback).trim();
+}
+
+function cleanUrl(value: string | undefined) {
+  const candidate = value?.trim();
+  if (!candidate) return null;
+  try {
+    const url = new URL(candidate);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ role?: string; next?: string; name?: string; username?: string; bio?: string; portfolioUrl?: string; companyName?: string; productUrl?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/auth/signin");
 
@@ -25,10 +40,18 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   const nextPath = cleanNextPath(params.next);
   const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
 
-  if (user && requestedRole && user.role !== UserRole.ADMIN && user.role !== requestedRole) {
+  if (user && requestedRole && user.role !== UserRole.ADMIN) {
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { role: requestedRole },
+      data: {
+        role: requestedRole,
+        name: cleanText(params.name, undefined),
+        username: cleanText(params.username, "SeedEnv Member"),
+        bio: cleanText(params.bio, undefined),
+        portfolioUrl: cleanUrl(params.portfolioUrl),
+        companyName: requestedRole === UserRole.DEVELOPER ? cleanText(params.companyName, undefined) : null,
+        productUrl: requestedRole === UserRole.DEVELOPER ? cleanUrl(params.productUrl) : null,
+      },
     });
   }
 
