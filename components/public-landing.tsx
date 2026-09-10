@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { Coins, Gem, LockKeyhole, Radio, Sparkles, Sprout, Swords, WalletCards, Zap } from "lucide-react";
+import { Coins, Download, Gem, LockKeyhole, MoreVertical, Plus, Radio, Share, Smartphone, Sparkles, Sprout, Swords, WalletCards, Zap } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -58,6 +58,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
   const { status } = useSession();
   const router = useRouter();
   const [guestNotice, setGuestNotice] = useState("");
+  const [installPlatform, setInstallPlatform] = useState<"ios" | "android">("ios");
 
   const isLoggedIn = status === "authenticated" || Boolean(viewer);
   const dashboardHref = viewer?.role === "DEVELOPER" ? "/console" : viewer?.role === "ADMIN" ? "/admin" : "/dashboard";
@@ -183,6 +184,64 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
               onProtectedAction={goToProtectedAction}
             />
           ))}
+        </div>
+      </section>
+
+      <section className="mx-auto mt-12 max-w-7xl px-4 sm:mt-16 sm:px-6 lg:px-8" id="install">
+        <div className="luxury-panel rounded-2xl p-5 sm:p-8">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-amber-500"><Download className="size-3.5" /> Install SeedEnv</p>
+              <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Keep the quest board one tap away.</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">Add SeedEnv to your home screen for a focused, full-screen workspace.</p>
+            </div>
+            <div className="grid grid-cols-2 rounded-xl border border-white/10 bg-zinc-950/60 p-1" role="tablist" aria-label="Installation instructions">
+              <button
+                aria-selected={installPlatform === "ios"}
+                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition-colors sm:px-4 sm:text-sm ${installPlatform === "ios" ? "bg-white text-zinc-950" : "text-zinc-400 hover:text-white"}`}
+                onClick={() => setInstallPlatform("ios")}
+                role="tab"
+                type="button"
+              >
+                iOS Safari
+              </button>
+              <button
+                aria-selected={installPlatform === "android"}
+                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition-colors sm:px-4 sm:text-sm ${installPlatform === "android" ? "bg-white text-zinc-950" : "text-zinc-400 hover:text-white"}`}
+                onClick={() => setInstallPlatform("android")}
+                role="tab"
+                type="button"
+              >
+                Android Chrome
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" role="tabpanel">
+            {(installPlatform === "ios" ? [
+              { icon: Share, label: "Tap Share", text: "Tap the square Share button with the upward arrow in Safari's bottom bar." },
+              { icon: Plus, label: "Add to Home Screen", text: "Scroll down the action sheet and tap Add to Home Screen." },
+              { icon: Plus, label: "Confirm Add", text: "Review the SeedEnv title, then tap Add in the top-right corner." },
+              { icon: Smartphone, label: "Launch SeedEnv", text: "Open SeedEnv from your Home Screen in full-screen standalone mode." },
+            ] : [
+              { icon: MoreVertical, label: "Open the menu", text: "Tap the three-dot menu in Chrome's top-right corner, or use the install prompt when it appears." },
+              { icon: Download, label: "Install app", text: "Select Install app or Add to Home screen." },
+              { icon: Download, label: "Confirm Install", text: "Confirm the dialog by tapping Install." },
+              { icon: Smartphone, label: "Open SeedEnv", text: "Launch SeedEnv from your app drawer or home screen without the URL bar." },
+            ]).map((step, index) => {
+              const StepIcon = step.icon;
+              return (
+                <div className="rounded-2xl border border-white/10 bg-zinc-950/45 p-4" key={step.label}>
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-500/10 text-amber-400"><StepIcon className="size-4" /></span>
+                    <span className="font-mono text-xs font-bold text-zinc-500">0{index + 1}</span>
+                  </div>
+                  <h3 className="mt-4 text-sm font-bold text-white">{step.label}</h3>
+                  <p className="mt-2 text-xs leading-5 text-zinc-400">{step.text}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
