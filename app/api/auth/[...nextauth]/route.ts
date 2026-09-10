@@ -14,7 +14,7 @@ function getResendApiKey() {
   return cleanEnv(process.env.RESEND_API_KEY);
 }
 
-const authEmailFrom = cleanEnv(process.env.AUTH_EMAIL_FROM) || "SeedEnv Authentication <auth@mail.seedenv.com>";
+const authEmailFrom = cleanEnv(process.env.AUTH_EMAIL_FROM) || "SeedEnv Authentication <auth@seedenv.com>";
 
 const seedenvLogo = `<img src="https://seedenv.com/seedenv-logo.png" alt="SeedEnv" width="72" height="78" style="display:block;width:72px;height:78px;border-radius:16px;margin:0 auto;object-fit:cover;" />`;
 
@@ -46,7 +46,7 @@ export const authOptions: NextAuthOptions = {
             from: provider.from,
             to: email,
             subject: "Verify your SeedEnv login",
-            text: `Authenticate your SeedEnv login: ${url}\n\nIf you did not request this login, you can safely ignore this email.`,
+            text: `Authenticate your SeedEnv login:\n${url}\n\nIf you did not request this login, you can safely ignore this email.`,
             html: `
               <div style="background:#090A0F;padding:40px 16px;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#FFFFFF;">
                 <div style="max-width:520px;margin:0 auto;border:1px solid #1F2430;background:rgba(14,16,23,0.92);border-radius:20px;padding:32px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,0.38);">

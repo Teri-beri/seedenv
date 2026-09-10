@@ -17,7 +17,7 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: AUTH_EMAIL_FROM
-        value: SeedEnv Authentication <auth@mail.seedenv.com>
+        value: SeedEnv Authentication <auth@seedenv.com>
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_PROOF_BUCKET
