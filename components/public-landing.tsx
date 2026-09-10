@@ -1,10 +1,10 @@
 "use client";
 
-import { signIn, useSession } from "next-auth/react";
-import { LockKeyhole, Sparkles, Sprout, WalletCards, X, Zap } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { LockKeyhole, Sparkles, Sprout, WalletCards, Zap } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { formatCents } from "@/lib/utils";
 
@@ -31,17 +31,17 @@ type Viewer = {
 
 export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewer: Viewer }) {
   const { status } = useSession();
-  const [authIntent, setAuthIntent] = useState<{ title: string; callbackUrl: string } | null>(null);
+  const router = useRouter();
 
   const isLoggedIn = status === "authenticated" || Boolean(viewer);
   const dashboardHref = viewer?.role === "DEVELOPER" ? "/console" : viewer?.role === "ADMIN" ? "/admin" : "/dashboard";
 
-  function requestAuth(title: string, callbackUrl: string) {
+  function goToAction(callbackUrl: string) {
     if (isLoggedIn) {
-      window.location.href = callbackUrl;
+      router.push(callbackUrl);
       return;
     }
-    setAuthIntent({ title, callbackUrl });
+    router.push(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
   }
 
   return (
@@ -73,10 +73,10 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
           ) : (
             <nav className="flex items-center gap-2 sm:gap-3">
               <a className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" href="#missions">Explore Missions</a>
-              <button className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" onClick={() => requestAuth("Create a SeedEnv deployment", "/console?intent=new-drop")} type="button">
+              <button className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" onClick={() => goToAction("/console?intent=new-drop")} type="button">
                 For Developers
               </button>
-              <Button onClick={() => requestAuth("Join SeedEnv", "/dashboard")}>
+              <Button onClick={() => goToAction("/dashboard")}>
                 Sign In / Join
               </Button>
             </nav>
@@ -96,8 +96,8 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
             SeedEnv lets testers preview active missions, compare cash rewards, and authenticate only when they are ready to claim work or submit proof.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button onClick={() => requestAuth("Claim your first mission", "/dashboard")}>Claim a Mission</Button>
-            <Button variant="ghost" onClick={() => requestAuth("Launch a developer deployment", "/console?intent=new-drop")}>New Drop</Button>
+            <Button onClick={() => goToAction("/dashboard")}>Claim a Mission</Button>
+            <Button variant="ghost" onClick={() => goToAction("/console?intent=new-drop")}>New Drop</Button>
           </div>
         </div>
 
@@ -152,11 +152,11 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
                   </div>
                   <p className="mt-2 text-xs text-neutral-500">{spotsLeft} / {mission.totalSlots} spots left</p>
                 </div>
-                <Button className="mt-5 w-full" onClick={() => requestAuth(`Claim ${mission.title}`, `/dashboard?claim=${mission.id}`)} disabled={spotsLeft <= 0}>
+                <Button className="mt-5 w-full" onClick={() => goToAction(`/dashboard?claim=${mission.id}`)} disabled={spotsLeft <= 0}>
                   <Zap className="size-4" /> Claim Mission
                 </Button>
                 {index === 0 ? (
-                  <button className="mt-3 flex w-full items-center justify-center gap-2 text-xs font-semibold text-neutral-500 transition-colors hover:text-neutral-300" onClick={() => requestAuth("Submit mission proof", `/dashboard?claim=${mission.id}`)} type="button">
+                  <button className="mt-3 flex w-full items-center justify-center gap-2 text-xs font-semibold text-neutral-500 transition-colors hover:text-neutral-300" onClick={() => goToAction(`/dashboard?claim=${mission.id}`)} type="button">
                     <LockKeyhole className="size-3.5" /> Submit proof after authentication
                   </button>
                 ) : null}
@@ -165,58 +165,6 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
           })}
         </div>
       </section>
-
-      {authIntent ? <AuthIntentModal intent={authIntent} onClose={() => setAuthIntent(null)} /> : null}
     </main>
-  );
-}
-
-function AuthIntentModal({ intent, onClose }: { intent: { title: string; callbackUrl: string }; onClose: () => void }) {
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [isPending, startTransition] = useTransition();
-
-  function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage("");
-    startTransition(async () => {
-      const result = await signIn("email", {
-        email,
-        redirect: false,
-        callbackUrl: intent.callbackUrl,
-      });
-      if (result?.error) {
-        setMessage("Email delivery failed. Check your address and try again.");
-        return;
-      }
-      setMessage("Magic link queued. Check your inbox and spam folder to continue.");
-    });
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-md">
-      <div className="w-full max-w-md rounded-2xl border border-[#1F2430] bg-[#0E1017] p-6 shadow-2xl shadow-black/50">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-500">Authentication required</p>
-            <h2 className="mt-2 text-2xl font-black text-white">{intent.title}</h2>
-            <p className="mt-2 text-sm leading-6 text-neutral-400">Enter your email and SeedEnv will return you to this action after verification.</p>
-          </div>
-          <button className="rounded-xl border border-[#1F2430] bg-black/20 p-2 text-neutral-400 hover:text-white" onClick={onClose} type="button">
-            <X className="size-4" />
-          </button>
-        </div>
-        {message ? <p className={`mt-5 rounded-lg p-3 text-sm ${message.startsWith("Magic") ? "bg-emerald-950/40 text-emerald-300" : "bg-red-950/40 text-red-300"}`}>{message}</p> : null}
-        <form className="mt-5 space-y-4" onSubmit={submit}>
-          <label className="block space-y-2 text-sm font-semibold text-neutral-300">
-            Email
-            <input className="w-full rounded-lg border border-[#2A2F3D] bg-[#090A0F] px-4 py-3 text-white outline-none transition-all placeholder:text-neutral-600 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20" onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" required type="email" value={email} />
-          </label>
-          <Button className="w-full" disabled={isPending || !email} type="submit">
-            {isPending ? "Sending link..." : "Send Magic Link"}
-          </Button>
-        </form>
-      </div>
-    </div>
   );
 }

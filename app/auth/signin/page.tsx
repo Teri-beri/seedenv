@@ -15,10 +15,12 @@ export default function SignInPage() {
     setMessage("");
 
     try {
+      const requestedCallback = new URLSearchParams(window.location.search).get("callbackUrl");
+      const callbackUrl = requestedCallback?.startsWith("/") ? requestedCallback : "/dashboard";
       const result = await signIn("email", {
         email,
         redirect: false,
-        callbackUrl: "/dashboard",
+        callbackUrl,
       });
 
       if (result?.error) {
