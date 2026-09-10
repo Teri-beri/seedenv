@@ -5,7 +5,16 @@ import NextAuth, { type NextAuthOptions } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
 
 const prisma = new PrismaClient();
-const authEmailFrom = process.env.AUTH_EMAIL_FROM || "SeedEnv Authentication <auth@mail.seedenv.com>";
+
+function cleanEnv(value: string | undefined) {
+  return value?.trim().replace(/^['"]|['"]$/g, "");
+}
+
+function getResendApiKey() {
+  return cleanEnv(process.env.RESEND_API_KEY);
+}
+
+const authEmailFrom = cleanEnv(process.env.AUTH_EMAIL_FROM) || "SeedEnv Authentication <auth@mail.seedenv.com>";
 
 const seedenvLogo = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
@@ -45,17 +54,21 @@ export const authOptions: NextAuthOptions = {
         port: 465,
         auth: {
           user: "resend",
-          pass: process.env.RESEND_API_KEY,
+          pass: getResendApiKey(),
         },
       },
       from: authEmailFrom,
       async sendVerificationRequest({ identifier: email, url, provider }) {
-        if (!process.env.RESEND_API_KEY) {
+        const resendApiKey = getResendApiKey();
+        if (!resendApiKey) {
           throw new Error("RESEND_API_KEY is required to send SeedEnv login emails.");
+        }
+        if (!resendApiKey.startsWith("re_")) {
+          throw new Error("RESEND_API_KEY must start with re_. Check for pasted quotes or the wrong Render environment value.");
         }
 
         try {
-          const resend = new Resend(process.env.RESEND_API_KEY);
+          const resend = new Resend(resendApiKey);
           const { data, error } = await resend.emails.send({
             from: provider.from,
             to: email,
@@ -107,6 +120,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: "/auth/signin",
+    error: "/auth/error",
   },
   secret: process.env.NEXTAUTH_SECRET,
 };

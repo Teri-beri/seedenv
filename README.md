@@ -64,3 +64,5 @@ Render does not receive local `.env` values. Set these in the Render dashboard b
 - `SUPABASE_PROOF_BUCKET=proof-screenshots`
 
 If `NEXTAUTH_SECRET` is missing, NextAuth will return `NO_SECRET` and protected routes will fail in production.
+
+Check `/api/auth/email-health` after deployment to verify auth email configuration without exposing secret values.

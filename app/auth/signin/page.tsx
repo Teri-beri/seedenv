@@ -23,7 +23,7 @@ export default function SignInPage() {
 
       if (result?.error) {
         console.error("Sign in error:", result.error);
-        setMessage("Email delivery failed. Check your Resend API key and verified sender domain, then try again.");
+        setMessage("Email delivery failed. Check Render email-health, RESEND_API_KEY, AUTH_EMAIL_FROM, and Resend domain verification.");
       } else {
         setMessage("Success! SeedEnv queued your magic authentication link. Check your inbox and spam folder.");
       }
