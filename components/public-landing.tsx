@@ -61,6 +61,8 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
 
   const isLoggedIn = status === "authenticated" || Boolean(viewer);
   const dashboardHref = viewer?.role === "DEVELOPER" ? "/console" : viewer?.role === "ADMIN" ? "/admin" : "/dashboard";
+  const topBounty = Math.max(...missions.map((mission) => mission.bountyPerTaskUsd), 0);
+  const openSlots = missions.reduce((sum, mission) => sum + Math.max(0, mission.totalSlots - mission.claimedSlots), 0);
 
   function goToSignIn(callbackUrl: string) {
     router.push(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
@@ -117,12 +119,12 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl items-center gap-8 px-4 py-8 sm:gap-10 sm:px-6 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-24">
+      <section className="mx-auto grid max-w-7xl items-center gap-8 px-4 py-6 sm:gap-10 sm:px-6 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-24">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-[#0E1017]/80 px-3 py-2 text-xs font-semibold text-amber-100 shadow-lg shadow-amber-500/10 backdrop-blur-md sm:px-4 sm:text-sm">
             <Sparkles className="size-4 text-amber-500" /> Browse live validation work before joining.
           </div>
-          <h1 className="hero-title mt-5 max-w-4xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-4xl font-black leading-[0.96] tracking-tight text-transparent sm:mt-6 sm:text-6xl xl:text-7xl">
+          <h1 className="hero-title mt-5 max-w-4xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-[2.35rem] font-black leading-[0.94] tracking-tight text-transparent sm:mt-6 sm:text-6xl xl:text-7xl">
             Seed authentic communities before launch day.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-neutral-400 sm:mt-6 sm:text-lg sm:leading-8">
@@ -133,9 +135,14 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
             <Button variant="ghost" onClick={() => goToProtectedAction("/console?intent=new-drop", "Creating deployments")}>New Drop</Button>
           </div>
           {guestNotice ? <p className="mt-4 max-w-xl rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 text-sm leading-6 text-neutral-300">{guestNotice}</p> : null}
+          <div className="mt-6 grid grid-cols-3 gap-2 sm:hidden">
+            <MobileStat label="Drops" value={missions.length.toString()} />
+            <MobileStat label="Open" value={openSlots.toString()} />
+            <MobileStat label="Top" value={`$${topBounty.toFixed(2)}`} />
+          </div>
         </div>
 
-        <aside className="luxury-panel rounded-2xl border-white/10 bg-zinc-900/80 p-4 backdrop-blur-md sm:p-5">
+        <aside className="luxury-panel hidden rounded-2xl border-white/10 bg-zinc-900/80 p-4 backdrop-blur-md sm:block sm:p-5">
           <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Loot snapshot</p>
           <div className="mt-5 grid gap-3">
             {missions.slice(0, 3).map((mission) => (
@@ -158,7 +165,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Quest Board</p>
             <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-3">
-              <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Active Seed Missions</h2>
+              <h2 className="text-2xl font-black tracking-tight text-white sm:text-4xl">Active Seed Missions</h2>
               <span className="relative flex size-3">
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
                 <span className="relative inline-flex size-3 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.75)]" />
@@ -198,6 +205,15 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
         </div>
       </div>
     </main>
+  );
+}
+
+function MobileStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-zinc-900/80 p-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-md">
+      <p className="font-mono text-lg font-black text-white">{value}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">{label}</p>
+    </div>
   );
 }
 

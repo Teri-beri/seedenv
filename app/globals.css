@@ -131,10 +131,23 @@ select {
   }
 
   .mobile-card-stack {
-    scroll-snap-type: y proximity;
+    display: flex;
+    gap: 1rem;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    overflow-x: auto;
+    padding: 0 1rem 0.75rem;
+    scroll-padding-left: 1rem;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .mobile-card-stack::-webkit-scrollbar {
+    display: none;
   }
 
   .mobile-card-stack > article {
+    min-width: min(86vw, 360px);
     scroll-snap-align: start;
   }
 }
