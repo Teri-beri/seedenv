@@ -8,9 +8,9 @@ const roleHome = {
 } as const;
 
 const protectedRoutes = [
-  { prefix: "/dashboard", role: "TESTER" },
-  { prefix: "/console", role: "DEVELOPER" },
-  { prefix: "/admin", role: "ADMIN" },
+  { prefix: "/dashboard", role: "TESTER", strictRole: false },
+  { prefix: "/console", role: "DEVELOPER", strictRole: false },
+  { prefix: "/admin", role: "ADMIN", strictRole: true },
 ] as const;
 
 export async function proxy(request: NextRequest) {
@@ -26,7 +26,7 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(signInUrl);
     }
 
-    if (token.role !== route.role) {
+    if (route.strictRole && token.role !== route.role) {
       const fallbackPath = typeof token.role === "string" && token.role in roleHome
         ? roleHome[token.role as keyof typeof roleHome]
         : "/auth/signin";

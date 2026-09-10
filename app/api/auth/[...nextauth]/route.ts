@@ -80,6 +80,12 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role || UserRole.TESTER;
+      } else if (token.id) {
+        const currentUser = await prisma.user.findUnique({
+          where: { id: token.id },
+          select: { role: true },
+        });
+        if (currentUser) token.role = currentUser.role;
       }
       return token;
     },
