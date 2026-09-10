@@ -75,16 +75,16 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
   }
 
   return (
-    <main className="seedenv-ambient-grid min-h-screen bg-[radial-gradient(circle_at_16%_0%,rgba(109,40,217,0.2),transparent_30%),radial-gradient(circle_at_86%_10%,rgba(245,158,11,0.12),transparent_24%),radial-gradient(circle_at_50%_52%,rgba(16,185,129,0.055),transparent_32%),linear-gradient(180deg,#090A0F_0%,#10131C_48%,#090A0F_100%)] pb-16 text-white">
-      <header className="sticky top-0 z-40 border-b border-[#1F2430] bg-[#090A0F]/86 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+    <main className="seedenv-ambient-grid mobile-app-shell min-h-screen bg-[radial-gradient(circle_at_16%_0%,rgba(109,40,217,0.2),transparent_30%),radial-gradient(circle_at_86%_10%,rgba(245,158,11,0.12),transparent_24%),radial-gradient(circle_at_50%_52%,rgba(16,185,129,0.055),transparent_32%),linear-gradient(180deg,#090A0F_0%,#10131C_48%,#090A0F_100%)] pb-16 text-white sm:pb-16">
+      <header className="mobile-app-header sticky top-0 z-40 border-b border-[#1F2430] bg-[#090A0F]/90 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
           <Link className="flex items-center gap-3" href="/">
-            <span className="relative size-11 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 shadow-lg shadow-amber-500/10">
+            <span className="relative size-10 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 shadow-lg shadow-amber-500/10 sm:size-11">
               <Image src="/seedenv-logo.png" alt="SeedEnv" fill sizes="44px" className="scale-125 object-cover" priority />
             </span>
             <span>
-              <span className="block text-xs font-semibold uppercase tracking-[0.32em] text-amber-500">SeedEnv</span>
-              <span className="block text-sm font-semibold text-neutral-300">Launch data infrastructure</span>
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-500 sm:text-xs sm:tracking-[0.32em]">SeedEnv</span>
+              <span className="block max-w-[130px] truncate text-xs font-semibold text-neutral-300 sm:max-w-none sm:text-sm">Launch data infrastructure</span>
             </span>
           </Link>
 
@@ -109,7 +109,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
               <a className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" href="#developers">
                 For Developers
               </a>
-              <Button onClick={() => goToSignIn("/dashboard")}>
+              <Button className="h-10 rounded-xl px-3 text-xs sm:h-11 sm:px-5 sm:text-sm" onClick={() => goToSignIn("/dashboard")}>
                 Sign In / Join
               </Button>
             </nav>
@@ -117,25 +117,25 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-24">
+      <section className="mx-auto grid max-w-7xl items-center gap-8 px-4 py-8 sm:gap-10 sm:px-6 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-24">
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-amber-100 shadow-lg shadow-amber-500/10 backdrop-blur-md">
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-[#0E1017]/80 px-3 py-2 text-xs font-semibold text-amber-100 shadow-lg shadow-amber-500/10 backdrop-blur-md sm:px-4 sm:text-sm">
             <Sparkles className="size-4 text-amber-500" /> Browse live validation work before joining.
           </div>
-          <h1 className="hero-title mt-6 max-w-4xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-5xl font-black leading-[0.96] tracking-tight text-transparent sm:text-6xl xl:text-7xl">
+          <h1 className="hero-title mt-5 max-w-4xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-4xl font-black leading-[0.96] tracking-tight text-transparent sm:mt-6 sm:text-6xl xl:text-7xl">
             Seed authentic communities before launch day.
           </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-8 text-neutral-400">
+          <p className="mt-4 max-w-2xl text-base leading-7 text-neutral-400 sm:mt-6 sm:text-lg sm:leading-8">
             SeedEnv lets testers preview active missions, compare loot rewards, and authenticate only when they are ready to join the board.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-6 hidden flex-wrap gap-3 sm:flex">
             <Button onClick={() => goToProtectedAction("/dashboard", "Claiming seed missions")}>Claim Seed</Button>
             <Button variant="ghost" onClick={() => goToProtectedAction("/console?intent=new-drop", "Creating deployments")}>New Drop</Button>
           </div>
           {guestNotice ? <p className="mt-4 max-w-xl rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 text-sm leading-6 text-neutral-300">{guestNotice}</p> : null}
         </div>
 
-        <aside className="luxury-panel rounded-2xl border-white/10 bg-zinc-900/80 p-5 backdrop-blur-md">
+        <aside className="luxury-panel rounded-2xl border-white/10 bg-zinc-900/80 p-4 backdrop-blur-md sm:p-5">
           <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Loot snapshot</p>
           <div className="mt-5 grid gap-3">
             {missions.slice(0, 3).map((mission) => (
@@ -154,11 +154,11 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
       </section>
 
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" id="missions">
-        <div className="mb-5 flex items-end justify-between gap-4">
+        <div className="mb-4 flex items-end justify-between gap-4 sm:mb-5">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Quest Board</p>
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <h2 className="text-4xl font-black tracking-tight text-white">Active Seed Missions</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-2 sm:gap-3">
+              <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Active Seed Missions</h2>
               <span className="relative flex size-3">
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-60" />
                 <span className="relative inline-flex size-3 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.75)]" />
@@ -167,7 +167,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
             </div>
           </div>
         </div>
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mobile-card-stack grid gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-3">
           {missions.map((mission, index) => (
             <QuestMissionCard
               index={index}
@@ -179,7 +179,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
         </div>
       </section>
 
-      <section className="mx-auto mt-16 max-w-7xl px-4 sm:px-6 lg:px-8" id="developers">
+      <section className="mx-auto mt-12 max-w-7xl px-4 sm:mt-16 sm:px-6 lg:px-8" id="developers">
         <div className="luxury-panel rounded-2xl p-6 md:p-8">
           <p className="text-xs uppercase tracking-[0.28em] text-amber-500">For Developers</p>
           <div className="mt-4 grid gap-6 md:grid-cols-[1fr_auto] md:items-end">
@@ -191,6 +191,12 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
           </div>
         </div>
       </section>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#090A0F]/92 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl sm:hidden">
+        <div className="mx-auto grid max-w-md grid-cols-2 gap-3">
+          <Button className="h-12 rounded-2xl" onClick={() => goToProtectedAction("/dashboard", "Claiming seed missions")}>Claim Seed</Button>
+          <Button className="h-12 rounded-2xl" onClick={() => goToSignIn("/dashboard")}>Sign In</Button>
+        </div>
+      </div>
     </main>
   );
 }
@@ -218,15 +224,15 @@ function QuestMissionCard({ index, mission, onProtectedAction }: {
 
   return (
     <article
-      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/80 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-amber-500/50 hover:shadow-[0_24px_90px_rgba(245,158,11,0.13)]"
+      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/80 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:border-amber-500/50 hover:shadow-[0_24px_90px_rgba(245,158,11,0.13)] sm:p-5"
       onMouseMove={moveSpotlight}
       style={{ "--spotlight-x": `${spotlight.x}%`, "--spotlight-y": `${spotlight.y}%` } as CSSProperties}
     >
       <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: "radial-gradient(420px circle at var(--spotlight-x) var(--spotlight-y), rgba(245,158,11,0.16), transparent 42%)" }} />
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.055),transparent_34%,rgba(109,40,217,0.08))]" />
       <div className="relative z-10">
-        <div className="flex items-start gap-4">
-          <div className="relative size-16 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/70 shadow-inner">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <div className="relative size-14 shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/70 shadow-inner sm:size-16">
             {mission.iconUrl ? <Image src={mission.iconUrl} alt="" fill sizes="64px" className="object-cover transition-transform duration-300 group-hover:scale-105" /> : <Sprout className="m-5 size-6 text-amber-500" />}
           </div>
           <div className="min-w-0 flex-1">
@@ -234,12 +240,12 @@ function QuestMissionCard({ index, mission, onProtectedAction }: {
               <span className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ${tier.className}`}>{tier.label}</span>
               <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[11px] font-semibold text-zinc-400">{mission.targetVibe}</span>
             </div>
-            <h3 className="mt-3 text-xl font-black tracking-tight text-white">{mission.title}</h3>
+            <h3 className="mt-3 text-lg font-black tracking-tight text-white sm:text-xl">{mission.title}</h3>
             <p className="mt-2 line-clamp-2 text-sm leading-6 text-zinc-400">{mission.description}</p>
           </div>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-white/10 bg-zinc-950/55 p-4 backdrop-blur-md">
+        <div className="mt-5 rounded-2xl border border-white/10 bg-zinc-950/55 p-3 backdrop-blur-md sm:p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">
               <Swords className="size-3.5 text-amber-500" /> Loot Drops

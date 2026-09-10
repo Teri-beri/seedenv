@@ -38,6 +38,10 @@ body {
   text-rendering: geometricPrecision;
 }
 
+html {
+  scroll-padding-top: 88px;
+}
+
 button,
 a,
 input,
@@ -109,5 +113,28 @@ select {
   .hero-title {
     font-size: clamp(2.5rem, 4.2vw, 3.5rem);
     line-height: 0.98;
+  }
+}
+
+@media (max-width: 639px) {
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  .mobile-app-shell {
+    min-height: 100svh;
+    padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .mobile-app-header {
+    padding-top: max(0.875rem, env(safe-area-inset-top));
+  }
+
+  .mobile-card-stack {
+    scroll-snap-type: y proximity;
+  }
+
+  .mobile-card-stack > article {
+    scroll-snap-align: start;
   }
 }
