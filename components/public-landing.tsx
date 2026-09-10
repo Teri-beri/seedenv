@@ -5,6 +5,7 @@ import { LockKeyhole, Sparkles, Sprout, WalletCards, Zap } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { formatCents } from "@/lib/utils";
 
@@ -32,16 +33,21 @@ type Viewer = {
 export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewer: Viewer }) {
   const { status } = useSession();
   const router = useRouter();
+  const [guestNotice, setGuestNotice] = useState("");
 
   const isLoggedIn = status === "authenticated" || Boolean(viewer);
   const dashboardHref = viewer?.role === "DEVELOPER" ? "/console" : viewer?.role === "ADMIN" ? "/admin" : "/dashboard";
 
-  function goToAction(callbackUrl: string) {
+  function goToSignIn(callbackUrl: string) {
+    router.push(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+  }
+
+  function goToProtectedAction(callbackUrl: string, actionLabel: string) {
     if (isLoggedIn) {
       router.push(callbackUrl);
       return;
     }
-    router.push(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+    setGuestNotice(`${actionLabel} is available after sign-in. You can keep browsing and press Sign In / Join when you are ready.`);
   }
 
   return (
@@ -73,10 +79,10 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
           ) : (
             <nav className="flex items-center gap-2 sm:gap-3">
               <a className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" href="#missions">Explore Missions</a>
-              <button className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" onClick={() => goToAction("/console?intent=new-drop")} type="button">
+              <a className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" href="#developers">
                 For Developers
-              </button>
-              <Button onClick={() => goToAction("/dashboard")}>
+              </a>
+              <Button onClick={() => goToSignIn("/dashboard")}>
                 Sign In / Join
               </Button>
             </nav>
@@ -96,9 +102,10 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
             SeedEnv lets testers preview active missions, compare cash rewards, and authenticate only when they are ready to claim work or submit proof.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button onClick={() => goToAction("/dashboard")}>Claim a Mission</Button>
-            <Button variant="ghost" onClick={() => goToAction("/console?intent=new-drop")}>New Drop</Button>
+            <Button onClick={() => goToProtectedAction("/dashboard", "Claiming missions")}>Claim a Mission</Button>
+            <Button variant="ghost" onClick={() => goToProtectedAction("/console?intent=new-drop", "Creating deployments")}>New Drop</Button>
           </div>
+          {guestNotice ? <p className="mt-4 max-w-xl rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 text-sm leading-6 text-neutral-300">{guestNotice}</p> : null}
         </div>
 
         <aside className="luxury-panel rounded-2xl p-5">
@@ -152,17 +159,30 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
                   </div>
                   <p className="mt-2 text-xs text-neutral-500">{spotsLeft} / {mission.totalSlots} spots left</p>
                 </div>
-                <Button className="mt-5 w-full" onClick={() => goToAction(`/dashboard?claim=${mission.id}`)} disabled={spotsLeft <= 0}>
+                <Button className="mt-5 w-full" onClick={() => goToProtectedAction(`/dashboard?claim=${mission.id}`, `Claiming ${mission.title}`)} disabled={spotsLeft <= 0}>
                   <Zap className="size-4" /> Claim Mission
                 </Button>
                 {index === 0 ? (
-                  <button className="mt-3 flex w-full items-center justify-center gap-2 text-xs font-semibold text-neutral-500 transition-colors hover:text-neutral-300" onClick={() => goToAction(`/dashboard?claim=${mission.id}`)} type="button">
+                  <button className="mt-3 flex w-full items-center justify-center gap-2 text-xs font-semibold text-neutral-500 transition-colors hover:text-neutral-300" onClick={() => goToProtectedAction(`/dashboard?claim=${mission.id}`, "Submitting proof")} type="button">
                     <LockKeyhole className="size-3.5" /> Submit proof after authentication
                   </button>
                 ) : null}
               </article>
             );
           })}
+        </div>
+      </section>
+
+      <section className="mx-auto mt-16 max-w-7xl px-4 sm:px-6 lg:px-8" id="developers">
+        <div className="luxury-panel rounded-2xl p-6 md:p-8">
+          <p className="text-xs uppercase tracking-[0.28em] text-amber-500">For Developers</p>
+          <div className="mt-4 grid gap-6 md:grid-cols-[1fr_auto] md:items-end">
+            <div>
+              <h2 className="max-w-3xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl">Preview the validation marketplace before creating a deployment.</h2>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-neutral-400">Browse live seed missions, reward levels, and tester-facing proof expectations. When you are ready to create a deployment, press Sign In / Join.</p>
+            </div>
+            <Button onClick={() => goToSignIn("/console?intent=new-drop")}>Sign In / Join</Button>
+          </div>
         </div>
       </section>
     </main>
