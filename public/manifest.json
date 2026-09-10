@@ -11,9 +11,9 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/seedenv-logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/seedenv-logo.png",
+      "sizes": "972x1048",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

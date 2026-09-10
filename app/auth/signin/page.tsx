@@ -43,7 +43,7 @@ export default function SignInPage() {
         <div className="mb-10 text-center">
           <div className="mb-6 flex justify-center">
             <div className="relative size-20 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#090A0F] shadow-lg shadow-amber-500/10">
-              <Image src="/seedenv-logo.svg" alt="SeedEnv" fill sizes="80px" priority />
+              <Image src="/seedenv-logo.png" alt="SeedEnv" fill sizes="80px" className="object-contain" priority />
             </div>
           </div>
           <h1 className="text-3xl font-bold text-amber-500">Welcome to SeedEnv</h1>

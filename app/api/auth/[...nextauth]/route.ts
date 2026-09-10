@@ -16,34 +16,7 @@ function getResendApiKey() {
 
 const authEmailFrom = cleanEnv(process.env.AUTH_EMAIL_FROM) || "SeedEnv Authentication <auth@mail.seedenv.com>";
 
-const seedenvLogo = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
-  <defs>
-    <radialGradient id="bgGlow" cx="50%" cy="34%" r="72%">
-      <stop offset="0%" stop-color="#14563C" />
-      <stop offset="45%" stop-color="#0E241B" />
-      <stop offset="100%" stop-color="#090A0F" />
-    </radialGradient>
-    <linearGradient id="seed" x1="17" y1="7" x2="29" y2="27" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F8E8D4" />
-      <stop offset="0.45" stop-color="#B98348" />
-      <stop offset="1" stop-color="#3C231A" />
-    </linearGradient>
-    <linearGradient id="root" x1="24" y1="22" x2="23" y2="42" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFF7E8" />
-      <stop offset="1" stop-color="#D8D1C2" />
-    </linearGradient>
-  </defs>
-  <rect width="48" height="48" rx="10" fill="url(#bgGlow)" />
-  <path d="M0 25C6 21 11 20 15 21C19 22 21 25 25 24C30 23 33 20 38 21C42 22 45 24 48 23V48H0V25Z" fill="#120F12" />
-  <path d="M25 5C31 11 33 16 31 21C30 25 26 28 22 27C18 26 16 22 17 18C18 13 21 9 25 5Z" fill="url(#seed)" />
-  <path d="M20 18C22 13 25 9 29 7" stroke="#FFF1DC" stroke-width="2.6" stroke-linecap="round" />
-  <path d="M24 24C22 29 19 31 15 32" stroke="url(#root)" stroke-width="2.7" stroke-linecap="round" />
-  <path d="M24 24C23 30 23 36 24 43" stroke="url(#root)" stroke-width="2.7" stroke-linecap="round" />
-  <path d="M25 24C28 29 32 32 38 33" stroke="url(#root)" stroke-width="2.7" stroke-linecap="round" />
-  <path d="M21 30C18 35 14 38 9 39" stroke="url(#root)" stroke-width="1.9" stroke-linecap="round" />
-  <path d="M27 31C31 36 35 39 40 40" stroke="url(#root)" stroke-width="1.9" stroke-linecap="round" />
-</svg>`;
+const seedenvLogo = `<img src="https://seedenv.com/seedenv-logo.png" alt="SeedEnv" width="72" height="78" style="display:block;width:72px;height:78px;border-radius:16px;margin:0 auto;" />`;
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -77,7 +50,7 @@ export const authOptions: NextAuthOptions = {
             html: `
               <div style="background:#090A0F;padding:40px 16px;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#FFFFFF;">
                 <div style="max-width:520px;margin:0 auto;border:1px solid #1F2430;background:rgba(14,16,23,0.92);border-radius:20px;padding:32px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,0.38);">
-                  <div style="margin:0 auto 24px;width:48px;height:48px;">${seedenvLogo}</div>
+                  <div style="margin:0 auto 24px;width:72px;height:78px;">${seedenvLogo}</div>
                   <p style="margin:0 0 10px;color:#F59E0B;font-size:12px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;">SeedEnv secure access</p>
                   <h1 style="margin:0;color:#F8FAFC;font-size:28px;line-height:1.15;font-weight:800;letter-spacing:-0.03em;">Authenticate your login</h1>
                   <p style="margin:18px 0 30px;color:#A1A1AA;font-size:16px;line-height:1.6;">Use this one-time link to complete your SeedEnv sign-in and verify access to your workspace.</p>

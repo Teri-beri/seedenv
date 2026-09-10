@@ -34,9 +34,9 @@ export const metadata: Metadata = {
     description: "Seed authentic beta communities. Get paid for real launch feedback.",
     images: [
       {
-        url: "/seedenv-logo.svg",
-        width: 48,
-        height: 48,
+        url: "/seedenv-logo.png",
+        width: 972,
+        height: 1048,
         alt: "SeedEnv",
       },
     ],
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "SeedEnv | Seed Real Beta Communities",
     description: "Seed authentic beta communities. Get paid for real launch feedback.",
-    images: ["/seedenv-logo.svg"],
+    images: ["/seedenv-logo.png"],
   },
   appleWebApp: {
     capable: true,
@@ -53,8 +53,8 @@ export const metadata: Metadata = {
     title: "SeedEnv",
   },
   icons: {
-    icon: "/seedenv-logo.svg",
-    apple: "/seedenv-logo.svg",
+    icon: "/seedenv-logo.png",
+    apple: "/seedenv-logo.png",
   },
 };
 
