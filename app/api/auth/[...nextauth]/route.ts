@@ -5,6 +5,7 @@ import NextAuth, { type NextAuthOptions } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
 
 const prisma = new PrismaClient();
+const authEmailFrom = process.env.AUTH_EMAIL_FROM || "SeedEnv Authentication <auth@mail.seedenv.com>";
 
 const seedenvLogo = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
@@ -47,7 +48,7 @@ export const authOptions: NextAuthOptions = {
           pass: process.env.RESEND_API_KEY,
         },
       },
-      from: "SeedEnv Authentication <auth@mail.seedenv.com>",
+      from: authEmailFrom,
       async sendVerificationRequest({ identifier: email, url, provider }) {
         if (!process.env.RESEND_API_KEY) {
           throw new Error("RESEND_API_KEY is required to send SeedEnv login emails.");
@@ -55,10 +56,11 @@ export const authOptions: NextAuthOptions = {
 
         try {
           const resend = new Resend(process.env.RESEND_API_KEY);
-          await resend.emails.send({
+          const { data, error } = await resend.emails.send({
             from: provider.from,
             to: email,
             subject: "Verify your SeedEnv login",
+            text: `Authenticate your SeedEnv login: ${url}\n\nIf you did not request this login, you can safely ignore this email.`,
             html: `
               <div style="background:#090A0F;padding:40px 16px;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#FFFFFF;">
                 <div style="max-width:520px;margin:0 auto;border:1px solid #1F2430;background:rgba(14,16,23,0.92);border-radius:20px;padding:32px;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,0.38);">
@@ -72,7 +74,11 @@ export const authOptions: NextAuthOptions = {
               </div>
             `,
           });
-          console.log(`SeedEnv magic link successfully sent to ${email}`);
+          if (error) {
+            console.error("Resend rejected SeedEnv verification email:", error);
+            throw new Error(error.message || "RESEND_SEND_ERROR");
+          }
+          console.log(`SeedEnv magic link successfully queued for ${email}: ${data?.id || "no-message-id"}`);
         } catch (error) {
           console.error("Error sending SeedEnv verification email:", error);
           throw new Error("SEND_VERIFICATION_EMAIL_ERROR");

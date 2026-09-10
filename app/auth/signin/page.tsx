@@ -18,14 +18,14 @@ export default function SignInPage() {
       const result = await signIn("email", {
         email,
         redirect: false,
-        callbackUrl: "/",
+        callbackUrl: "/dashboard",
       });
 
       if (result?.error) {
         console.error("Sign in error:", result.error);
-        setMessage("An error occurred. Please verify your email or try again later.");
+        setMessage("Email delivery failed. Check your Resend API key and verified sender domain, then try again.");
       } else {
-        setMessage("Success! Check your email for the magic authentication link.");
+        setMessage("Success! SeedEnv queued your magic authentication link. Check your inbox and spam folder.");
       }
     } catch (error) {
       console.error("Unexpected sign in error:", error);

@@ -32,6 +32,7 @@ Open `https://seedenv.com` in production or your local development URL while run
 - `NEXTAUTH_URL`: canonical auth URL if NextAuth is enabled, usually `https://seedenv.com`.
 - `NEXTAUTH_SECRET`: random secret generated with `openssl rand -base64 32`.
 - `RESEND_API_KEY`: Resend key used for SeedEnv magic-link email authentication from `auth@mail.seedenv.com`.
+- `AUTH_EMAIL_FROM`: verified Resend sender, for example `SeedEnv Authentication <auth@mail.seedenv.com>`.
 - `STRIPE_SECRET_KEY`: Stripe secret key for escrow checkout.
 - `STRIPE_WEBHOOK_SECRET`: Stripe webhook signing secret for `/api/stripe/webhook`.
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROOF_BUCKET`: proof screenshot storage.
@@ -59,6 +60,7 @@ Render does not receive local `.env` values. Set these in the Render dashboard b
 - `NEXTAUTH_URL=https://seedenv.com`
 - `NEXTAUTH_SECRET`
 - `RESEND_API_KEY`
+- `AUTH_EMAIL_FROM=SeedEnv Authentication <auth@mail.seedenv.com>`
 - `SUPABASE_PROOF_BUCKET=proof-screenshots`
 
 If `NEXTAUTH_SECRET` is missing, NextAuth will return `NO_SECRET` and protected routes will fail in production.
