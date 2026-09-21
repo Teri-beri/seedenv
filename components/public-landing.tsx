@@ -282,7 +282,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
       </section>
       <footer className="order-6 mx-auto mt-12 w-full max-w-7xl border-t border-white/10 px-4 py-8 text-sm text-zinc-500 sm:mt-16 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} SeedEnv. Operated by {process.env.NEXT_PUBLIC_TERIMUS_URL ? <a className="font-semibold text-amber-400 hover:underline" href={process.env.NEXT_PUBLIC_TERIMUS_URL}>TERIMUS LLC</a> : <span className="font-semibold text-zinc-300">TERIMUS LLC</span>}.</p>
+          <p>© {new Date().getFullYear()} SeedEnv. Operated by <Link className="font-semibold text-amber-400 hover:underline" href="/terimus">TERIMUS LLC</Link>.</p>
           <p className="font-mono text-xs">Human validation infrastructure</p>
         </div>
       </footer>
