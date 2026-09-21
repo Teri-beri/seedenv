@@ -63,7 +63,7 @@ On Android:
 - Rejections return the claimed slot to the public pool.
 - `/api/cron/expire-slots` expires abandoned 30-minute locks.
 - `/api/assets/download?campaignId=...` exports approved proof media and a manifest as a zip.
-- `npm run seed:goddesses-beta` creates or updates the active Goddesses TestFlight validation mission. Run it from the Render shell after deployment so it uses the production `DATABASE_URL`.
+- Render runs `npm run seed:goddesses-beta` during startup after migrations, creating or updating the active Goddesses TestFlight validation mission from the production `DATABASE_URL`.
 
 ## Notes
 

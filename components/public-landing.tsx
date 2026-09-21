@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { CSSProperties, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AnalyticsTracker, trackAnalytics } from "@/components/analytics-tracker";
+import { AnimatedGridBackground } from "@/components/animated-grid-background";
 import { formatCents } from "@/lib/utils";
 
 type Mission = {
@@ -100,6 +101,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
   return (
     <main className="seedenv-ambient-grid mobile-app-shell flex min-h-screen flex-col bg-[radial-gradient(circle_at_16%_0%,rgba(109,40,217,0.2),transparent_30%),radial-gradient(circle_at_86%_10%,rgba(245,158,11,0.12),transparent_24%),radial-gradient(circle_at_50%_52%,rgba(16,185,129,0.055),transparent_32%),linear-gradient(180deg,#090A0F_0%,#10131C_48%,#090A0F_100%)] pb-16 text-white sm:pb-16">
       <AnalyticsTracker />
+      <AnimatedGridBackground />
       <header className="mobile-app-header sticky top-0 z-40 border-b border-[#1F2430] bg-[#090A0F]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
           <Link className="flex items-center gap-3" href="/">
