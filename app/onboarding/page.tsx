@@ -38,9 +38,9 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   const params = await searchParams;
   const requestedRole = cleanRequestedRole(params.role);
   const nextPath = cleanNextPath(params.next);
-  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
+  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true, onboardingCompletedAt: true } });
 
-  if (user && requestedRole && user.role !== UserRole.ADMIN) {
+  if (user && requestedRole && !user.onboardingCompletedAt && user.role !== UserRole.ADMIN) {
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
@@ -51,6 +51,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         portfolioUrl: cleanUrl(params.portfolioUrl),
         companyName: requestedRole === UserRole.DEVELOPER ? cleanText(params.companyName, undefined) : null,
         productUrl: requestedRole === UserRole.DEVELOPER ? cleanUrl(params.productUrl) : null,
+        onboardingCompletedAt: new Date(),
       },
     });
   }
