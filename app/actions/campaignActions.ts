@@ -36,8 +36,8 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
 
   const testerPayoutPoolUsd = input.totalSlots * input.bountyPerTaskUsd;
   const totalBudgetUsd = Number((testerPayoutPoolUsd / (1 - SEEDENV_PLATFORM_FEE_PERCENT)).toFixed(2));
-  const platformFeeUsd = Number((totalBudgetUsd * SEEDENV_PLATFORM_FEE_PERCENT).toFixed(2));
-  const escrowTotalCents = usdToCents(totalBudgetUsd + platformFeeUsd);
+  const platformFeeUsd = Number((totalBudgetUsd - testerPayoutPoolUsd).toFixed(2));
+  const escrowTotalCents = usdToCents(totalBudgetUsd);
 
   const campaign = await prisma.appCampaign.create({
     data: {
@@ -69,7 +69,7 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
       amountCents: escrowTotalCents,
       type: TransactionType.ESCROW_DEPOSIT,
       status: TransactionStatus.PENDING,
-      description: `Escrow deposit for ${campaign.title}`,
+      description: `Escrow deposit for ${campaign.title} (${campaign.id})`,
     },
   });
 
@@ -79,30 +79,39 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
   }
 
   const stripe = getStripe();
-  const session = await stripe.checkout.sessions.create({
-    mode: "payment",
-    payment_method_types: ["card"],
-    line_items: [
-      {
-        quantity: 1,
-        price_data: {
-          currency: "usd",
-          unit_amount: escrowTotalCents,
-          product_data: {
-            name: `SeedEnv escrow: ${campaign.title}`,
-            description: `${input.totalSlots} tester slots at $${input.bountyPerTaskUsd.toFixed(2)} plus 8% platform and telemetry fee`,
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: escrowTotalCents,
+            product_data: {
+              name: `SeedEnv escrow: ${campaign.title}`,
+              description: `${input.totalSlots} tester slots at $${input.bountyPerTaskUsd.toFixed(2)} plus 8% platform and telemetry fee`,
+            },
           },
         },
+      ],
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=success&campaign=${campaign.id}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=cancelled&campaign=${campaign.id}`,
+      metadata: {
+        type: "SEEDENV_CAMPAIGN_ESCROW",
+        campaignId: campaign.id,
+        developerId: developer.id,
       },
-    ],
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=success&campaign=${campaign.id}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=cancelled&campaign=${campaign.id}`,
-    metadata: {
-      type: "SEEDENV_CAMPAIGN_ESCROW",
-      campaignId: campaign.id,
-      developerId: developer.id,
-    },
-  });
+    });
+  } catch (error) {
+    await prisma.$transaction([
+      prisma.appCampaign.update({ where: { id: campaign.id }, data: { status: CampaignStatus.PAUSED } }),
+      prisma.walletTransaction.updateMany({ where: { description: { contains: `(${campaign.id})` }, status: TransactionStatus.PENDING }, data: { status: TransactionStatus.FAILED } }),
+    ]);
+    throw error;
+  }
 
   return { campaignId: campaign.id, checkoutUrl: session.url, escrowTotalCents };
 }
@@ -116,6 +125,8 @@ export async function handleStripeWebhook(event: { type: string; data: { object:
 
   const stripePaymentId = object.payment_intent || object.id || null;
   await prisma.$transaction(async (tx) => {
+    const campaign = await tx.appCampaign.findUnique({ where: { id: metadata.campaignId }, select: { status: true } });
+    if (!campaign || campaign.status === CampaignStatus.ACTIVE) return;
     await tx.appCampaign.update({
       where: { id: metadata.campaignId },
       data: { status: CampaignStatus.ACTIVE },

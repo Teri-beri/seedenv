@@ -63,6 +63,7 @@ On Android:
 - Rejections return the claimed slot to the public pool.
 - `/api/cron/expire-slots` expires abandoned 30-minute locks.
 - `/api/assets/download?campaignId=...` exports approved proof media and a manifest as a zip.
+- `npm run seed:goddesses-beta` creates or updates the active Goddesses TestFlight validation mission. Run it from the Render shell after deployment so it uses the production `DATABASE_URL`.
 
 ## Notes
 
@@ -79,6 +80,10 @@ Render does not receive local `.env` values. Set these in the Render dashboard b
 - `RESEND_API_KEY`
 - `AUTH_EMAIL_FROM=SeedEnv Authentication <auth@seedenv.com>`
 - `SUPABASE_PROOF_BUCKET=proof-screenshots`
+- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
+- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`
+- `CRON_SECRET`
+- `NEXT_PUBLIC_TERIMUS_URL` — the exact TERIMUS LLC landing-page URL used by the public footer.
 
 If `NEXTAUTH_SECRET` is missing, NextAuth will return `NO_SECRET` and protected routes will fail in production.
 

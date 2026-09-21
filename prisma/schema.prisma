@@ -216,3 +216,17 @@ model WalletTransaction {
   @@index([type, status])
   @@index([stripePaymentId])
 }
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  eventName  String
+  path       String
+  sessionKey String?
+  referrer   String?
+  userAgent  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([eventName, createdAt])
+  @@index([path, createdAt])
+}

@@ -23,6 +23,13 @@ const proofSchema = z.object({
   networkLogs: z.string().max(20000).optional().or(z.literal("")),
 });
 
+function hasValidImageSignature(buffer: Buffer, mimeType: string) {
+  if (mimeType === "image/png") return buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  if (mimeType === "image/jpeg") return buffer.subarray(0, 3).equals(Buffer.from([255, 216, 255]));
+  if (mimeType === "image/webp") return buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP";
+  return false;
+}
+
 export async function claimTaskSlot(campaignId: string) {
   const tester = await getCurrentUser("TESTER");
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
@@ -38,10 +45,11 @@ export async function claimTaskSlot(campaignId: string) {
     if (existing && existing.status === SubmissionStatus.PENDING) return existing;
     if (existing && existing.status === SubmissionStatus.APPROVED) throw new Error("You already completed this mission.");
 
-    await tx.appCampaign.update({
-      where: { id: campaignId },
+    const claimed = await tx.appCampaign.updateMany({
+      where: { id: campaignId, claimedSlots: { lt: campaign.totalSlots } },
       data: { claimedSlots: { increment: 1 } },
     });
+    if (claimed.count !== 1) throw new Error("This mission is fully claimed.");
 
     return tx.submission.upsert({
       where: { campaignId_testerId: { campaignId, testerId: tester.id } },
@@ -88,6 +96,7 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
     const base64 = input.proofImageBase64.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64, "base64");
     if (buffer.byteLength > 5 * 1024 * 1024) throw new Error("Proof screenshots must be under 5MB.");
+    if (!hasValidImageSignature(buffer, input.proofImageMimeType)) throw new Error("Proof upload does not match its declared image type.");
     proofImageUrl = await uploadProofImage({
       buffer,
       contentType: input.proofImageMimeType,

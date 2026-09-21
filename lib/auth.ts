@@ -10,6 +10,10 @@ export async function getCurrentUser(roleHint: UserRole = "TESTER") {
     if (authenticatedUser) return authenticatedUser;
   }
 
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Authentication required.");
+  }
+
   const configuredUserId = process.env.SEEDENV_PREVIEW_USER_ID;
   if (configuredUserId) {
     const user = await prisma.user.findUnique({ where: { id: configuredUserId } });

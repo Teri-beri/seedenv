@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CSSProperties, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { AnalyticsTracker, trackAnalytics } from "@/components/analytics-tracker";
 import { formatCents } from "@/lib/utils";
 
 type Mission = {
@@ -75,6 +76,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
   const router = useRouter();
   const [guestNotice, setGuestNotice] = useState("");
   const [installPlatform, setInstallPlatform] = useState<"ios" | "android">("ios");
+  const [audience, setAudience] = useState<"validator" | "developer">("validator");
 
   const isLoggedIn = status === "authenticated" || Boolean(viewer);
   const dashboardHref = viewer?.role === "DEVELOPER" ? "/console" : viewer?.role === "ADMIN" ? "/admin" : "/dashboard";
@@ -82,10 +84,12 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
   const openSlots = missions.reduce((sum, mission) => sum + Math.max(0, mission.totalSlots - mission.claimedSlots), 0);
 
   function goToSignIn(callbackUrl: string) {
+    trackAnalytics("signup_start", { callbackUrl });
     router.push(`/auth/signin?callbackUrl=${encodeURIComponent(callbackUrl)}`);
   }
 
   function goToProtectedAction(callbackUrl: string, actionLabel: string) {
+    trackAnalytics("cta_click", { action: actionLabel, callbackUrl });
     if (isLoggedIn) {
       router.push(callbackUrl);
       return;
@@ -94,7 +98,8 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
   }
 
   return (
-    <main className="seedenv-ambient-grid mobile-app-shell min-h-screen bg-[radial-gradient(circle_at_16%_0%,rgba(109,40,217,0.2),transparent_30%),radial-gradient(circle_at_86%_10%,rgba(245,158,11,0.12),transparent_24%),radial-gradient(circle_at_50%_52%,rgba(16,185,129,0.055),transparent_32%),linear-gradient(180deg,#090A0F_0%,#10131C_48%,#090A0F_100%)] pb-16 text-white sm:pb-16">
+    <main className="seedenv-ambient-grid mobile-app-shell flex min-h-screen flex-col bg-[radial-gradient(circle_at_16%_0%,rgba(109,40,217,0.2),transparent_30%),radial-gradient(circle_at_86%_10%,rgba(245,158,11,0.12),transparent_24%),radial-gradient(circle_at_50%_52%,rgba(16,185,129,0.055),transparent_32%),linear-gradient(180deg,#090A0F_0%,#10131C_48%,#090A0F_100%)] pb-16 text-white sm:pb-16">
+      <AnalyticsTracker />
       <header className="mobile-app-header sticky top-0 z-40 border-b border-[#1F2430] bg-[#090A0F]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
           <Link className="flex items-center gap-3" href="/">
@@ -136,20 +141,24 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl items-center gap-8 px-4 py-6 sm:gap-10 sm:px-6 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-24">
+      <section className="order-1 mx-auto grid max-w-7xl items-center gap-8 px-4 py-6 sm:gap-10 sm:px-6 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-24">
         <div>
+          <div className="mb-6 inline-flex rounded-full border border-white/10 bg-[#0E1017]/80 p-1 shadow-lg shadow-black/20" role="tablist" aria-label="Choose your SeedEnv path">
+            <button aria-selected={audience === "validator"} className={`rounded-full px-4 py-2 text-xs font-bold transition sm:text-sm ${audience === "validator" ? "bg-amber-500 text-[#090A0F]" : "text-zinc-500 hover:text-white"}`} onClick={() => setAudience("validator")} role="tab" type="button">For Validators / Testers</button>
+            <button aria-selected={audience === "developer"} className={`rounded-full px-4 py-2 text-xs font-bold transition sm:text-sm ${audience === "developer" ? "bg-amber-500 text-[#090A0F]" : "text-zinc-500 hover:text-white"}`} onClick={() => setAudience("developer")} role="tab" type="button">For Developers</button>
+          </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-[#0E1017]/80 px-3 py-2 text-xs font-semibold text-amber-100 shadow-lg shadow-amber-500/10 backdrop-blur-md sm:px-4 sm:text-sm">
             <Sparkles className="size-4 text-amber-500" /> ⚡ Real software testing. Real payouts. Powered by vetted human feedback.
           </div>
           <h1 className="hero-title mt-5 max-w-4xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-[2.35rem] font-black leading-[0.94] tracking-tight text-transparent sm:mt-6 sm:text-6xl xl:text-7xl">
-            Seed authentic communities before launch day.
+            {audience === "validator" ? "Build reputation through real product validation." : "Launch with evidence your users can trust."}
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-neutral-400 sm:mt-6 sm:text-lg sm:leading-8">
-            SeedEnv lets developers launch guaranteed testing cohorts while testers complete quick micro-missions, build verified reputation, and unlock high-tier app store readiness packages.
+            {audience === "validator" ? "Complete focused missions, earn transparent payouts, and unlock higher-tier validation work with every verified submission." : "Deploy guaranteed testing cohorts, collect fraud-resistant telemetry, and turn human feedback into a launch-ready product signal."}
           </p>
           <div className="mt-6 hidden flex-wrap gap-3 sm:flex">
-            <Button onClick={() => goToProtectedAction("/console?intent=new-campaign", "Deploying a cohort")}>Deploy a Cohort <ArrowRight className="size-4" /></Button>
-            <a className="inline-flex h-11 items-center justify-center rounded-xl border border-white/15 px-5 text-sm font-semibold text-neutral-200 transition-colors hover:border-amber-400/50 hover:text-white" href="#missions">Start as a Scout ($0 Entry)</a>
+            <Button className={audience === "validator" ? "order-first" : "border border-white/15 bg-transparent text-white hover:border-amber-400/50 hover:bg-transparent"} onClick={() => audience === "validator" ? goToProtectedAction("/dashboard", "Starting as a Scout") : goToProtectedAction("/console?intent=new-campaign", "Deploying a cohort")}>{audience === "validator" ? "Start as a Scout ($0 Entry)" : "Deploy a Cohort"} <ArrowRight className="size-4" /></Button>
+            <a className={`inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold transition-colors ${audience === "validator" ? "border border-white/15 text-neutral-200 hover:border-amber-400/50 hover:text-white" : "border border-amber-400/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"}`} href={audience === "validator" ? "#missions" : "#developers"}>{audience === "validator" ? "See Live Missions" : "View Developer Pricing"}</a>
           </div>
           {guestNotice ? <p className="mt-4 max-w-xl rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 text-sm leading-6 text-neutral-300">{guestNotice}</p> : null}
           <div className="mt-6 grid grid-cols-3 gap-2 sm:hidden">
@@ -160,7 +169,8 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
         </div>
 
         <aside className="luxury-panel hidden rounded-2xl border-white/10 bg-zinc-900/80 p-4 backdrop-blur-md sm:block sm:p-5">
-          <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Active rewards</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-amber-500">{audience === "validator" ? "Active rewards" : "Developer signal"}</p>
+          {audience === "developer" ? <div className="mt-5 space-y-3"><MetricLine label="Verified human validators" value={`${openSlots} open slots`} /><MetricLine label="Platform fee" value="8% of total budget" /><MetricLine label="Evidence layer" value="Proof + telemetry" /></div> : null}
           <div className="mt-5 grid gap-3">
             {missions.slice(0, 3).map((mission) => (
               <div key={mission.id} className="rounded-2xl border border-white/10 bg-zinc-950/45 p-4 backdrop-blur-md transition-all hover:border-amber-500/50">
@@ -177,9 +187,10 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
         </aside>
       </section>
 
-      <ValidatorJourney />
+      <div className="order-2"><ValidatorJourney /></div>
 
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" id="missions">
+      <section className="order-3 border-y border-white/5 bg-[#0E1017]/30 px-4 py-12 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:py-16" id="missions">
+        <div className="mx-auto max-w-7xl px-0 sm:px-2 lg:px-4">
         <div className="mb-4 flex items-end justify-between gap-4 sm:mb-5">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Quest Board</p>
@@ -203,9 +214,10 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
             />
           ))}
         </div>
+        </div>
       </section>
 
-      <section className="mx-auto mt-12 max-w-7xl px-4 sm:mt-16 sm:px-6 lg:px-8" id="install">
+      <section className="order-5 mx-auto mt-12 max-w-7xl px-4 sm:mt-16 sm:px-6 lg:px-8" id="install">
         <div className="luxury-panel rounded-2xl p-5 sm:p-8">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -263,9 +275,17 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
         </div>
       </section>
 
-      <section className="mx-auto mt-12 max-w-7xl px-4 sm:mt-16 sm:px-6 lg:px-8" id="developers">
+      <section className="order-4 mt-12 w-full border-y border-amber-400/10 bg-[#0E1017]/55 py-12 sm:mt-16 sm:py-16" id="developers">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <DeveloperPricing onDeploy={() => goToProtectedAction("/console?intent=new-campaign", "Deploying a cohort")} />
+        </div>
       </section>
+      <footer className="order-6 mx-auto mt-12 w-full max-w-7xl border-t border-white/10 px-4 py-8 text-sm text-zinc-500 sm:mt-16 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} SeedEnv. Operated by {process.env.NEXT_PUBLIC_TERIMUS_URL ? <a className="font-semibold text-amber-400 hover:underline" href={process.env.NEXT_PUBLIC_TERIMUS_URL}>TERIMUS LLC</a> : <span className="font-semibold text-zinc-300">TERIMUS LLC</span>}.</p>
+          <p className="font-mono text-xs">Human validation infrastructure</p>
+        </div>
+      </footer>
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#090A0F]/92 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl sm:hidden">
         <div className="mx-auto grid max-w-md grid-cols-2 gap-3">
           <Button className="h-12 rounded-2xl" onClick={() => goToProtectedAction("/dashboard", "Starting as a Scout")}>Start as a Scout</Button>
@@ -282,7 +302,7 @@ function ValidatorJourney() {
 
   return (
     <section className="mx-auto mt-12 max-w-7xl px-4 sm:mt-16 sm:px-6 lg:px-8" aria-labelledby="validator-journey-title">
-      <div className="luxury-panel rounded-2xl p-5 sm:p-8">
+      <div className="rounded-2xl border-y border-white/10 bg-[#0E1017]/45 px-1 py-5 sm:px-6 sm:py-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Progression path</p>
@@ -292,7 +312,7 @@ function ValidatorJourney() {
           <span className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-200"><ShieldCheck className="size-4" /> Human-verified progression</span>
         </div>
 
-        <div className="relative mt-8 grid gap-4 md:grid-cols-3 md:gap-0">
+        <div className="relative mt-8 grid gap-4 md:grid-cols-3 md:gap-5">
           <div className="pointer-events-none absolute left-[16%] right-[16%] top-7 hidden border-t border-dashed border-white/20 md:block" aria-hidden="true" />
           {journeyTiers.map((tier, index) => {
             const isSelected = selectedId === tier.id;
@@ -364,6 +384,10 @@ function DeveloperPricing({ onDeploy }: { onDeploy: () => void }) {
   );
 }
 
+function MetricLine({ label, value }: { label: string; value: string }) {
+  return <div className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-zinc-950/55 px-4 py-3"><span className="text-xs text-zinc-500">{label}</span><span className="font-mono text-xs font-bold text-amber-300">{value}</span></div>;
+}
+
 function MobileStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-zinc-900/80 p-3 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-md">
@@ -422,17 +446,13 @@ function QuestMissionCard({ index, mission, onProtectedAction }: {
             <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">
               <Swords className="size-3.5 text-amber-500" /> Mission Bounties
             </p>
-            <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200">Unlocks {Math.min(99, 33 + index * 12)}% of Tier 2</span>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3">
             <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <div className="flex items-center gap-2 text-xs font-semibold text-amber-200"><Coins className="size-4" /> Cash</div>
-              <p className="mt-2 font-mono text-lg font-black text-amber-500">{formatCents(Math.round(mission.bountyPerTaskUsd * 100))}</p>
+              <p className="mt-1 font-mono text-2xl font-black text-amber-400">{formatCents(Math.round(mission.bountyPerTaskUsd * 100))}<span className="ml-2 text-xs font-semibold text-amber-200/70">per validated mission</span></p>
             </div>
-            <div className="rounded-xl border border-violet-400/20 bg-violet-500/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-              <div className="flex items-center gap-2 text-xs font-semibold text-violet-200"><Gem className="size-4" /> REP Gain</div>
-              <p className="mt-2 font-mono text-lg font-black text-violet-200">+{repReward}</p>
-            </div>
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 py-2.5"><span className="flex items-center gap-2 text-xs font-semibold text-violet-200"><Gem className="size-4" /> REP Gain <strong className="font-mono">+{repReward}</strong></span><span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200">Unlocks {Math.min(99, 33 + index * 12)}% of Tier 2</span></div>
           </div>
           <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-zinc-400"><CircleHelp className="mt-0.5 size-3.5 shrink-0 text-amber-500" /> Requires: 1 screen recording + 2-sentence friction log</p>
         </div>

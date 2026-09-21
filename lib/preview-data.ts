@@ -2,6 +2,7 @@ import { CampaignStatus, PlatformType, TaskProofType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export async function ensurePreviewData() {
+  if (process.env.NODE_ENV === "production") return;
   const campaignCount = await prisma.appCampaign.count();
   if (campaignCount > 0) return;
 
@@ -31,7 +32,7 @@ export async function ensurePreviewData() {
         targetVibe: vibe,
         bountyPerTaskUsd: bounty,
         totalBudgetUsd: bounty * totalSlots,
-        platformFeeUsd: bounty * totalSlots * 0.2,
+        platformFeeUsd: Number(((bounty * totalSlots) * 0.08).toFixed(2)),
         totalSlots,
         claimedSlots,
         completedSlots: Math.floor(claimedSlots / 2),

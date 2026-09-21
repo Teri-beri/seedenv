@@ -78,14 +78,14 @@ export function CompactSignupForm() {
   }
 
   return (
-    <div className="w-full max-w-md space-y-6">
-      <div className="grid grid-cols-2 rounded-xl border border-zinc-800 bg-zinc-900 p-1" role="tablist" aria-label="Account type">
+    <div className="w-full max-w-lg space-y-8 rounded-2xl border border-white/10 bg-neutral-900/60 p-6 shadow-2xl shadow-black/30 backdrop-blur-md sm:p-8">
+      <div className="grid grid-cols-2 rounded-xl border border-neutral-800 bg-zinc-950/70 p-1" role="tablist" aria-label="Account type">
         {(["TESTER", "DEVELOPER"] as const).map((item) => {
           const active = role === item;
           return (
             <button
               aria-selected={active}
-              className={`rounded-lg py-2.5 text-sm transition-all ${active ? "border border-amber-500/30 bg-amber-500/10 font-semibold text-amber-400" : "font-medium text-zinc-400 hover:text-white"}`}
+              className={`rounded-lg px-3 py-3 text-sm transition-all ${active ? "border border-amber-500/40 bg-amber-500/10 font-semibold text-amber-400" : "font-medium text-zinc-400 hover:text-white"}`}
               onClick={() => { setRole(item); setMessage(""); }}
               role="tab"
               type="button"
@@ -99,25 +99,25 @@ export function CompactSignupForm() {
 
       <div className="space-y-1">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-amber-400">{role === "TESTER" ? "Tester access" : "Developer access"}</p>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Create {role === "TESTER" ? "tester" : "developer"} account</h1>
-        <p className="text-sm text-zinc-400">{role === "TESTER" ? "Start with Tier 1 Scout missions and build your rank." : "Launch validation cohorts with transparent payouts and proof."}</p>
+        <h1 className="text-3xl font-bold tracking-tight text-white">Create {role === "TESTER" ? "tester" : "developer"} account</h1>
+        <p className="pt-1 text-base leading-6 text-zinc-400">{role === "TESTER" ? "Start with Tier 1 Scout missions and build your rank." : "Launch validation cohorts with transparent payouts and proof."}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <button aria-label="Continue with GitHub" className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm font-medium text-zinc-200 transition-colors hover:border-zinc-700" onClick={() => continueWithProvider("github")} type="button"><Code2 className="size-4" /> GitHub</button>
-        <button aria-label="Continue with Google" className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm font-medium text-zinc-200 transition-colors hover:border-zinc-700" onClick={() => continueWithProvider("google")} type="button"><Globe2 className="size-4" /> Google</button>
+        <button aria-label="Continue with GitHub" className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-200 transition-colors hover:border-zinc-700" onClick={() => continueWithProvider("github")} type="button"><Code2 className="size-4" /> GitHub</button>
+        <button aria-label="Continue with Google" className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-200 transition-colors hover:border-zinc-700" onClick={() => continueWithProvider("google")} type="button"><Globe2 className="size-4" /> Google</button>
       </div>
 
       <div className="relative flex items-center justify-center"><div className="w-full border-t border-zinc-800" /><span className="absolute bg-[#0d0e12] px-3 text-xs font-mono uppercase tracking-wider text-zinc-500">or continue with email</span></div>
 
-      <form className="space-y-4" onSubmit={continueWithEmail}>
-        <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400" htmlFor="signup-name">Full Name<input autoComplete="name" className="mt-1.5 w-full rounded-lg border border-zinc-800 bg-zinc-900/80 px-3.5 py-2.5 text-sm text-white outline-none transition-all placeholder-zinc-600 focus:border-amber-500 focus:ring-1 focus:ring-amber-500" id="signup-name" onChange={(event) => setName(event.target.value)} placeholder="Alex Morgan" required value={name} /></label>
-        <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400" htmlFor="signup-email">Email Address<input autoComplete="email" className="mt-1.5 w-full rounded-lg border border-zinc-800 bg-zinc-900/80 px-3.5 py-2.5 text-sm text-white outline-none transition-all placeholder-zinc-600 focus:border-amber-500 focus:ring-1 focus:ring-amber-500" id="signup-email" onChange={(event) => setEmail(event.target.value)} placeholder="alex@company.com" required type="email" value={email} /></label>
-        <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-3 text-sm font-semibold text-black shadow-lg shadow-amber-500/10 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} type="submit">{loading ? <LoaderCircle className="size-4 animate-spin" /> : null}{loading ? "Sending access link..." : "Continue to Onboarding →"}</button>
+      <form className="space-y-5" onSubmit={continueWithEmail}>
+        <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400" htmlFor="signup-name">Full Name<input autoComplete="name" className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-neutral-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-500" id="signup-name" onChange={(event) => setName(event.target.value)} placeholder="Alex Morgan" required value={name} /></label>
+        <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400" htmlFor="signup-email">Email Address<input autoComplete="email" className="mt-2 w-full rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-neutral-500 focus:border-amber-500 focus:ring-1 focus:ring-amber-500" id="signup-email" onChange={(event) => setEmail(event.target.value)} placeholder="alex@company.com" required type="email" value={email} /></label>
+        <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-amber-500 px-4 py-3.5 text-base font-semibold text-black shadow-lg shadow-amber-500/10 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} type="submit">{loading ? <LoaderCircle className="size-4 animate-spin" /> : null}{loading ? "Sending access link..." : "Continue to Onboarding →"}</button>
       </form>
 
       {message ? <p className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3 text-center text-xs leading-5 text-zinc-300" role="status">{message}</p> : null}
-      <p className="text-center text-xs text-zinc-500">Already have an account? <a className="text-amber-400 hover:underline" href="/auth/signin">Sign in</a></p>
+      <p className="pt-1 text-center text-sm text-zinc-500">Already have an account? <a className="font-semibold text-amber-400 hover:underline" href="/auth/signin">Sign in</a></p>
     </div>
   );
 }

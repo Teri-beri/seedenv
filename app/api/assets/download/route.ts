@@ -1,11 +1,21 @@
 import JSZip from "jszip";
 import { NextRequest, NextResponse } from "next/server";
 import { SubmissionStatus } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   const campaignId = request.nextUrl.searchParams.get("campaignId");
   if (!campaignId) return NextResponse.json({ message: "campaignId is required" }, { status: 400 });
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return NextResponse.json({ message: "Authentication required" }, { status: 401 });
+
+  const campaign = await prisma.appCampaign.findUnique({ where: { id: campaignId }, select: { developerId: true } });
+  if (!campaign || (campaign.developerId !== session.user.id && session.user.role !== "ADMIN")) {
+    return NextResponse.json({ message: "Campaign access denied" }, { status: 403 });
+  }
 
   const submissions = await prisma.submission.findMany({
     where: { campaignId, status: SubmissionStatus.APPROVED, proofImageUrl: { not: null } },

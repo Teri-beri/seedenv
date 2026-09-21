@@ -6,6 +6,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import AuthCheck from "@/components/AuthCheck";
 import { DeveloperStudio } from "@/components/developer-studio";
 import { DeveloperHeader } from "@/components/navigation";
+import { AnalyticsSummary, type AnalyticsSummaryData } from "@/components/analytics-summary";
 import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
 
@@ -17,25 +18,39 @@ export default async function ConsolePage() {
   if (session.user.role !== "DEVELOPER") redirect("/");
 
   await ensurePreviewData();
+  const campaignScope = { developerId: session.user.id };
   const [pendingSubmissions, approvedAssets, campaigns] = await Promise.all([
     prisma.submission.findMany({
-      where: { status: SubmissionStatus.PENDING, proofImageUrl: { not: null } },
+      where: { status: SubmissionStatus.PENDING, proofImageUrl: { not: null }, campaign: campaignScope },
       include: { tester: true, campaign: { include: { instructions: { orderBy: { stepNumber: "asc" } } } } },
       take: 5,
       orderBy: { createdAt: "asc" },
     }),
     prisma.submission.findMany({
-      where: { status: SubmissionStatus.APPROVED },
+      where: { status: SubmissionStatus.APPROVED, campaign: campaignScope },
       include: { tester: true, campaign: true },
       take: 12,
       orderBy: { reviewedAt: "desc" },
     }),
     prisma.appCampaign.findMany({
+      where: campaignScope,
       orderBy: { createdAt: "desc" },
       take: 3,
       select: { id: true, title: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true },
     }),
   ]);
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
+  const [pageViews, ctaClicks, signupStarts, uniqueSessions, referrerRows] = await Promise.all([
+    prisma.analyticsEvent.count({ where: { eventName: "page_view", createdAt: { gte: since } } }),
+    prisma.analyticsEvent.count({ where: { eventName: "cta_click", createdAt: { gte: since } } }),
+    prisma.analyticsEvent.count({ where: { eventName: "signup_start", createdAt: { gte: since } } }),
+    prisma.analyticsEvent.findMany({ where: { createdAt: { gte: since }, sessionKey: { not: null } }, distinct: ["sessionKey"], select: { sessionKey: true } }),
+    prisma.analyticsEvent.findMany({ where: { createdAt: { gte: since }, referrer: { not: null } }, select: { referrer: true } }),
+  ]);
+  const referrerCounts = new Map<string, number>();
+  referrerRows.forEach((row) => { if (row.referrer) referrerCounts.set(row.referrer, (referrerCounts.get(row.referrer) || 0) + 1); });
+  const analytics: AnalyticsSummaryData = { pageViews, ctaClicks, signupStarts, uniqueSessions: uniqueSessions.length, topReferrers: [...referrerCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([referrer, count]) => ({ referrer, count })) };
 
   return (
     <AuthCheck role="DEVELOPER">
@@ -73,6 +88,8 @@ export default async function ConsolePage() {
             </div>
           </div>
         </section>
+        <AnalyticsSummary data={analytics} />
+        <div className="mt-8" />
         <DeveloperStudio submissions={pendingSubmissions} assets={approvedAssets} />
       </div>
     </main>
