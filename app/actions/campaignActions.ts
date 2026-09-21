@@ -34,7 +34,8 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
     throw new Error("Only developers can launch SeedEnv drops.");
   }
 
-  const totalBudgetUsd = Number((input.totalSlots * input.bountyPerTaskUsd).toFixed(2));
+  const testerPayoutPoolUsd = input.totalSlots * input.bountyPerTaskUsd;
+  const totalBudgetUsd = Number((testerPayoutPoolUsd / (1 - SEEDENV_PLATFORM_FEE_PERCENT)).toFixed(2));
   const platformFeeUsd = Number((totalBudgetUsd * SEEDENV_PLATFORM_FEE_PERCENT).toFixed(2));
   const escrowTotalCents = usdToCents(totalBudgetUsd + platformFeeUsd);
 
@@ -89,7 +90,7 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
           unit_amount: escrowTotalCents,
           product_data: {
             name: `SeedEnv escrow: ${campaign.title}`,
-            description: `${input.totalSlots} tester slots at $${input.bountyPerTaskUsd.toFixed(2)} plus 20% platform fee`,
+            description: `${input.totalSlots} tester slots at $${input.bountyPerTaskUsd.toFixed(2)} plus 8% platform and telemetry fee`,
           },
         },
       },

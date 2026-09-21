@@ -76,6 +76,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [proofHash, setProofHash] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
+  const [telemetry, setTelemetry] = useState({ osBuild: "", deviceModel: "", screenResolution: "", appBuildVersion: "", networkType: "", recordingUrl: "", crashLogs: "", networkLogs: "" });
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [scope, animate] = useAnimate();
@@ -138,6 +139,7 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
           proofImageMimeType: selectedFile.type,
           proofImageHash: proofHash,
           feedbackText: feedback,
+          ...telemetry,
         });
         celebrate();
         setMessage(`Proof submitted. Review pending: ${formatCents(payoutCents)} + ${xpGain} XP queued.`);
@@ -233,7 +235,12 @@ export function MissionExperience({ missions }: { missions: Mission[] }) {
               <p className="mt-3 font-semibold text-white">Upload proof screenshot</p>
               <p className="mt-1 text-xs text-white/48">SHA-256 dedupe runs in your browser before upload.</p>
             </label>
-            <textarea value={feedback} onChange={(event) => setFeedback(event.target.value)} placeholder="What felt real, confusing, slow, or surprisingly good?" className="min-h-32 w-full rounded-2xl border border-stroke bg-black/24 p-4 text-sm text-white outline-none placeholder:text-white/34 focus:border-aurum" />
+            <div className="grid gap-3 rounded-2xl border border-stroke bg-black/24 p-4 sm:grid-cols-2">
+              {([["osBuild", "OS & build", "iOS 18.2"], ["deviceModel", "Device model", "iPhone 15 Pro"], ["screenResolution", "Screen resolution", "1179 x 2556"], ["appBuildVersion", "App build", "1.4.0 (82)"], ["networkType", "Network type", "Wi-Fi / 5G"]] as const).map(([key, label, placeholder]) => <label className="text-xs font-mono uppercase tracking-[0.12em] text-white/48" key={key}>{label}<input className="mt-1.5 w-full rounded-lg border border-stroke bg-[#0E1017] px-3 py-2 text-sm font-sans normal-case tracking-normal text-white outline-none focus:border-aurum" onChange={(event) => setTelemetry((current) => ({ ...current, [key]: event.target.value }))} placeholder={placeholder} value={telemetry[key]} /></label>)}
+              <label className="text-xs font-mono uppercase tracking-[0.12em] text-white/48 sm:col-span-2">Recording URL <input className="mt-1.5 w-full rounded-lg border border-stroke bg-[#0E1017] px-3 py-2 text-sm font-sans normal-case tracking-normal text-white outline-none focus:border-aurum" onChange={(event) => setTelemetry((current) => ({ ...current, recordingUrl: event.target.value }))} placeholder="https://.../recording.mp4" type="url" value={telemetry.recordingUrl} /></label>
+            </div>
+            <textarea value={feedback} onChange={(event) => setFeedback(event.target.value)} placeholder="What felt real, confusing, slow, or surprisingly good? Include Steps, Expected, and Actual when reporting a bug." className="min-h-32 w-full rounded-2xl border border-stroke bg-black/24 p-4 text-sm text-white outline-none placeholder:text-white/34 focus:border-aurum" />
+            <div className="grid gap-3 sm:grid-cols-2"><textarea value={telemetry.crashLogs} onChange={(event) => setTelemetry((current) => ({ ...current, crashLogs: event.target.value }))} placeholder="Crash logs (optional)" className="min-h-24 w-full rounded-xl border border-stroke bg-[#0E1017] p-3 font-mono text-xs text-emerald-300 outline-none focus:border-aurum" /><textarea value={telemetry.networkLogs} onChange={(event) => setTelemetry((current) => ({ ...current, networkLogs: event.target.value }))} placeholder="Network logs (optional)" className="min-h-24 w-full rounded-xl border border-stroke bg-[#0E1017] p-3 font-mono text-xs text-emerald-300 outline-none focus:border-aurum" /></div>
             <Button className="w-full" onClick={handleSubmit} disabled={isPending}>
               <CheckCircle2 className="size-4" /> Submit Proof
             </Button>

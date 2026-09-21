@@ -13,6 +13,14 @@ const proofSchema = z.object({
   proofImageMimeType: z.string().regex(/^image\/(png|jpe?g|webp)$/).optional(),
   proofImageHash: z.string().min(16).max(128).optional(),
   feedbackText: z.string().min(12).max(2000),
+  recordingUrl: z.string().url().optional().or(z.literal("")),
+  osBuild: z.string().max(120).optional().or(z.literal("")),
+  deviceModel: z.string().max(120).optional().or(z.literal("")),
+  screenResolution: z.string().max(80).optional().or(z.literal("")),
+  appBuildVersion: z.string().max(80).optional().or(z.literal("")),
+  networkType: z.string().max(80).optional().or(z.literal("")),
+  crashLogs: z.string().max(20000).optional().or(z.literal("")),
+  networkLogs: z.string().max(20000).optional().or(z.literal("")),
 });
 
 export async function claimTaskSlot(campaignId: string) {
@@ -93,6 +101,14 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
       proofImageUrl,
       proofImageHash: input.proofImageHash,
       feedbackText: input.feedbackText,
+      recordingUrl: input.recordingUrl || null,
+      osBuild: input.osBuild || null,
+      deviceModel: input.deviceModel || null,
+      screenResolution: input.screenResolution || null,
+      appBuildVersion: input.appBuildVersion || null,
+      networkType: input.networkType || null,
+      crashLogs: input.crashLogs || null,
+      networkLogs: input.networkLogs || null,
     },
   });
 }
@@ -145,7 +161,7 @@ export async function approveSubmission(submissionId: string) {
 
 export async function rejectSubmission(submissionId: string, reason: string) {
   const reviewer = await getCurrentUser("DEVELOPER");
-  const safeReason = z.enum(["Blurry Image", "Irrelevant Content", "Incomplete Steps", "Low Effort"]).parse(reason);
+  const safeReason = z.enum(["Blurry Image", "Irrelevant Content", "Incomplete Steps", "Low Effort", "Generic Feedback", "Did not follow test script", "Incomplete video proof"]).parse(reason);
 
   return prisma.$transaction(async (tx) => {
     const submission = await tx.submission.findUnique({ where: { id: submissionId }, include: { campaign: true } });
@@ -162,6 +178,20 @@ export async function rejectSubmission(submissionId: string, reason: string) {
     });
 
     return { rejected: true, reason: safeReason };
+  });
+}
+
+export async function requestSubmissionRevision(submissionId: string, note: string) {
+  const reviewer = await getCurrentUser("DEVELOPER");
+  const safeNote = z.string().trim().min(8).max(300).parse(note);
+  const submission = await prisma.submission.findUnique({ where: { id: submissionId }, include: { campaign: true } });
+  if (!submission || submission.status !== SubmissionStatus.PENDING) throw new Error("Pending submission not found.");
+  if (submission.campaign.developerId !== reviewer.id && reviewer.role !== "ADMIN") throw new Error("You cannot request revisions for this submission.");
+
+  return prisma.submission.update({
+    where: { id: submissionId },
+    data: { rejectionReason: `Revision requested: ${safeNote}` },
+    select: { id: true, rejectionReason: true },
   });
 }
 

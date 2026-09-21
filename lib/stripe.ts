@@ -6,4 +6,4 @@ export function getStripe() {
   return new Stripe(key, { apiVersion: "2026-08-26.dahlia" });
 }
 
-export const SEEDENV_PLATFORM_FEE_PERCENT = 0.2;
+export const SEEDENV_PLATFORM_FEE_PERCENT = 0.08;

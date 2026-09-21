@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { Coins, Download, Gem, LockKeyhole, MoreVertical, Plus, Radio, Share, Smartphone, Sparkles, Sprout, Swords, WalletCards, Zap } from "lucide-react";
+import { ArrowRight, Check, CircleHelp, Coins, Download, Gem, LockKeyhole, MoreVertical, Plus, Radio, Share, ShieldCheck, Smartphone, Sparkles, Sprout, Swords, WalletCards, Zap } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,10 +35,26 @@ type MissionTier = {
   className: string;
 };
 
+type JourneyTier = {
+  id: string;
+  label: string;
+  requirement: string;
+  perks: string[];
+  reward: string;
+  status: string;
+  className: string;
+};
+
+const journeyTiers: JourneyTier[] = [
+  { id: "scout", label: "Scout", requirement: "Unlocked by default", perks: ["3–5 min micro-tasks", "$3–$7 payouts", "Friction notes and single-flow checks"], reward: "+40–160 REP", status: "Ready to claim", className: "border-emerald-400/40 bg-emerald-500/10 text-emerald-100" },
+  { id: "validator", label: "Verified Validator", requirement: "3 validated Scout submissions and a 95%+ pass rate", perks: ["Multi-step scenario testing", "Crash and network log collection", "$15–$35 bounties"], reward: "+160–420 REP", status: "0 / 3 Scout missions completed", className: "border-violet-400/40 bg-violet-500/10 text-violet-100" },
+  { id: "launch", label: "Launch Squad", requirement: "Top 10% Validator REP", perks: ["App Store readiness audits", "Curated marketplace seeding", "$50–$150+ packages"], reward: "Verified specialist", status: "Locked · earn your place", className: "border-amber-400/40 bg-amber-500/10 text-amber-100" },
+];
+
 function missionTier(mission: Mission): MissionTier {
   if (mission.bountyPerTaskUsd >= 5) {
     return {
-      label: "Elite Bounty",
+      label: "Priority Cohort",
       className: "border-amber-400/30 bg-amber-500/10 text-amber-200 shadow-[0_0_28px_rgba(245,158,11,0.12)]",
     };
   }
@@ -108,7 +124,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
             </nav>
           ) : (
             <nav className="flex items-center gap-2 sm:gap-3">
-              <a className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" href="#missions">New Drops</a>
+              <a className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" href="#missions">Quest Board</a>
               <a className="hidden text-sm font-semibold text-neutral-400 transition-colors hover:text-white md:inline" href="#developers">
                 For Developers
               </a>
@@ -123,17 +139,17 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
       <section className="mx-auto grid max-w-7xl items-center gap-8 px-4 py-6 sm:gap-10 sm:px-6 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:py-24">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-[#0E1017]/80 px-3 py-2 text-xs font-semibold text-amber-100 shadow-lg shadow-amber-500/10 backdrop-blur-md sm:px-4 sm:text-sm">
-            <Sparkles className="size-4 text-amber-500" /> Browse live validation work before joining.
+            <Sparkles className="size-4 text-amber-500" /> ⚡ Real software testing. Real payouts. Powered by vetted human feedback.
           </div>
           <h1 className="hero-title mt-5 max-w-4xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-[2.35rem] font-black leading-[0.94] tracking-tight text-transparent sm:mt-6 sm:text-6xl xl:text-7xl">
             Seed authentic communities before launch day.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-neutral-400 sm:mt-6 sm:text-lg sm:leading-8">
-            SeedEnv lets testers preview active missions, compare loot rewards, and authenticate only when they are ready to join the board.
+            SeedEnv lets developers launch guaranteed testing cohorts while testers complete quick micro-missions, build verified reputation, and unlock high-tier app store readiness packages.
           </p>
           <div className="mt-6 hidden flex-wrap gap-3 sm:flex">
-            <Button onClick={() => goToProtectedAction("/dashboard", "Claiming seed missions")}>Claim Seed</Button>
-            <Button variant="ghost" onClick={() => goToProtectedAction("/console?intent=new-drop", "Creating deployments")}>New Drop</Button>
+            <Button onClick={() => goToProtectedAction("/console?intent=new-campaign", "Deploying a cohort")}>Deploy a Cohort <ArrowRight className="size-4" /></Button>
+            <a className="inline-flex h-11 items-center justify-center rounded-xl border border-white/15 px-5 text-sm font-semibold text-neutral-200 transition-colors hover:border-amber-400/50 hover:text-white" href="#missions">Start as a Scout ($0 Entry)</a>
           </div>
           {guestNotice ? <p className="mt-4 max-w-xl rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 text-sm leading-6 text-neutral-300">{guestNotice}</p> : null}
           <div className="mt-6 grid grid-cols-3 gap-2 sm:hidden">
@@ -144,7 +160,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
         </div>
 
         <aside className="luxury-panel hidden rounded-2xl border-white/10 bg-zinc-900/80 p-4 backdrop-blur-md sm:block sm:p-5">
-          <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Loot snapshot</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Active rewards</p>
           <div className="mt-5 grid gap-3">
             {missions.slice(0, 3).map((mission) => (
               <div key={mission.id} className="rounded-2xl border border-white/10 bg-zinc-950/45 p-4 backdrop-blur-md transition-all hover:border-amber-500/50">
@@ -160,6 +176,8 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
           </div>
         </aside>
       </section>
+
+      <ValidatorJourney />
 
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8" id="missions">
         <div className="mb-4 flex items-end justify-between gap-4 sm:mb-5">
@@ -246,24 +264,103 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
       </section>
 
       <section className="mx-auto mt-12 max-w-7xl px-4 sm:mt-16 sm:px-6 lg:px-8" id="developers">
-        <div className="luxury-panel rounded-2xl p-6 md:p-8">
-          <p className="text-xs uppercase tracking-[0.28em] text-amber-500">For Developers</p>
-          <div className="mt-4 grid gap-6 md:grid-cols-[1fr_auto] md:items-end">
-            <div>
-              <h2 className="max-w-3xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl">Preview the validation marketplace before creating a deployment.</h2>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-neutral-400">Browse live seed missions, reward levels, and tester-facing proof expectations. When you are ready to create a deployment, press Sign In / Join.</p>
-            </div>
-            <Button onClick={() => goToSignIn("/console?intent=new-drop")}>Sign In / Join</Button>
-          </div>
-        </div>
+        <DeveloperPricing onDeploy={() => goToProtectedAction("/console?intent=new-campaign", "Deploying a cohort")} />
       </section>
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#090A0F]/92 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl sm:hidden">
         <div className="mx-auto grid max-w-md grid-cols-2 gap-3">
-          <Button className="h-12 rounded-2xl" onClick={() => goToProtectedAction("/dashboard", "Claiming seed missions")}>Claim Seed</Button>
+          <Button className="h-12 rounded-2xl" onClick={() => goToProtectedAction("/dashboard", "Starting as a Scout")}>Start as a Scout</Button>
           <Button className="h-12 rounded-2xl" onClick={() => goToSignIn("/dashboard")}>Sign In</Button>
         </div>
       </div>
     </main>
+  );
+}
+
+function ValidatorJourney() {
+  const [selectedId, setSelectedId] = useState("scout");
+  const selectedTier = journeyTiers.find((tier) => tier.id === selectedId) || journeyTiers[0];
+
+  return (
+    <section className="mx-auto mt-12 max-w-7xl px-4 sm:mt-16 sm:px-6 lg:px-8" aria-labelledby="validator-journey-title">
+      <div className="luxury-panel rounded-2xl p-5 sm:p-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Progression path</p>
+            <h2 id="validator-journey-title" className="mt-2 text-2xl font-black tracking-tight text-white sm:text-3xl">The Validator Journey</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">Start with a focused check, earn verified reputation, and graduate into launch-critical validation work.</p>
+          </div>
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-200"><ShieldCheck className="size-4" /> Human-verified progression</span>
+        </div>
+
+        <div className="relative mt-8 grid gap-4 md:grid-cols-3 md:gap-0">
+          <div className="pointer-events-none absolute left-[16%] right-[16%] top-7 hidden border-t border-dashed border-white/20 md:block" aria-hidden="true" />
+          {journeyTiers.map((tier, index) => {
+            const isSelected = selectedId === tier.id;
+            return (
+              <div className="relative z-10 flex flex-col md:px-3" key={tier.id}>
+                <button
+                  aria-describedby={`journey-detail-${tier.id}`}
+                  aria-label={`${tier.label}: ${tier.requirement}`}
+                  aria-pressed={isSelected}
+                  className={`group flex items-center gap-3 rounded-2xl border p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-400/50 ${isSelected ? "border-amber-400/60 bg-amber-500/10 shadow-[0_0_30px_rgba(245,158,11,0.12)]" : "border-white/10 bg-zinc-950/55"}`}
+                  onClick={() => setSelectedId(tier.id)}
+                  type="button"
+                >
+                  <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border ${tier.className} ${tier.id === "scout" ? "animate-pulse" : ""}`}>
+                    {tier.id === "launch" ? <ShieldCheck className="size-4" /> : <span className="font-mono text-xs font-black">{index + 1}</span>}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-white">Tier {index + 1}: {tier.label}</span>
+                    <span className="mt-1 block text-xs text-zinc-500">{tier.status}</span>
+                  </span>
+                </button>
+                <div className="mt-3 rounded-2xl border border-white/10 bg-zinc-950/45 p-4" id={`journey-detail-${tier.id}`}>
+                  <p className="text-xs font-bold uppercase tracking-[0.14em] text-amber-500">{tier.reward}</p>
+                  <p className="mt-2 text-xs leading-5 text-zinc-400">{tier.requirement}</p>
+                  <ul className="mt-3 space-y-2 text-xs leading-5 text-zinc-300">
+                    {tier.perks.map((perk) => <li className="flex gap-2" key={perk}><Check className="mt-0.5 size-3.5 shrink-0 text-emerald-400" /> {perk}</li>)}
+                  </ul>
+                  {tier.id === "validator" ? <div className="mt-4"><div className="mb-1 flex justify-between text-[10px] font-bold uppercase tracking-[0.12em] text-zinc-500"><span>Scout submissions</span><span>0 / 3</span></div><div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full w-0 rounded-full bg-violet-400" /></div></div> : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-5 rounded-xl border border-amber-400/15 bg-amber-500/5 px-4 py-3 text-xs leading-5 text-amber-100/80" role="status">Selected path: <strong className="text-amber-300">{selectedTier.label}</strong>. Tap any milestone to inspect its requirements and perks.</p>
+      </div>
+    </section>
+  );
+}
+
+function DeveloperPricing({ onDeploy }: { onDeploy: () => void }) {
+  const [budget, setBudget] = useState(300);
+  const testerCount = Math.max(1, Math.round(budget / 10));
+  const payoutLow = Math.round(budget * 0.9);
+  const payoutHigh = Math.round(budget * 0.95);
+  const feeLow = Math.round(budget * 0.05);
+  const feeHigh = Math.round(budget * 0.1);
+
+  return (
+    <div className="luxury-panel rounded-2xl p-5 md:p-8">
+      <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-start">
+        <div>
+          <p className="text-xs uppercase tracking-[0.28em] text-amber-500">For Developers · Transparent pricing</p>
+          <h2 className="mt-3 max-w-2xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl">Launch validation without mystery fees.</h2>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-neutral-400">SeedEnv takes only a 5%–10% platform fee on your total campaign budget. 90%+ goes directly to incentivizing vetted, enthusiastic beta users.</p>
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {["Proof hosting", "Automated validation", "Fraud protection"].map((item) => <div className="rounded-xl border border-white/10 bg-zinc-950/45 p-3 text-xs font-semibold text-zinc-300" key={item}><Check className="mb-2 size-4 text-emerald-400" />{item}</div>)}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-zinc-950/55 p-5">
+          <div className="flex items-center justify-between gap-3"><label className="text-sm font-bold text-white" htmlFor="campaign-budget">Campaign budget</label><div className="flex items-center gap-1 rounded-lg border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-amber-200"><span>$</span><input aria-label="Campaign budget in dollars" className="w-20 bg-transparent text-right font-mono font-black outline-none" id="campaign-budget" max="5000" min="100" onChange={(event) => setBudget(Number(event.target.value) || 100)} type="number" value={budget} /></div></div>
+          <input aria-label="Campaign budget slider" className="mt-5 w-full accent-amber-500" max="5000" min="100" onChange={(event) => setBudget(Number(event.target.value))} step="25" type="range" value={budget} />
+          <div className="mt-5 space-y-3 text-sm"><div className="flex justify-between gap-4 text-zinc-300"><span>Tester payout pool (90–95%)</span><strong className="font-mono text-emerald-300">${payoutLow}–${payoutHigh}</strong></div><div className="flex justify-between gap-4 text-zinc-300"><span>Platform & telemetry fee (5–10%)</span><strong className="font-mono text-amber-300">${feeLow}–${feeHigh}</strong></div><div className="flex justify-between gap-4 border-t border-white/10 pt-3 text-zinc-300"><span>Guaranteed deliverables</span><strong className="font-mono text-white">{testerCount} audits</strong></div></div>
+          <p className="mt-4 text-xs leading-5 text-zinc-500">Distributed across {testerCount} testers with device logs and verified tester reviews included.</p>
+          <Button className="mt-5 w-full" onClick={onDeploy}>Launch This Cohort <ArrowRight className="size-4" /></Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -284,7 +381,7 @@ function QuestMissionCard({ index, mission, onProtectedAction }: {
   const [spotlight, setSpotlight] = useState({ x: 50, y: 50 });
   const spotsLeft = mission.totalSlots - mission.claimedSlots;
   const claimedPercent = Math.min(100, Math.max(0, (mission.claimedSlots / mission.totalSlots) * 100));
-  const xpReward = Math.max(75, Math.round(mission.bountyPerTaskUsd * 32));
+  const repReward = Math.max(75, Math.round(mission.bountyPerTaskUsd * 32));
   const tier = missionTier(mission);
   const segmentCount = 12;
   const filledSegments = Math.round((claimedPercent / 100) * segmentCount);
@@ -323,9 +420,9 @@ function QuestMissionCard({ index, mission, onProtectedAction }: {
         <div className="mt-5 rounded-2xl border border-white/10 bg-zinc-950/55 p-3 backdrop-blur-md sm:p-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">
-              <Swords className="size-3.5 text-amber-500" /> Loot Drops
+              <Swords className="size-3.5 text-amber-500" /> Mission Bounties
             </p>
-            <span className="font-mono text-xs text-zinc-500">Board #{index + 1}</span>
+            <span className="rounded-full border border-amber-400/20 bg-amber-500/10 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200">Unlocks {Math.min(99, 33 + index * 12)}% of Tier 2</span>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -333,10 +430,11 @@ function QuestMissionCard({ index, mission, onProtectedAction }: {
               <p className="mt-2 font-mono text-lg font-black text-amber-500">{formatCents(Math.round(mission.bountyPerTaskUsd * 100))}</p>
             </div>
             <div className="rounded-xl border border-violet-400/20 bg-violet-500/10 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-              <div className="flex items-center gap-2 text-xs font-semibold text-violet-200"><Gem className="size-4" /> XP</div>
-              <p className="mt-2 font-mono text-lg font-black text-violet-200">+{xpReward}</p>
+              <div className="flex items-center gap-2 text-xs font-semibold text-violet-200"><Gem className="size-4" /> REP Gain</div>
+              <p className="mt-2 font-mono text-lg font-black text-violet-200">+{repReward}</p>
             </div>
           </div>
+          <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-zinc-400"><CircleHelp className="mt-0.5 size-3.5 shrink-0 text-amber-500" /> Requires: 1 screen recording + 2-sentence friction log</p>
         </div>
 
         <div className="mt-4 rounded-2xl border border-white/10 bg-zinc-950/45 p-4">
@@ -353,7 +451,7 @@ function QuestMissionCard({ index, mission, onProtectedAction }: {
         </div>
 
         <Button className="mt-5 w-full border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_18px_38px_rgba(245,158,11,0.12)] active:scale-[0.98]" onClick={() => onProtectedAction(`/dashboard?claim=${mission.id}`, `Claiming ${mission.title}`)} disabled={spotsLeft <= 0}>
-          <Zap className="size-4" /> Claim Seed
+          <Zap className="size-4" /> Claim Mission
         </Button>
         {index === 0 ? (
           <button className="mt-3 flex w-full items-center justify-center gap-2 text-xs font-semibold text-zinc-500 transition-colors hover:text-zinc-300" onClick={() => onProtectedAction(`/dashboard?claim=${mission.id}`, "Submitting proof")} type="button">

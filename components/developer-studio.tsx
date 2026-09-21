@@ -5,15 +5,24 @@ import { motion } from "framer-motion";
 import { ArrowDown, ArrowUp, BadgeDollarSign, Boxes, CheckCircle2, ImageIcon, Plus, Trash2, XCircle } from "lucide-react";
 import Image from "next/image";
 import { useMemo, useState, useTransition } from "react";
-import { approveSubmission, rejectSubmission } from "@/app/actions/submissionActions";
+import { approveSubmission, rejectSubmission, requestSubmissionRevision } from "@/app/actions/submissionActions";
 import { createCampaignWithEscrow, type CampaignInput } from "@/app/actions/campaignActions";
 import { Button } from "@/components/ui/button";
+import { DeveloperInsights } from "@/components/developer-insights";
 import { formatCents } from "@/lib/utils";
 
 type ReviewSubmission = {
   id: string;
   proofImageUrl: string | null;
+  recordingUrl: string | null;
   feedbackText: string | null;
+  osBuild: string | null;
+  deviceModel: string | null;
+  screenResolution: string | null;
+  appBuildVersion: string | null;
+  networkType: string | null;
+  crashLogs: string | null;
+  networkLogs: string | null;
   payoutCents: number;
   tester: { username: string; avatarUrl: string | null };
   campaign: {
@@ -51,8 +60,8 @@ export function DeveloperStudio({ submissions, assets }: { submissions: ReviewSu
   const [isPending, startTransition] = useTransition();
 
   const payoutPool = useMemo(() => form.totalSlots * form.bountyPerTaskUsd, [form.totalSlots, form.bountyPerTaskUsd]);
-  const platformFee = useMemo(() => payoutPool * 0.2, [payoutPool]);
-  const totalEscrow = payoutPool + platformFee;
+  const totalEscrow = useMemo(() => payoutPool / 0.92, [payoutPool]);
+  const platformFee = useMemo(() => totalEscrow * 0.08, [totalEscrow]);
 
   function updateTask(index: number, patch: Partial<CampaignInput["instructions"][number]>) {
     setForm((current) => ({
@@ -84,12 +93,15 @@ export function DeveloperStudio({ submissions, assets }: { submissions: ReviewSu
     });
   }
 
-  function review(submissionId: string, action: "approve" | "reject", reason?: string) {
+  function review(submissionId: string, action: "approve" | "reject" | "revision", reason?: string) {
     startTransition(async () => {
       try {
         if (action === "approve") {
           const result = await approveSubmission(submissionId);
-          setMessage(`Approved: ${formatCents(result.payoutCents)} and ${result.xpGain} XP released.`);
+          setMessage(`Approved: ${formatCents(result.payoutCents)} and ${result.xpGain} REP released.`);
+        } else if (action === "revision") {
+          await requestSubmissionRevision(submissionId, reason || "Please add clearer reproduction steps and supporting proof.");
+          setMessage("Revision request sent to the tester.");
         } else {
           await rejectSubmission(submissionId, reason || "Low Effort");
           setMessage("Submission rejected and slot returned.");
@@ -102,6 +114,7 @@ export function DeveloperStudio({ submissions, assets }: { submissions: ReviewSu
 
   return (
     <section className="space-y-8">
+      <DeveloperInsights submissions={submissions} />
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="luxury-panel rounded-2xl p-6 transition-all hover:border-violet-500/30">
           <div className="flex items-center justify-between gap-4">
@@ -184,10 +197,11 @@ export function DeveloperStudio({ submissions, assets }: { submissions: ReviewSu
               <Slider label="Number of testers" min={5} max={250} value={form.totalSlots} onChange={(value) => setForm({ ...form, totalSlots: value })} />
               <Slider label="Bounty per tester ($)" min={1} max={25} value={form.bountyPerTaskUsd} step={0.5} onChange={(value) => setForm({ ...form, bountyPerTaskUsd: value })} />
               <div className="grid gap-3 md:grid-cols-3">
-                <Metric label="Tester payout pool" value={`$${payoutPool.toFixed(2)}`} />
-                <Metric label="20% platform fee" value={`$${platformFee.toFixed(2)}`} />
+                <Metric label="Tester payout escrow (92%)" value={`$${payoutPool.toFixed(2)}`} />
+                <Metric label="8% platform & telemetry fee" value={`$${platformFee.toFixed(2)}`} />
                 <Metric label="Total escrow" value={`$${totalEscrow.toFixed(2)}`} gold />
               </div>
+              <p className="text-xs leading-5 text-white/50">No hidden markups. 92% of funds go straight to rewarding verified human validators.</p>
               <Button size="lg" className="w-full" onClick={launchCampaign} disabled={isPending}>
                 <BadgeDollarSign className="size-5" /> Deposit Escrow & Launch
               </Button>
@@ -237,7 +251,7 @@ function IconButton({ label, icon, onClick }: { label: string; icon: React.React
   return <button aria-label={label} type="button" onClick={onClick} className="rounded-xl border border-[#1F2430] bg-[#0E1017]/80 p-2 text-white/72 backdrop-blur-md transition-all hover:border-violet-500/30 hover:text-white">{icon}</button>;
 }
 
-function ReviewDeck({ submissions, onReview, isPending }: { submissions: ReviewSubmission[]; onReview: (id: string, action: "approve" | "reject", reason?: string) => void; isPending: boolean }) {
+function ReviewDeck({ submissions, onReview, isPending }: { submissions: ReviewSubmission[]; onReview: (id: string, action: "approve" | "reject" | "revision", reason?: string) => void; isPending: boolean }) {
   const active = submissions[0];
   return (
     <div className="luxury-panel rounded-2xl p-6 transition-all hover:border-violet-500/30">
@@ -262,9 +276,10 @@ function ReviewDeck({ submissions, onReview, isPending }: { submissions: ReviewS
               <p className="text-sm font-bold text-violet-200">{active.tester.username}</p>
               <p className="mt-2 text-sm leading-6 text-white/62">{active.feedbackText || "No feedback submitted yet."}</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Button onClick={() => onReview(active.id, "approve")} disabled={isPending}><CheckCircle2 className="size-4" /> Approve & Pay</Button>
-              <Button variant="danger" onClick={() => onReview(active.id, "reject", "Low Effort")} disabled={isPending}><XCircle className="size-4" /> Reject</Button>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Button onClick={() => onReview(active.id, "approve")} disabled={isPending}><CheckCircle2 className="size-4" /> Approve & Release</Button>
+              <Button variant="ghost" onClick={() => { const note = window.prompt("What should the tester clarify or resubmit?", "Please add clearer reproduction steps and supporting proof."); if (note) onReview(active.id, "revision", note); }} disabled={isPending}>Request Revision</Button>
+              <Button variant="danger" onClick={() => { const reason = window.prompt("Reason: Generic Feedback, Did not follow test script, or Incomplete video proof", "Generic Feedback"); if (reason) onReview(active.id, "reject", reason); }} disabled={isPending}><XCircle className="size-4" /> Reject Quality</Button>
             </div>
           </div>
         </div>

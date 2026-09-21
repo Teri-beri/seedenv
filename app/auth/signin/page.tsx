@@ -1,11 +1,11 @@
 import { Suspense } from "react";
-import { RoleSignInForm } from "@/components/role-signin-form";
+import { CompactSignupForm } from "@/components/compact-signup-form";
 
 export default function SignInPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#090A0F] px-4 py-12 text-white">
       <Suspense fallback={<SignInFallback />}>
-        <RoleSignInForm />
+        <CompactSignupForm />
       </Suspense>
     </div>
   );

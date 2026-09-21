@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     buildCommand: npm run build
-    startCommand: npm run start
+    startCommand: npx prisma migrate deploy && npm run start
     envVars:
       - key: NODE_VERSION
         value: 22.x

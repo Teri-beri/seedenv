@@ -176,8 +176,16 @@ model Submission {
   testerId        String
   tester          User             @relation("TesterSubmissions", fields: [testerId], references: [id], onDelete: Cascade)
   proofImageUrl   String?
+  recordingUrl    String?
   proofImageHash  String?
   feedbackText    String?
+  osBuild         String?
+  deviceModel     String?
+  screenResolution String?
+  appBuildVersion String?
+  networkType     String?
+  crashLogs       String?           @db.Text
+  networkLogs     String?           @db.Text
   status          SubmissionStatus @default(PENDING)
   rejectionReason String?
   payoutCents     Int
