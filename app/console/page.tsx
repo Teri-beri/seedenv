@@ -19,6 +19,8 @@ export default async function ConsolePage() {
 
   await ensurePreviewData();
   const campaignScope = { developerId: session.user.id };
+  const analyticsOwnerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();
+  const canViewAnalytics = Boolean(analyticsOwnerEmail && session.user.email?.toLowerCase() === analyticsOwnerEmail);
   const [pendingSubmissions, approvedAssets, campaigns] = await Promise.all([
     prisma.submission.findMany({
       where: { status: SubmissionStatus.PENDING, proofImageUrl: { not: null }, campaign: campaignScope },
@@ -39,18 +41,21 @@ export default async function ConsolePage() {
       select: { id: true, title: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true },
     }),
   ]);
-  const since = new Date();
-  since.setDate(since.getDate() - 30);
-  const [pageViews, ctaClicks, signupStarts, uniqueSessions, referrerRows] = await Promise.all([
-    prisma.analyticsEvent.count({ where: { eventName: "page_view", createdAt: { gte: since } } }),
-    prisma.analyticsEvent.count({ where: { eventName: "cta_click", createdAt: { gte: since } } }),
-    prisma.analyticsEvent.count({ where: { eventName: "signup_start", createdAt: { gte: since } } }),
-    prisma.analyticsEvent.findMany({ where: { createdAt: { gte: since }, sessionKey: { not: null } }, distinct: ["sessionKey"], select: { sessionKey: true } }),
-    prisma.analyticsEvent.findMany({ where: { createdAt: { gte: since }, referrer: { not: null } }, select: { referrer: true } }),
-  ]);
-  const referrerCounts = new Map<string, number>();
-  referrerRows.forEach((row) => { if (row.referrer) referrerCounts.set(row.referrer, (referrerCounts.get(row.referrer) || 0) + 1); });
-  const analytics: AnalyticsSummaryData = { pageViews, ctaClicks, signupStarts, uniqueSessions: uniqueSessions.length, topReferrers: [...referrerCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([referrer, count]) => ({ referrer, count })) };
+  let analytics: AnalyticsSummaryData | null = null;
+  if (canViewAnalytics) {
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+    const [pageViews, ctaClicks, signupStarts, uniqueSessions, referrerRows] = await Promise.all([
+      prisma.analyticsEvent.count({ where: { eventName: "page_view", createdAt: { gte: since } } }),
+      prisma.analyticsEvent.count({ where: { eventName: "cta_click", createdAt: { gte: since } } }),
+      prisma.analyticsEvent.count({ where: { eventName: "signup_start", createdAt: { gte: since } } }),
+      prisma.analyticsEvent.findMany({ where: { createdAt: { gte: since }, sessionKey: { not: null } }, distinct: ["sessionKey"], select: { sessionKey: true } }),
+      prisma.analyticsEvent.findMany({ where: { createdAt: { gte: since }, referrer: { not: null } }, select: { referrer: true } }),
+    ]);
+    const referrerCounts = new Map<string, number>();
+    referrerRows.forEach((row) => { if (row.referrer) referrerCounts.set(row.referrer, (referrerCounts.get(row.referrer) || 0) + 1); });
+    analytics = { pageViews, ctaClicks, signupStarts, uniqueSessions: uniqueSessions.length, topReferrers: [...referrerCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([referrer, count]) => ({ referrer, count })) };
+  }
 
   return (
     <AuthCheck role="DEVELOPER">
@@ -88,7 +93,7 @@ export default async function ConsolePage() {
             </div>
           </div>
         </section>
-        <AnalyticsSummary data={analytics} />
+        {analytics ? <AnalyticsSummary data={analytics} /> : null}
         <div className="mt-8" />
         <DeveloperStudio submissions={pendingSubmissions} assets={approvedAssets} />
       </div>

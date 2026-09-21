@@ -84,6 +84,7 @@ Render does not receive local `.env` values. Set these in the Render dashboard b
 - `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`
 - `CRON_SECRET`
 - `NEXT_PUBLIC_TERIMUS_URL` — the exact TERIMUS LLC landing-page URL used by the public footer.
+- `SEEDENV_ANALYTICS_OWNER_EMAIL` — the exact owner email allowed to view site analytics in the developer console. Analytics is hidden when this is unset.
 
 If `NEXTAUTH_SECRET` is missing, NextAuth will return `NO_SECRET` and protected routes will fail in production.
 

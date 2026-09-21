@@ -34,3 +34,5 @@ services:
         sync: false
       - key: NEXT_PUBLIC_TERIMUS_URL
         sync: false
+      - key: SEEDENV_ANALYTICS_OWNER_EMAIL
+        sync: false

@@ -24,6 +24,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Stripe webhook signing is not configured." }, { status: 500 });
   }
 
-  const parsed = JSON.parse(rawBody) as { type: string; data: { object: { id?: string; payment_intent?: string; metadata?: Record<string, string> } } };
-  return NextResponse.json(await handleStripeWebhook(parsed));
+  try {
+    const parsed = JSON.parse(rawBody) as { type: string; data: { object: { id?: string; payment_intent?: string; metadata?: Record<string, string> } } };
+    return NextResponse.json(await handleStripeWebhook(parsed));
+  } catch {
+    return NextResponse.json({ message: "Invalid webhook payload" }, { status: 400 });
+  }
 }
