@@ -98,10 +98,11 @@ select {
 
 .seedenv-ambient-grid {
   background-image:
-    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1px, transparent 0),
+    radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.08) 1px, transparent 1.5px),
     linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 22px 22px, 64px 64px, 64px 64px;
+  background-size: 16px 16px, 64px 64px, 64px 64px;
+  background-position: 0 0, 0 0, 0 0;
 }
 
 .seedenv-ambient-grid > :not(.seedenv-grid-flash) {
