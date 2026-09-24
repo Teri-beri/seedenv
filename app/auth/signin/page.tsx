@@ -8,13 +8,13 @@ export default function SignInPage() {
     <main className="seedenv-ambient-grid relative grid min-h-screen place-items-center overflow-hidden bg-[linear-gradient(180deg,#090A0F_0%,#0D1018_50%,#090A0F_100%)] px-4 py-10 text-white sm:py-12">
       <AnimatedGridBackground />
       <div className="relative z-10 mx-auto flex w-full max-w-lg flex-col items-center">
-        <div className="mb-7 inline-flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-zinc-950/70 px-4 py-3 shadow-2xl shadow-black/60 backdrop-blur-xl">
-          <div className="relative size-11 overflow-hidden rounded-xl border border-white/[0.08] bg-zinc-950 shadow-lg shadow-black/50">
-            <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="44px" className="scale-[1.55] object-cover" priority />
+        <div className="mb-8 flex items-center gap-3">
+          <div className="relative size-12 overflow-hidden rounded-xl border border-white/[0.08] bg-zinc-950 shadow-lg shadow-black/50">
+            <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="48px" className="scale-[1.65] object-cover" priority />
           </div>
           <div className="text-left">
-            <p className="text-[15px] font-semibold leading-none tracking-tight text-white">SeedEnv</p>
-            <p className="mt-1 text-[11px] leading-none text-zinc-500">Seed real beta communities.</p>
+            <p className="text-lg font-semibold leading-none tracking-tight text-white">SeedEnv</p>
+            <p className="mt-1 text-xs leading-none text-zinc-500">Seed real beta communities.</p>
           </div>
         </div>
         <Suspense fallback={<SignInFallback />}>

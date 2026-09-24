@@ -16,6 +16,13 @@ function getInitialRole(value: string | null): SignupRole {
   return value === "DEVELOPER" ? "DEVELOPER" : "TESTER";
 }
 
+function authErrorMessage(value: string | null) {
+  if (!value) return "";
+  if (value === "Callback") return "We could not complete that sign-in. Please try again or continue with email.";
+  if (value === "OAuthAccountNotLinked") return "That email is already linked to a different sign-in method. Continue with email or use the original provider.";
+  return "Authentication could not be completed. Please try again.";
+}
+
 function getSafeCallback(value: string | null, role: SignupRole) {
   if (value?.startsWith("/")) return value;
   return role === "DEVELOPER" ? "/console?intent=new-campaign" : "/dashboard";
@@ -74,7 +81,9 @@ export function CompactSignupForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(() => authErrorMessage(searchParams.get("error")));
+  const isAuthError = Boolean(searchParams.get("error"));
+  const mode = isAuthError ? "signin" : "signup";
 
   async function continueWithEmail(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -136,6 +145,7 @@ export function CompactSignupForm() {
 
   return (
     <div className="w-full max-w-lg space-y-7 rounded-2xl border border-white/[0.08] bg-zinc-950/75 p-6 shadow-2xl shadow-black/80 backdrop-blur-xl sm:p-8">
+      {isAuthError ? <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100" role="alert">{message}</div> : null}
       <div className="grid grid-cols-2 rounded-xl border border-zinc-800 bg-zinc-900 p-1" role="tablist" aria-label="Account type">
         {(["TESTER", "DEVELOPER"] as const).map((item) => {
           const active = role === item;
@@ -155,8 +165,8 @@ export function CompactSignupForm() {
       </div>
 
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-white">Create {role === "TESTER" ? "tester" : "developer"} account</h1>
-        <p className="text-base leading-6 text-zinc-400">{role === "TESTER" ? "Start with Tier 1 Scout missions and build your rank." : "Launch validation cohorts with transparent payouts and proof."}</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">{mode === "signin" ? "Sign in" : `Create ${role === "TESTER" ? "tester" : "developer"} account`}</h1>
+        <p className="text-base leading-6 text-zinc-400">{mode === "signin" ? "Continue to your SeedEnv workspace with your preferred access method." : role === "TESTER" ? "Start with Tier 1 Scout missions and build your rank." : "Launch validation cohorts with transparent payouts and proof."}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -167,12 +177,12 @@ export function CompactSignupForm() {
       <div className="relative flex items-center justify-center"><div className="w-full border-t border-zinc-800" /><span className="absolute bg-[#0b0c10] px-3 text-xs font-mono uppercase tracking-wider text-zinc-500">or continue with email</span></div>
 
       <form className="space-y-5" onSubmit={continueWithEmail}>
-        <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400" htmlFor="signup-name">Full Name<input autoComplete="name" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signup-name" onChange={(event) => setName(event.target.value)} placeholder="Alex Morgan" required value={name} /></label>
-        <label className="block text-xs font-mono uppercase tracking-wider text-zinc-400" htmlFor="signup-email">Email Address<input autoComplete="email" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signup-email" onChange={(event) => setEmail(event.target.value)} placeholder="alex@company.com" required type="email" value={email} /></label>
-        <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300/20 bg-gradient-to-b from-amber-400 to-amber-600 px-4 py-3.5 text-base font-semibold text-black shadow-lg shadow-amber-500/15 transition-all hover:from-amber-300 hover:to-amber-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} type="submit">{loading ? <LoaderCircle className="size-4 animate-spin" /> : null}{loading ? "Sending access link..." : "Continue to Onboarding"}</button>
+        <label className="block text-sm font-medium text-zinc-300" htmlFor="signup-name">Full name<input autoComplete="name" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signup-name" onChange={(event) => setName(event.target.value)} placeholder="Alex Morgan" required value={name} /></label>
+        <label className="block text-sm font-medium text-zinc-300" htmlFor="signup-email">Email address<input autoComplete="email" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signup-email" onChange={(event) => setEmail(event.target.value)} placeholder="alex@company.com" required type="email" value={email} /></label>
+        <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300/30 bg-amber-500 px-4 py-3.5 text-base font-semibold text-black shadow-sm shadow-black/20 transition-all hover:bg-amber-400 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} type="submit">{loading ? <LoaderCircle className="size-4 animate-spin" /> : null}{loading ? "Sending access link..." : mode === "signin" ? "Send sign-in link" : "Continue to Onboarding"}</button>
       </form>
 
-      {message ? <p className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3 text-center text-xs leading-5 text-zinc-300" role="status">{message}</p> : null}
+      {message && !isAuthError ? <p className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3 text-center text-xs leading-5 text-zinc-300" role="status">{message}</p> : null}
       <p className="pt-1 text-center text-sm text-zinc-500">Already have an account? <a className="font-semibold text-amber-400 hover:underline" href="/auth/signin">Sign in</a></p>
     </div>
   );
