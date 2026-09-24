@@ -143,7 +143,9 @@ export function CompactSignupForm() {
   }
 
   return (
-    <div className="w-full max-w-lg space-y-7 rounded-2xl border border-white/[0.08] bg-zinc-950/75 p-6 shadow-2xl shadow-black/80 backdrop-blur-xl sm:p-8">
+    <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/[0.08] bg-zinc-950/75 p-6 shadow-2xl shadow-black/80 backdrop-blur-xl sm:p-8">
+      <div className="pointer-events-none absolute inset-0 opacity-[0.03]" aria-hidden="true" style={{ backgroundImage: "url('/seedenv-logo-v2.png')", backgroundRepeat: "repeat", backgroundSize: "112px 84px", backgroundPosition: "center" }} />
+      <div className="relative z-10 space-y-7">
       {isAuthError ? <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100" role="alert">{message}</div> : null}
       <div className="grid grid-cols-2 rounded-xl border border-zinc-800 bg-zinc-900 p-1" role="tablist" aria-label="Account type">
         {(["TESTER", "DEVELOPER"] as const).map((item) => {
@@ -164,7 +166,7 @@ export function CompactSignupForm() {
       </div>
 
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-white">Create {role === "TESTER" ? "tester" : "developer"} account</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">SeedEnv</h1>
         <p className="text-base leading-6 text-zinc-400">Get started with your SeedEnv workspace.</p>
       </div>
 
@@ -183,6 +185,7 @@ export function CompactSignupForm() {
 
       {message && !isAuthError ? <p className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3 text-center text-xs leading-5 text-zinc-300" role="status">{message}</p> : null}
       <p className="pt-1 text-center text-sm text-zinc-500">Already have an account? <a className="font-semibold text-amber-400 hover:underline" href="/auth/signin">Sign in</a></p>
+      </div>
     </div>
   );
 }
