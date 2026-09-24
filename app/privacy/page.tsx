@@ -65,6 +65,7 @@ export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-[#090A0F] px-4 py-16 text-white">
       <article className="mx-auto max-w-4xl rounded-2xl border border-white/[0.08] bg-zinc-950/75 p-6 shadow-2xl shadow-black/80 sm:p-10">
+        <a className="inline-flex items-center rounded-lg border border-white/[0.08] bg-zinc-950/70 px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white" href="/auth/signin">← Back to sign up</a>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-400">SeedEnv</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight">Privacy Policy</h1>
         <p className="mt-3 text-sm text-zinc-500">Last Updated: September 2026</p>
