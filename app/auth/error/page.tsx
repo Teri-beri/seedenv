@@ -16,7 +16,7 @@ export default async function AuthErrorPage({ searchParams }: { searchParams: Pr
     <main className="flex min-h-screen items-center justify-center bg-[#090A0F] px-4 py-12 text-white">
       <section className="w-full max-w-md rounded-xl border border-[#1F2430] bg-[#0E1017] p-10 text-center shadow-2xl shadow-black/40">
         <div className="mx-auto mb-6 size-20 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#090A0F] shadow-lg shadow-amber-500/10">
-          <Image src="/seedenv-logo.png" alt="SeedEnv" width={80} height={86} className="scale-125 object-cover" priority />
+          <Image src="/seedenv-logo-v2.png" alt="SeedEnv" width={80} height={86} className="scale-125 object-cover" priority />
         </div>
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-red-300">Authentication error</p>
         <h1 className="mt-3 text-3xl font-bold text-amber-500">Email sign-in failed</h1>

@@ -51,7 +51,7 @@ export function DeveloperHeader() {
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative size-11 overflow-hidden rounded-2xl border border-stroke bg-surface shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
-            <Image src="/seedenv-logo.png" alt="SeedEnv" fill sizes="44px" className="scale-125 object-cover" />
+            <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="44px" className="scale-125 object-cover" />
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-aurum">SeedEnv</p>

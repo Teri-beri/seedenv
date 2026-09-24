@@ -20,7 +20,7 @@ function analyticsOwnerEmail() {
 
 const authEmailFrom = cleanEnv(process.env.AUTH_EMAIL_FROM) || "SeedEnv Authentication <auth@seedenv.com>";
 
-const seedenvLogo = `<img src="https://seedenv.com/seedenv-logo.png" alt="SeedEnv" width="88" height="95" style="display:block;width:88px;height:95px;border-radius:22px;margin:0 auto;object-fit:cover;box-shadow:0 18px 48px rgba(245,158,11,0.18);" />`;
+const seedenvLogo = `<img src="https://seedenv.com/seedenv-logo-v2.png" alt="SeedEnv" width="88" height="95" style="display:block;width:88px;height:95px;border-radius:22px;margin:0 auto;object-fit:cover;box-shadow:0 18px 48px rgba(245,158,11,0.18);" />`;
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),

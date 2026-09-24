@@ -106,7 +106,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
           <Link className="flex items-center gap-3" href="/">
             <span className="relative size-10 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 shadow-lg shadow-amber-500/10 sm:size-11">
-              <Image src="/seedenv-logo.png" alt="SeedEnv" fill sizes="44px" className="scale-125 object-cover" priority />
+              <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="44px" className="scale-125 object-cover" priority />
             </span>
             <span>
               <span className="block text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-500 sm:text-xs sm:tracking-[0.32em]">SeedEnv</span>

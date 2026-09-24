@@ -118,7 +118,7 @@ export function RoleSignInForm() {
     <div className="grid max-h-[calc(100svh-2rem)] w-full max-w-5xl overflow-y-auto rounded-3xl border border-[#1F2430] bg-[#0E1017] shadow-2xl shadow-black/40 sm:max-h-none sm:rounded-2xl lg:grid-cols-[0.92fr_1.08fr]">
       <aside className="border-b border-[#1F2430] bg-[#090A0F]/50 p-5 sm:p-8 lg:border-b-0 lg:border-r">
         <div className="relative mb-5 size-16 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#090A0F] shadow-lg shadow-amber-500/10 sm:mb-8 sm:size-20">
-          <Image src="/seedenv-logo.png" alt="SeedEnv" fill sizes="80px" className="scale-125 object-cover" priority />
+          <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="80px" className="scale-125 object-cover" priority />
         </div>
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-amber-500">Welcome to SeedEnv</p>
         <h1 className="mt-3 bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-3xl font-black tracking-tight text-transparent sm:mt-4 sm:text-4xl">Choose your access path.</h1>
