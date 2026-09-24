@@ -66,7 +66,6 @@ model User {
   name                   String?
   image                  String?
   role                   UserRole            @default(TESTER)
-  onboardingCompletedAt  DateTime?
   username               String              @default("SeedEnv Member")
   avatarUrl              String?
   bio                    String?
