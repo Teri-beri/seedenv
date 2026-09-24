@@ -6,9 +6,24 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
-import { prepareSignupProfile } from "@/app/actions/signupActions";
 
 type SignupRole = "TESTER" | "DEVELOPER";
+
+type PreparedSignupProfile = {
+  email: string;
+  onboardingParams: string;
+};
+
+async function prepareSignupProfile(data: Record<string, string>) {
+  const response = await fetch("/api/signup/prepare", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || "We could not start your SeedEnv account.");
+  return payload as PreparedSignupProfile;
+}
 
 const roleDetails: Record<SignupRole, {
   label: string;
