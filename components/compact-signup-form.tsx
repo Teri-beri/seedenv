@@ -83,7 +83,6 @@ export function CompactSignupForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(() => authErrorMessage(searchParams.get("error")));
   const isAuthError = Boolean(searchParams.get("error"));
-  const mode = isAuthError ? "signin" : "signup";
 
   async function continueWithEmail(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -165,8 +164,8 @@ export function CompactSignupForm() {
       </div>
 
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-white">{mode === "signin" ? "Sign in" : `Create ${role === "TESTER" ? "tester" : "developer"} account`}</h1>
-        <p className="text-base leading-6 text-zinc-400">{mode === "signin" ? "Continue to your SeedEnv workspace with your preferred access method." : role === "TESTER" ? "Start with Tier 1 Scout missions and build your rank." : "Launch validation cohorts with transparent payouts and proof."}</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-white">Create {role === "TESTER" ? "tester" : "developer"} account</h1>
+        <p className="text-base leading-6 text-zinc-400">Get started with your SeedEnv workspace.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -179,7 +178,7 @@ export function CompactSignupForm() {
       <form className="space-y-5" onSubmit={continueWithEmail}>
         <label className="block text-sm font-medium text-zinc-300" htmlFor="signup-name">Full name<input autoComplete="name" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signup-name" onChange={(event) => setName(event.target.value)} placeholder="Alex Morgan" required value={name} /></label>
         <label className="block text-sm font-medium text-zinc-300" htmlFor="signup-email">Email address<input autoComplete="email" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signup-email" onChange={(event) => setEmail(event.target.value)} placeholder="alex@company.com" required type="email" value={email} /></label>
-        <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300/30 bg-amber-500 px-4 py-3.5 text-base font-semibold text-black shadow-sm shadow-black/20 transition-all hover:bg-amber-400 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} type="submit">{loading ? <LoaderCircle className="size-4 animate-spin" /> : null}{loading ? "Sending access link..." : mode === "signin" ? "Send sign-in link" : "Continue to Onboarding"}</button>
+        <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300/30 bg-amber-500 px-4 py-3.5 text-base font-semibold text-black shadow-sm shadow-black/20 transition-all hover:bg-amber-400 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} type="submit">{loading ? <LoaderCircle className="size-4 animate-spin" /> : null}{loading ? "Sending sign-up link..." : "Create account"}</button>
       </form>
 
       {message && !isAuthError ? <p className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3 text-center text-xs leading-5 text-zinc-300" role="status">{message}</p> : null}
