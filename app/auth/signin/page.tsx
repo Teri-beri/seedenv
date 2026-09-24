@@ -8,14 +8,11 @@ export default function SignInPage() {
     <main className="seedenv-ambient-grid relative grid min-h-screen place-items-center overflow-hidden bg-[linear-gradient(180deg,#090A0F_0%,#0D1018_50%,#090A0F_100%)] px-4 py-10 text-white sm:py-12">
       <AnimatedGridBackground />
       <div className="relative z-10 mx-auto flex w-full max-w-lg flex-col items-center">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="relative size-12 overflow-hidden rounded-xl border border-white/[0.08] bg-zinc-950 shadow-lg shadow-black/50">
-            <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="48px" className="scale-[1.65] object-cover" priority />
+        <div className="mb-8 flex flex-col items-center gap-2 text-center">
+          <div className="relative size-10 overflow-hidden rounded-lg">
+            <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="40px" className="scale-[1.7] object-cover" priority />
           </div>
-          <div className="text-left">
-            <p className="text-lg font-semibold leading-none tracking-tight text-white">SeedEnv</p>
-            <p className="mt-1 text-xs leading-none text-zinc-500">Seed real beta communities.</p>
-          </div>
+          <p className="text-xl font-semibold leading-none tracking-tight text-white">SeedEnv</p>
         </div>
         <Suspense fallback={<SignInFallback />}>
           <CompactSignupForm />
