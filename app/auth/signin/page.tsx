@@ -1,11 +1,11 @@
 import { Suspense } from "react";
-import { AnimatedGridBackground } from "@/components/animated-grid-background";
 import { CompactSignupForm } from "@/components/compact-signup-form";
+import { GridBackground } from "@/components/grid-background";
 
 export default function SignInPage() {
   return (
-    <main className="seedenv-ambient-grid relative grid min-h-screen place-items-center overflow-hidden bg-[linear-gradient(180deg,#090A0F_0%,#0D1018_50%,#090A0F_100%)] px-4 py-10 text-white sm:py-12">
-      <AnimatedGridBackground />
+    <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[linear-gradient(180deg,#090A0F_0%,#0D1018_50%,#090A0F_100%)] px-4 py-10 text-white sm:py-12">
+      <GridBackground />
       <div className="relative z-10 mx-auto flex w-full max-w-lg flex-col items-center">
         <Suspense fallback={<SignInFallback />}>
           <CompactSignupForm />
