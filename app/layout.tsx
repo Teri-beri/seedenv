@@ -35,8 +35,8 @@ export const metadata: Metadata = {
     images: [
       {
         url: "/seedenv-logo.png",
-        width: 972,
-        height: 1048,
+        width: 1024,
+        height: 768,
         alt: "SeedEnv",
       },
     ],

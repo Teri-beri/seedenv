@@ -1,0 +1,17 @@
+name: Expire SeedEnv slots
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  expire-slots:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call protected SeedEnv cron endpoint
+        run: |
+          curl --fail --show-error --silent \
+            --request POST \
+            --header "Authorization: Bearer ${{ secrets.SEEDENV_CRON_SECRET }}" \
+            "https://seedenv.com/api/cron/expire-slots"

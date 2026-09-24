@@ -7,14 +7,15 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "npm install && prisma generate && next build",
+    "build": "npm install --include=dev && prisma generate && next build",
     "build:local": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
-    "seed:goddesses-beta": "tsx scripts/seed-goddesses-beta.ts"
+    "seed:goddesses-beta": "tsx scripts/seed-goddesses-beta.ts",
+    "user:developer": "tsx scripts/set-user-role.ts --role DEVELOPER"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -45,6 +46,7 @@
     "resend": "^6.27.0",
     "stripe": "^22.6.1",
     "tailwind-merge": "^3.6.0",
+    "tsx": "^4.23.13",
     "zod": "^4.6.0"
   },
   "devDependencies": {
@@ -57,7 +59,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
-    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

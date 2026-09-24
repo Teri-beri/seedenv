@@ -14,6 +14,10 @@ function getResendApiKey() {
   return cleanEnv(process.env.RESEND_API_KEY);
 }
 
+function analyticsOwnerEmail() {
+  return cleanEnv(process.env.SEEDENV_ANALYTICS_OWNER_EMAIL)?.toLowerCase();
+}
+
 const authEmailFrom = cleanEnv(process.env.AUTH_EMAIL_FROM) || "SeedEnv Authentication <auth@seedenv.com>";
 
 const seedenvLogo = `<img src="https://seedenv.com/seedenv-logo.png" alt="SeedEnv" width="88" height="95" style="display:block;width:88px;height:95px;border-radius:22px;margin:0 auto;object-fit:cover;box-shadow:0 18px 48px rgba(245,158,11,0.18);" />`;
@@ -104,7 +108,11 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role || UserRole.TESTER;
+        const shouldPromoteOwner = Boolean(user.email && analyticsOwnerEmail() === user.email.toLowerCase());
+        if (shouldPromoteOwner && user.role !== UserRole.DEVELOPER) {
+          await prisma.user.update({ where: { id: user.id }, data: { role: UserRole.DEVELOPER } });
+        }
+        token.role = shouldPromoteOwner ? UserRole.DEVELOPER : user.role || UserRole.TESTER;
       } else if (token.id) {
         const currentUser = await prisma.user.findUnique({
           where: { id: token.id },
