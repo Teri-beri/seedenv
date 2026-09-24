@@ -21,6 +21,41 @@ function getGitHubCredentials() {
   return clientId && clientSecret ? { clientId, clientSecret } : null;
 }
 
+type GitHubProfile = {
+  id: number | string;
+  login: string;
+  name?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
+};
+
+type GitHubEmail = {
+  email: string;
+  primary: boolean;
+  verified: boolean;
+};
+
+async function getGitHubEmail(profile: GitHubProfile, accessToken?: string) {
+  if (profile.email) return profile.email;
+  if (!accessToken) return `${profile.login}-${profile.id}@users.noreply.github.com`;
+
+  try {
+    const response = await fetch("https://api.github.com/user/emails", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/vnd.github+json",
+      },
+    });
+    if (!response.ok) return `${profile.login}-${profile.id}@users.noreply.github.com`;
+    const emails = await response.json() as GitHubEmail[];
+    return emails.find((email) => email.primary && email.verified)?.email
+      || emails.find((email) => email.verified)?.email
+      || `${profile.login}-${profile.id}@users.noreply.github.com`;
+  } catch {
+    return `${profile.login}-${profile.id}@users.noreply.github.com`;
+  }
+}
+
 function analyticsOwnerEmail() {
   return cleanEnv(process.env.SEEDENV_ANALYTICS_OWNER_EMAIL)?.toLowerCase();
 }
@@ -108,7 +143,21 @@ export const authOptions: NextAuthOptions = {
         }
       },
     }),
-    ...(githubCredentials ? [GitHubProvider(githubCredentials)] : []),
+    ...(githubCredentials ? [GitHubProvider({
+      ...githubCredentials,
+      allowDangerousEmailAccountLinking: true,
+      authorization: { params: { scope: "read:user user:email" } },
+      async profile(profile: GitHubProfile, tokens) {
+        const email = await getGitHubEmail(profile, tokens.access_token);
+        return {
+          id: String(profile.id),
+          name: profile.name || profile.login,
+          email,
+          image: profile.avatar_url || null,
+          role: UserRole.TESTER,
+        };
+      },
+    })] : []),
   ],
   session: {
     strategy: "jwt",
