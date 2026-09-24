@@ -1,1 +1,1 @@
-ALTER TABLE "Account" ADD COLUMN "refresh_token_expires_in" INTEGER;
+ALTER TABLE "Account" ADD COLUMN IF NOT EXISTS "refresh_token_expires_in" INTEGER;
