@@ -50,6 +50,7 @@ On Android:
 - `NEXTAUTH_SECRET`: random secret generated with `openssl rand -base64 32`.
 - `RESEND_API_KEY`: Resend key used for SeedEnv magic-link email authentication from a verified sender on `seedenv.com`.
 - `AUTH_EMAIL_FROM`: verified Resend sender, for example `SeedEnv Authentication <auth@seedenv.com>`.
+- `GITHUB_ID`, `GITHUB_SECRET`: GitHub OAuth app credentials for the sign-in page. Configure the GitHub callback URL as `https://seedenv.com/api/auth/callback/github`.
 - `STRIPE_SECRET_KEY`: Stripe secret key for escrow checkout.
 - `STRIPE_WEBHOOK_SECRET`: Stripe webhook signing secret for `/api/stripe/webhook`.
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROOF_BUCKET`: proof screenshot storage.
@@ -79,6 +80,7 @@ Render does not receive local `.env` values. Set these in the Render dashboard b
 - `NEXTAUTH_SECRET`
 - `RESEND_API_KEY`
 - `AUTH_EMAIL_FROM=SeedEnv Authentication <auth@seedenv.com>`
+- `GITHUB_ID` and `GITHUB_SECRET` from a GitHub OAuth app with callback URL `https://seedenv.com/api/auth/callback/github`.
 - `SUPABASE_PROOF_BUCKET=proof-screenshots`
 - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
 - `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`

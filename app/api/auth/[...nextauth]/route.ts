@@ -3,6 +3,7 @@ import { PrismaClient, UserRole } from "@prisma/client";
 import { Resend } from "resend";
 import NextAuth, { type NextAuthOptions } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
+import GitHubProvider from "next-auth/providers/github";
 
 const prisma = new PrismaClient();
 
@@ -14,6 +15,12 @@ function getResendApiKey() {
   return cleanEnv(process.env.RESEND_API_KEY);
 }
 
+function getGitHubCredentials() {
+  const clientId = cleanEnv(process.env.GITHUB_ID);
+  const clientSecret = cleanEnv(process.env.GITHUB_SECRET);
+  return clientId && clientSecret ? { clientId, clientSecret } : null;
+}
+
 function analyticsOwnerEmail() {
   return cleanEnv(process.env.SEEDENV_ANALYTICS_OWNER_EMAIL)?.toLowerCase();
 }
@@ -21,6 +28,7 @@ function analyticsOwnerEmail() {
 const authEmailFrom = cleanEnv(process.env.AUTH_EMAIL_FROM) || "SeedEnv Authentication <auth@seedenv.com>";
 
 const seedenvLogo = `<img src="https://seedenv.com/seedenv-logo-v2.png" alt="SeedEnv" width="88" height="95" style="display:block;width:88px;height:95px;border-radius:22px;margin:0 auto;object-fit:cover;box-shadow:0 18px 48px rgba(245,158,11,0.18);" />`;
+const githubCredentials = getGitHubCredentials();
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -100,6 +108,7 @@ export const authOptions: NextAuthOptions = {
         }
       },
     }),
+    ...(githubCredentials ? [GitHubProvider(githubCredentials)] : []),
   ],
   session: {
     strategy: "jwt",

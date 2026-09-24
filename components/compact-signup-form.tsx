@@ -17,6 +17,23 @@ function getSafeCallback(value: string | null, role: SignupRole) {
   return role === "DEVELOPER" ? "/console?intent=new-campaign" : "/dashboard";
 }
 
+function getOAuthCallback(value: string | null, role: SignupRole) {
+  const next = getSafeCallback(value, role);
+  const callback = new URL(next, window.location.origin);
+
+  if (callback.pathname === "/onboarding") {
+    callback.searchParams.set("role", callback.searchParams.get("role") || role);
+    callback.searchParams.set("next", getSafeCallback(callback.searchParams.get("next"), role));
+    return `${callback.pathname}${callback.search}`;
+  }
+
+  const params = new URLSearchParams({
+    role,
+    next: `${callback.pathname}${callback.search}${callback.hash}`,
+  });
+  return `/onboarding?${params.toString()}`;
+}
+
 export function CompactSignupForm() {
   const searchParams = useSearchParams();
   const [role, setRole] = useState<SignupRole>(() => getInitialRole(searchParams.get("role")));
@@ -64,17 +81,23 @@ export function CompactSignupForm() {
   async function continueWithProvider(provider: "github" | "google") {
     setLoading(true);
     setMessage("");
-    const next = getSafeCallback(searchParams.get("callbackUrl"), role);
-    const result = await signIn(provider, {
-      callbackUrl: `/onboarding?role=${role}&next=${encodeURIComponent(next)}`,
-      redirect: false,
-    });
-    if (result?.error) {
+
+    try {
+      const result = await signIn(provider, {
+        callbackUrl: getOAuthCallback(searchParams.get("callbackUrl"), role),
+        redirect: false,
+      });
+      if (result?.error) {
+        setMessage(`${provider === "github" ? "GitHub" : "Google"} access could not start. Continue with email instead.`);
+        setLoading(false);
+        return;
+      }
+      if (result?.url) window.location.href = result.url;
+    } catch (error) {
+      console.error("SeedEnv OAuth sign-in failed:", error);
       setMessage(`${provider === "github" ? "GitHub" : "Google"} access is not enabled on this deployment yet. Continue with email instead.`);
       setLoading(false);
-      return;
     }
-    if (result?.url) window.location.href = result.url;
   }
 
   return (
@@ -104,8 +127,8 @@ export function CompactSignupForm() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <button aria-label="Continue with GitHub" className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-200 transition-colors hover:border-zinc-700" onClick={() => continueWithProvider("github")} type="button"><Code2 className="size-4" /> GitHub</button>
-        <button aria-label="Continue with Google" className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-200 transition-colors hover:border-zinc-700" onClick={() => continueWithProvider("google")} type="button"><Globe2 className="size-4" /> Google</button>
+        <button aria-label="Continue with GitHub" className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-200 transition-colors hover:border-zinc-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} onClick={() => continueWithProvider("github")} type="button"><Code2 className="size-4" /> {loading ? "Opening..." : "GitHub"}</button>
+        <button aria-label="Continue with Google" className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-200 transition-colors hover:border-zinc-700 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} onClick={() => continueWithProvider("google")} type="button"><Globe2 className="size-4" /> Google</button>
       </div>
 
       <div className="relative flex items-center justify-center"><div className="w-full border-t border-zinc-800" /><span className="absolute bg-[#0d0e12] px-3 text-xs font-mono uppercase tracking-wider text-zinc-500">or continue with email</span></div>

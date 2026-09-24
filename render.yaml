@@ -18,6 +18,10 @@ services:
         sync: false
       - key: AUTH_EMAIL_FROM
         value: SeedEnv Authentication <auth@seedenv.com>
+      - key: GITHUB_ID
+        sync: false
+      - key: GITHUB_SECRET
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_PROOF_BUCKET
