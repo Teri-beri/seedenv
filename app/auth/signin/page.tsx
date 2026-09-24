@@ -1,10 +1,12 @@
 import { Suspense } from "react";
 import Image from "next/image";
+import { AnimatedGridBackground } from "@/components/animated-grid-background";
 import { CompactSignupForm } from "@/components/compact-signup-form";
 
 export default function SignInPage() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#090A0F] px-4 py-10 text-white sm:py-12">
+    <main className="seedenv-ambient-grid relative flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_16%_0%,rgba(109,40,217,0.2),transparent_30%),radial-gradient(circle_at_86%_10%,rgba(245,158,11,0.12),transparent_24%),radial-gradient(circle_at_50%_52%,rgba(16,185,129,0.055),transparent_32%),linear-gradient(180deg,#090A0F_0%,#10131C_48%,#090A0F_100%)] px-4 py-10 text-white sm:py-12">
+      <AnimatedGridBackground />
       <div className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-500/[0.07] blur-3xl" aria-hidden="true" />
       <div className="absolute left-1/2 top-[18%] h-64 w-96 -translate-x-1/2 rounded-full bg-violet-500/[0.04] blur-3xl" aria-hidden="true" />
       <div className="relative z-10 flex w-full max-w-lg flex-col items-center">
