@@ -147,6 +147,11 @@ export function CompactSignupForm() {
       <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.05]" aria-hidden="true" style={{ backgroundImage: "url('/seedenv-logo-v2.png')", backgroundRepeat: "no-repeat", backgroundSize: "320px", backgroundPosition: "center 60%" }} />
       <div className="relative z-10 space-y-7">
       {isAuthError ? <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100" role="alert">{message}</div> : null}
+      <div className="space-y-2">
+        <h1 className="text-3xl font-semibold tracking-tight text-white">SeedEnv</h1>
+        <p className="text-base leading-6 text-zinc-400">Get started with your SeedEnv workspace.</p>
+      </div>
+
       <div className="grid grid-cols-2 rounded-xl border border-zinc-800 bg-zinc-900 p-1" role="tablist" aria-label="Account type">
         {(["TESTER", "DEVELOPER"] as const).map((item) => {
           const active = role === item;
@@ -163,11 +168,6 @@ export function CompactSignupForm() {
             </button>
           );
         })}
-      </div>
-
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-white">SeedEnv</h1>
-        <p className="text-base leading-6 text-zinc-400">Get started with your SeedEnv workspace.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
