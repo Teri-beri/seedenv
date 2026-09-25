@@ -144,7 +144,7 @@ export function CompactSignupForm() {
 
   return (
     <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/[0.08] bg-zinc-950/75 p-6 shadow-2xl shadow-black/80 backdrop-blur-xl sm:p-8">
-      <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.05]" aria-hidden="true" style={{ backgroundImage: "url('/seedenv-logo-v2.png')", backgroundRepeat: "no-repeat", backgroundSize: "320px", backgroundPosition: "center 60%" }} />
+      <div className="pointer-events-none absolute inset-0 z-0 opacity-[0.05]" aria-hidden="true" style={{ backgroundImage: "url('/seedenv-logo-v2.png')", backgroundRepeat: "no-repeat", backgroundSize: "400px", backgroundPosition: "center 62%" }} />
       <div className="relative z-10 space-y-7">
       {isAuthError ? <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100" role="alert">{message}</div> : null}
       <div className="space-y-2">
