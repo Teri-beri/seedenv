@@ -80,6 +80,8 @@ export function CompactSignupForm() {
   const [role, setRole] = useState<SignupRole>(() => getInitialRole(searchParams.get("role")));
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"signup" | "password">("signup");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(() => authErrorMessage(searchParams.get("error")));
   const isAuthError = Boolean(searchParams.get("error"));
@@ -118,6 +120,45 @@ export function CompactSignupForm() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function continueWithPassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const result = await signIn("credentials", {
+        email: email.trim(),
+        password,
+        redirect: false,
+        callbackUrl: getSafeCallback(searchParams.get("callbackUrl"), role),
+      });
+      if (result?.error || !result?.url) {
+        setMessage("Incorrect email or password. Too many attempts will temporarily lock sign-in.");
+        setLoading(false);
+        return;
+      }
+      window.location.href = result.url;
+    } catch (error) {
+      console.error("SeedEnv password sign-in failed:", error);
+      setMessage("We could not sign you in. Please try again.");
+      setLoading(false);
+    }
+  }
+
+  async function sendResetLink() {
+    if (!email.trim()) {
+      setMessage("Enter your email first, then we'll send a one-time sign-in link.");
+      return;
+    }
+    setLoading(true);
+    setMessage("");
+    const result = await signIn("email", { email: email.trim(), redirect: false, callbackUrl: "/account#security" });
+    setMessage(result?.error
+      ? "We could not send that link. Please try again."
+      : "Sign-in link sent. Open it, then set a new password under Account > Security.");
+    setLoading(false);
   }
 
   async function continueWithProvider(provider: "github" | "google") {
@@ -177,14 +218,27 @@ export function CompactSignupForm() {
 
       <div className="relative flex items-center justify-center"><div className="w-full border-t border-zinc-800" /><span className="absolute bg-[#0b0c10] px-3 text-xs font-mono uppercase tracking-wider text-zinc-500">or continue with email</span></div>
 
-      <form className="space-y-5" onSubmit={continueWithEmail}>
+      <form className="space-y-5" onSubmit={continueWithEmail} hidden={mode !== "signup"}>
         <label className="block text-sm font-medium text-zinc-300" htmlFor="signup-name">Full name<input autoComplete="name" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signup-name" onChange={(event) => setName(event.target.value)} placeholder="Alex Morgan" required value={name} /></label>
         <label className="block text-sm font-medium text-zinc-300" htmlFor="signup-email">Email address<input autoComplete="email" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signup-email" onChange={(event) => setEmail(event.target.value)} placeholder="alex@company.com" required type="email" value={email} /></label>
         <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300/30 bg-amber-500 px-4 py-3.5 text-base font-semibold text-black shadow-sm shadow-black/20 transition-all hover:bg-amber-400 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} type="submit">{loading ? <LoaderCircle className="size-4 animate-spin" /> : null}{loading ? "Sending sign-up link..." : "Create account"}</button>
       </form>
 
+      {mode === "password" ? (
+        <form className="space-y-5" onSubmit={continueWithPassword}>
+          <label className="block text-sm font-medium text-zinc-300" htmlFor="signin-email">Email address<input autoComplete="email" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signin-email" onChange={(event) => setEmail(event.target.value)} placeholder="alex@company.com" required type="email" value={email} /></label>
+          <label className="block text-sm font-medium text-zinc-300" htmlFor="signin-password">Password<input autoComplete="current-password" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signin-password" onChange={(event) => setPassword(event.target.value)} required type="password" value={password} /></label>
+          <button className="flex w-full items-center justify-center gap-2 rounded-lg border border-amber-300/30 bg-amber-500 px-4 py-3.5 text-base font-semibold text-black shadow-sm shadow-black/20 transition-all hover:bg-amber-400 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} type="submit">{loading ? <LoaderCircle className="size-4 animate-spin" /> : null}{loading ? "Signing in..." : "Sign in"}</button>
+          <button className="w-full text-center text-sm text-zinc-400 hover:text-zinc-200" disabled={loading} onClick={sendResetLink} type="button">Forgot password? Email me a sign-in link</button>
+        </form>
+      ) : null}
+
       {message && !isAuthError ? <p className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3 text-center text-xs leading-5 text-zinc-300" role="status">{message}</p> : null}
-      <p className="pt-1 text-center text-sm text-zinc-500">Already have an account? <a className="font-semibold text-amber-400 hover:underline" href="/auth/signin">Sign in</a></p>
+      {mode === "signup" ? (
+        <p className="pt-1 text-center text-sm text-zinc-500">Already have an account? <button className="font-semibold text-amber-400 hover:underline" onClick={() => { setMode("password"); setMessage(""); }} type="button">Sign in with password</button></p>
+      ) : (
+        <p className="pt-1 text-center text-sm text-zinc-500">New to SeedEnv? <button className="font-semibold text-amber-400 hover:underline" onClick={() => { setMode("signup"); setMessage(""); }} type="button">Create an account</button></p>
+      )}
       </div>
     </div>
   );

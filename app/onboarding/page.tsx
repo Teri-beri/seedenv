@@ -38,7 +38,10 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   const params = await searchParams;
   const requestedRole = cleanRequestedRole(params.role);
   const nextPath = cleanNextPath(params.next);
-  const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true, passwordHash: true, _count: { select: { accounts: true } } },
+  });
 
   if (user && requestedRole && user.role !== UserRole.ADMIN) {
     await prisma.user.update({
@@ -56,5 +59,8 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   }
 
   if (user?.role === UserRole.ADMIN) redirect("/admin");
+  if (user && !user.passwordHash && user._count.accounts === 0) {
+    redirect(`/onboarding/setup?next=${encodeURIComponent(nextPath)}`);
+  }
   redirect(nextPath);
 }

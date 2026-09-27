@@ -18,6 +18,12 @@ export default async function ConsolePage() {
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "DEVELOPER") redirect("/");
 
+  const security = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { passwordHash: true, _count: { select: { accounts: true } } },
+  });
+  if (security && !security.passwordHash && security._count.accounts === 0) redirect("/onboarding/setup?next=/console");
+
   await ensurePreviewData();
   const campaignScope = { developerId: session.user.id };
   const analyticsOwnerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();

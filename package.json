@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "npm install --include=dev && prisma generate && next build",
     "build:local": "prisma generate && next build",
-    "start": "next start",
+    "start": "tsx scripts/ensure-schema.ts && next start",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

@@ -2,11 +2,33 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { PrismaClient, UserRole } from "@prisma/client";
 import { Resend } from "resend";
 import NextAuth, { type NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
 import EmailProvider from "next-auth/providers/email";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
+import { verifyPassword } from "@/lib/password";
 
 const prisma = new PrismaClient();
+
+const MAX_FAILED_LOGINS = 5;
+const LOCKOUT_MS = 15 * 60 * 1000;
+const failedLogins = new Map<string, { count: number; firstFailureAt: number }>();
+
+function isLockedOut(email: string) {
+  const entry = failedLogins.get(email);
+  if (!entry) return false;
+  if (Date.now() - entry.firstFailureAt > LOCKOUT_MS) {
+    failedLogins.delete(email);
+    return false;
+  }
+  return entry.count >= MAX_FAILED_LOGINS;
+}
+
+function recordFailedLogin(email: string) {
+  const entry = failedLogins.get(email);
+  if (entry) entry.count += 1;
+  else failedLogins.set(email, { count: 1, firstFailureAt: Date.now() });
+}
 
 function cleanEnv(value: string | undefined) {
   return value?.trim().replace(/^['"]|['"]$/g, "");
@@ -76,6 +98,28 @@ const googleCredentials = getGoogleCredentials();
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: [
+    CredentialsProvider({
+      id: "credentials",
+      name: "Password",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = credentials?.email?.trim().toLowerCase();
+        const password = credentials?.password;
+        if (!email || !password || isLockedOut(email)) return null;
+
+        const user = await prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" } } });
+        if (!user?.passwordHash || !(await verifyPassword(password, user.passwordHash))) {
+          recordFailedLogin(email);
+          return null;
+        }
+
+        failedLogins.delete(email);
+        return { id: user.id, email: user.email, name: user.name, image: user.image, role: user.role };
+      },
+    }),
     EmailProvider({
       server: {
         host: "smtp.resend.com",

@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import AuthCheck from "@/components/AuthCheck";
 import { AccountSettingsForm } from "@/components/account-settings-form";
+import { PasswordSettingsForm } from "@/components/password-settings-form";
 import { prisma } from "@/lib/prisma";
 import { rankProgress } from "@/lib/rank";
 import { formatCents } from "@/lib/utils";
@@ -63,7 +64,10 @@ export default async function AccountPage() {
           </header>
 
           <section className="mt-10 grid gap-6 lg:grid-cols-[380px_1fr]">
-            <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, bio: user.bio, portfolioUrl: user.portfolioUrl, companyName: user.companyName, productUrl: user.productUrl, role: user.role }} />
+            <div className="space-y-6">
+              <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, bio: user.bio, portfolioUrl: user.portfolioUrl, companyName: user.companyName, productUrl: user.productUrl, role: user.role }} />
+              <PasswordSettingsForm email={user.email} hasPassword={Boolean(user.passwordHash)} />
+            </div>
 
             <div className="space-y-6">
               <section className="luxury-panel rounded-2xl p-6">

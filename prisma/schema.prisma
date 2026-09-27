@@ -65,6 +65,7 @@ model User {
   emailVerified          DateTime?
   name                   String?
   image                  String?
+  passwordHash           String?
   role                   UserRole            @default(TESTER)
   username               String              @default("SeedEnv Member")
   avatarUrl              String?

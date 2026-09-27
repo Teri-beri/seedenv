@@ -20,6 +20,12 @@ export default async function DashboardPage() {
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "TESTER") redirect("/");
 
+  const security = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { passwordHash: true, _count: { select: { accounts: true } } },
+  });
+  if (security && !security.passwordHash && security._count.accounts === 0) redirect("/onboarding/setup?next=/dashboard");
+
   await ensurePreviewData();
   const [tester, missions, leaderboard] = await Promise.all([
     getCurrentUser("TESTER"),
