@@ -9,6 +9,7 @@ import { DeveloperHeader } from "@/components/navigation";
 import { AnalyticsSummary, type AnalyticsSummaryData } from "@/components/analytics-summary";
 import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
+import { getProofImageUrl } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,10 @@ export default async function ConsolePage() {
       take: 3,
       select: { id: true, title: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true },
     }),
+  ]);
+  const [pendingPreviews, approvedPreviews] = await Promise.all([
+    Promise.all(pendingSubmissions.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
+    Promise.all(approvedAssets.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
   ]);
   let analytics: AnalyticsSummaryData | null = null;
   if (canViewAnalytics) {
@@ -95,7 +100,7 @@ export default async function ConsolePage() {
         </section>
         {analytics ? <AnalyticsSummary data={analytics} /> : null}
         <div className="mt-8" />
-        <DeveloperStudio submissions={pendingSubmissions} assets={approvedAssets} />
+        <DeveloperStudio submissions={pendingPreviews} assets={approvedPreviews} />
       </div>
     </main>
     </AuthCheck>

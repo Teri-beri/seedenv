@@ -4,6 +4,7 @@ import { SubmissionStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { getProofImageUrl } from "@/lib/storage";
 
 export async function GET(request: NextRequest) {
   const campaignId = request.nextUrl.searchParams.get("campaignId");
@@ -26,7 +27,6 @@ export async function GET(request: NextRequest) {
   const zip = new JSZip();
   zip.file("manifest.json", JSON.stringify(submissions.map((submission) => ({
     tester: submission.tester.username,
-    proofImageUrl: submission.proofImageUrl,
     feedbackText: submission.feedbackText,
     reviewedAt: submission.reviewedAt,
   })), null, 2));
@@ -34,7 +34,9 @@ export async function GET(request: NextRequest) {
   for (const [index, submission] of submissions.entries()) {
     if (!submission.proofImageUrl || submission.proofImageUrl.startsWith("data:")) continue;
     try {
-      const response = await fetch(submission.proofImageUrl);
+      const proofUrl = await getProofImageUrl(submission.proofImageUrl);
+      if (!proofUrl) continue;
+      const response = await fetch(proofUrl);
       if (!response.ok) continue;
       const arrayBuffer = await response.arrayBuffer();
       const extension = response.headers.get("content-type")?.includes("png") ? "png" : "jpg";

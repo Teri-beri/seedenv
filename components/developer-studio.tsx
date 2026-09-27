@@ -270,7 +270,7 @@ function ReviewDeck({ submissions, onReview, isPending }: { submissions: ReviewS
           </div>
           <div className="space-y-4">
             <div className="relative min-h-72 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 backdrop-blur-md transition-all hover:border-violet-500/30">
-              {active.proofImageUrl ? <Image src={active.proofImageUrl} alt="Tester proof" fill sizes="(min-width: 1536px) 50vw, (min-width: 1024px) 100vw, 100vw" className="object-cover" /> : <ImageIcon className="m-16 size-16 text-white/20" />}
+                  {active.proofImageUrl ? <Image src={active.proofImageUrl} alt="Tester proof" fill sizes="(min-width: 1536px) 50vw, (min-width: 1024px) 100vw, 100vw" className="object-cover" unoptimized /> : <ImageIcon className="m-16 size-16 text-white/20" />}
             </div>
             <div className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 backdrop-blur-md transition-all hover:border-violet-500/30">
               <p className="text-sm font-bold text-violet-200">{active.tester.username}</p>
@@ -301,7 +301,7 @@ function AssetVault({ assets }: { assets: Asset[] }) {
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {assets.map((asset) => (
           <article key={asset.id} className="overflow-hidden rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 backdrop-blur-md transition-all hover:border-violet-500/30">
-            <div className="relative h-44 bg-black/28">{asset.proofImageUrl && <Image src={asset.proofImageUrl} alt="Approved asset" fill sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" className="object-cover" />}</div>
+              <div className="relative h-44 bg-black/28">{asset.proofImageUrl && <Image src={asset.proofImageUrl} alt="Approved asset" fill sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" className="object-cover" unoptimized />}</div>
             <div className="p-4">
               <p className="font-bold">{asset.campaign.title}</p>
               <p className="mt-1 text-sm text-white/50">{asset.tester.username}</p>

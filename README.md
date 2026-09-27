@@ -56,6 +56,13 @@ On Android:
 - `STRIPE_WEBHOOK_SECRET`: Stripe webhook signing secret for `/api/stripe/webhook`.
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROOF_BUCKET`: proof screenshot storage.
 
+## Production Security Operations
+
+- After deploying the private-proof storage code, set the `proof-screenshots` bucket to **private** in Supabase Storage. Uploads now store object paths, and the authenticated developer console and asset export issue five-minute signed links for new and existing Supabase proof records. Test preview and ZIP download before accepting more submissions. Existing public links cannot be revoked by code alone while the bucket stays public. Keep the service-role key server-only, and rotate it if it has ever been exposed.
+- Turn on multi-factor authentication for every owner/staff account at GitHub, Render, the domain registrar/DNS provider, Stripe, Supabase, Resend, and Google Cloud (if used). Restrict repository, database, and payment access to named people with the least privileges. These switches must be enabled in the providers' dashboards.
+- Configure automated **PostgreSQL backups** with your database provider (or an encrypted scheduled `pg_dump` stored off-site). Verify an actual restore to a separate database at least monthly. Also back up Supabase Storage objects separately; a database backup does not include proof files. Never put backups or secrets in Git.
+- Enable GitHub Dependabot security alerts and review its weekly dependency PRs. Run `npm audit --omit=dev` regularly. As of September 2026, NextAuth v4's Nodemailer 7 peer dependency has reported high-severity advisories; do not force Nodemailer 10 until the authentication integration is tested against a compatible NextAuth version. Monitor advisories and plan that upgrade.
+
 ## Core Flows
 
 - Developers create campaigns in `ESCROW_PENDING`, fund tester payout pool plus 20% SeedEnv fee, then Stripe webhook activates the campaign.
