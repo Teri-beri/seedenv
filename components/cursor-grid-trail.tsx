@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 
 const cellSize = 44;
 const trailRadius = 56;
@@ -29,11 +30,15 @@ function isGridVisibleAt(target: EventTarget | null) {
 }
 
 export function CursorGridTrail() {
+  const pathname = usePathname();
   const layerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const layer = layerRef.current;
-    if (!layer || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!layer || pathname === "/auth/signin" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      layer?.replaceChildren();
+      return;
+    }
     const trailLayer = layer;
     const dots = new Map<string, HTMLSpanElement>();
     const removalTimers = new Map<string, number>();
@@ -92,7 +97,7 @@ export function CursorGridTrail() {
       removalTimers.clear();
       trailLayer.replaceChildren();
     };
-  }, []);
+  }, [pathname]);
 
   return <div aria-hidden="true" className="cursor-grid-trail-layer pointer-events-none fixed inset-0 z-20 overflow-hidden" ref={layerRef} />;
 }

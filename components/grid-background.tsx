@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-const cellSize = 44;
+const cellSize = 40;
 const trailRadius = 56;
 const fadeMs = 1000;
 const spawnPulseCount = 22;
