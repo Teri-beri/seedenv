@@ -1,5 +1,5 @@
-import { SubmissionStatus, UserRole } from "@prisma/client";
-import { ArrowLeft, ArrowRight, BadgeCheck, BriefcaseBusiness, CheckCircle2, CreditCard, ShieldCheck, Sprout, Trophy, WalletCards } from "lucide-react";
+import { SubmissionStatus, TransactionStatus, TransactionType, UserRole } from "@prisma/client";
+import { ArrowLeft, ArrowRight, BadgeCheck, BriefcaseBusiness, CheckCircle2, ShieldCheck, Sprout, Trophy, WalletCards } from "lucide-react";
 import { getServerSession } from "next-auth";
 import Image from "next/image";
 import Link from "next/link";
@@ -9,12 +9,15 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import AuthCheck from "@/components/AuthCheck";
 import { AnalyticsSummary, type AnalyticsSummaryData } from "@/components/analytics-summary";
 import { AccountSettingsForm } from "@/components/account-settings-form";
+import { AccountSignOutButton } from "@/components/account-signout-button";
 import { NotificationSettingsForm } from "@/components/notification-settings-form";
 import { PasswordSettingsForm } from "@/components/password-settings-form";
+import { StripeSettingsCard } from "@/components/stripe-settings-card";
 import { WorkspaceAccessSwitcher } from "@/components/workspace-access-switcher";
 import { getAnalyticsSummary } from "@/lib/analytics";
 import { prisma } from "@/lib/prisma";
 import { rankProgress } from "@/lib/rank";
+import { getStripe } from "@/lib/stripe";
 import { formatCents } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +41,7 @@ function normalizeNotificationPreferences(value: unknown): NotificationPreferenc
   };
 }
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string; draft?: string; stripePayment?: string; stripeConnect?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/auth/signin?callbackUrl=/account");
   const params = await searchParams;
@@ -82,6 +85,39 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     ? params.tab as VisibleAccountTab
     : "profile";
 
+  const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
+  let paymentMethodSaved = false;
+  let connectDetailsSubmitted = false;
+  let payoutsEnabled = false;
+  let connectCountry: string | null = null;
+  let pendingPayoutCount = 0;
+  let pendingPayoutAmountCents = 0;
+  if (activeTab === "portfolio" && user.role === UserRole.TESTER) {
+    const pendingPayouts = await prisma.walletTransaction.aggregate({
+      where: { userId: user.id, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING },
+      _count: { _all: true },
+      _sum: { amountCents: true },
+    });
+    pendingPayoutCount = pendingPayouts._count._all;
+    pendingPayoutAmountCents = pendingPayouts._sum.amountCents || 0;
+  }
+  if (stripeConfigured && activeTab === "portfolio") {
+    const stripe = getStripe();
+    const [customer, connectAccount] = await Promise.all([
+      user.stripeCustomerId ? stripe.customers.retrieve(user.stripeCustomerId).catch(() => null) : Promise.resolve(null),
+      user.stripeConnectAccountId ? stripe.accounts.retrieve(user.stripeConnectAccountId).catch(() => null) : Promise.resolve(null),
+    ]);
+    if (customer && !customer.deleted) paymentMethodSaved = Boolean(customer.invoice_settings.default_payment_method);
+    if (connectAccount) {
+      connectDetailsSubmitted = connectAccount.details_submitted;
+      payoutsEnabled = connectAccount.payouts_enabled;
+      connectCountry = connectAccount.country || null;
+    }
+  }
+  const stripeDraft = user.role === UserRole.DEVELOPER && params.draft
+    ? await prisma.appCampaign.findFirst({ where: { id: params.draft, developerId: user.id, status: "DRAFT" }, select: { id: true } })
+    : null;
+
   let sitePerformance: AnalyticsSummaryData | null = null;
   if (canViewSitePerformance) {
     sitePerformance = await getAnalyticsSummary();
@@ -106,6 +142,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 </span>
               </Link>
             </div>
+            <AccountSignOutButton />
           </header>
 
           <nav aria-label="Account settings" className="mt-8 flex max-w-full gap-2 overflow-x-auto border-b border-[#1F2430] pb-2">
@@ -213,7 +250,22 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                   </div>
                 </section>
 
-                <PayoutSetupCard stripeConnectAccountId={user.stripeConnectAccountId} />
+                {user.role !== UserRole.ADMIN ? (
+                  <StripeSettingsCard
+                    role={user.role}
+                    stripeConfigured={stripeConfigured}
+                    paymentMethodSaved={paymentMethodSaved}
+                    connectAccountId={user.stripeConnectAccountId}
+                    connectCountry={connectCountry}
+                    connectDetailsSubmitted={connectDetailsSubmitted}
+                    payoutsEnabled={payoutsEnabled}
+                    pendingPayoutCount={pendingPayoutCount}
+                    pendingPayoutAmountCents={pendingPayoutAmountCents}
+                    paymentSetupResult={params.stripePayment}
+                    connectSetupResult={params.stripeConnect}
+                    draftId={stripeDraft?.id}
+                  />
+                ) : null}
               </div>
             ) : null}
           </section>
@@ -260,29 +312,6 @@ function DeveloperPortfolio({ campaigns }: { campaigns: Array<{ id: string; titl
   }
 
   return <PortfolioList empty="No developer deployments yet." items={campaigns.map((campaign) => ({ id: campaign.id, title: campaign.title, meta: `${campaign.targetVibe} · ${campaign.completedSlots}/${campaign.claimedSlots} completed`, value: `$${campaign.bountyPerTaskUsd.toFixed(2)}` }))} title="Deployment portfolio" />;
-}
-
-function PayoutSetupCard({ stripeConnectAccountId }: { stripeConnectAccountId: string | null }) {
-  const isConnected = Boolean(stripeConnectAccountId);
-  return (
-    <section className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-5 backdrop-blur-md sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <CreditCard className="mt-1 size-5 text-amber-500" />
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-amber-500">Payout setup</p>
-            <h2 className="mt-1 text-lg font-bold text-white">Connect payout method</h2>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-400">
-              {isConnected ? "A Stripe Connect account is linked to your SeedEnv profile." : "Stripe Connect onboarding is not enabled on this workspace yet. Your balance and transaction history remain available in the ledger."}
-            </p>
-          </div>
-        </div>
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${isConnected ? "border-emerald-500/30 bg-emerald-950/40 text-emerald-300" : "border-[#2A2F3D] bg-[#090A0F] text-neutral-400"}`}>
-          {isConnected ? "Connected" : "Not connected"}
-        </span>
-      </div>
-    </section>
-  );
 }
 
 async function AdminPortfolio() {

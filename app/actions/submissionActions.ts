@@ -8,6 +8,7 @@ import { notificationEnabled, sendNotificationEmail } from "@/lib/notifications"
 import { prisma } from "@/lib/prisma";
 import { rankForXp, xpForBounty } from "@/lib/rank";
 import { uploadProofImage } from "@/lib/storage";
+import { getStripe } from "@/lib/stripe";
 import { formatCents, usdToCents } from "@/lib/utils";
 
 const proofSchema = z.object({
@@ -182,38 +183,104 @@ export async function approveSubmission(submissionId: string) {
     await tx.user.update({
       where: { id: submission.testerId },
       data: {
-        walletBalanceCents: { increment: submission.payoutCents },
         xpPoints: { increment: xpGain },
         rankTier: rankForXp(nextXp),
         lastActiveDate: new Date(),
       },
     });
-    await tx.walletTransaction.create({
+    const payout = await tx.walletTransaction.create({
       data: {
         userId: submission.testerId,
         amountCents: submission.payoutCents,
         type: TransactionType.BOUNTY_PAYOUT,
-        status: TransactionStatus.COMPLETED,
-        description: `Approved bounty for ${submission.campaign.title}`,
+        status: TransactionStatus.PENDING,
+        description: `Payout pending Stripe transfer for ${submission.campaign.title}`,
       },
+      select: { id: true },
     });
 
-    return { payoutCents: submission.payoutCents, xpGain, testerId: submission.testerId };
+    return { payoutCents: submission.payoutCents, xpGain, testerId: submission.testerId, payoutTransactionId: payout.id };
   });
 
   const tester = await prisma.user.findUnique({
     where: { id: result.testerId },
     select: { email: true, notificationPreferences: true },
   });
+  const payoutSent = await transferTesterPayout(result.testerId, result.payoutTransactionId);
   if (tester && notificationEnabled(tester.notificationPreferences, "email_ledger_updates", true)) {
     await sendNotificationEmail(
       tester.email,
-      "Your SeedEnv payout was approved",
-      `Your ${formatCents(result.payoutCents)} tester payout has been approved and added to your SeedEnv ledger.`,
+      payoutSent ? "Your SeedEnv payout was sent" : "Your SeedEnv payout is pending setup",
+      payoutSent
+        ? `Your ${formatCents(result.payoutCents)} tester payout was transferred to your Stripe account.`
+        : `Your ${formatCents(result.payoutCents)} tester payout was approved and is pending Stripe payout setup. Open Account > Portfolio / Billing to connect Stripe and release it.`,
     );
   }
 
-  return { payoutCents: result.payoutCents, xpGain: result.xpGain };
+  return { payoutCents: result.payoutCents, xpGain: result.xpGain, payoutStatus: payoutSent ? "TRANSFERRED" as const : "PENDING" as const };
+}
+
+async function transferTesterPayout(testerId: string, transactionId: string) {
+  const [tester, transaction] = await Promise.all([
+    prisma.user.findUnique({ where: { id: testerId }, select: { stripeConnectAccountId: true } }),
+    prisma.walletTransaction.findUnique({ where: { id: transactionId }, select: { amountCents: true, status: true } }),
+  ]);
+  if (!tester || !transaction) return false;
+  if (transaction.status === TransactionStatus.COMPLETED) return true;
+  if (!tester.stripeConnectAccountId || !process.env.STRIPE_SECRET_KEY) return false;
+
+  try {
+    const stripe = getStripe();
+    const account = await stripe.accounts.retrieve(tester.stripeConnectAccountId);
+    if (!account.payouts_enabled) return false;
+
+    const transfer = await stripe.transfers.create({
+      amount: transaction.amountCents,
+      currency: "usd",
+      destination: tester.stripeConnectAccountId,
+      metadata: { seedenvUserId: testerId, seedenvLedgerTransactionId: transactionId },
+    }, { idempotencyKey: `seedenv-payout-${transactionId}` });
+
+    const settled = await prisma.$transaction(async (database) => {
+      const updated = await database.walletTransaction.updateMany({
+        where: { id: transactionId, status: TransactionStatus.PENDING },
+        data: { status: TransactionStatus.COMPLETED, stripePaymentId: transfer.id, description: "Tester payout transferred to Stripe" },
+      });
+      if (updated.count) {
+        await database.user.update({ where: { id: testerId }, data: { walletBalanceCents: { increment: transaction.amountCents } } });
+      }
+      return updated.count > 0;
+    });
+    if (settled) return true;
+    const current = await prisma.walletTransaction.findUnique({ where: { id: transactionId }, select: { status: true } });
+    return current?.status === TransactionStatus.COMPLETED;
+  } catch (error) {
+    console.warn("Stripe tester payout transfer failed:", error instanceof Error ? error.message : "Unknown transfer error.");
+    return false;
+  }
+}
+
+export async function releasePendingTesterPayouts() {
+  const tester = await getCurrentUser("TESTER");
+  if (tester.role !== "TESTER") throw new Error("Switch to your Tester workspace to release payouts.");
+  if (!tester.stripeConnectAccountId || !process.env.STRIPE_SECRET_KEY) {
+    return { releasedCount: 0, pendingCount: await prisma.walletTransaction.count({ where: { userId: tester.id, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING } }) };
+  }
+
+  const pending = await prisma.walletTransaction.findMany({
+    where: { userId: tester.id, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  let releasedCount = 0;
+  for (const payout of pending) {
+    if (await transferTesterPayout(tester.id, payout.id)) releasedCount += 1;
+  }
+
+  return {
+    releasedCount,
+    pendingCount: await prisma.walletTransaction.count({ where: { userId: tester.id, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING } }),
+  };
 }
 
 export async function rejectSubmission(submissionId: string, reason: string) {

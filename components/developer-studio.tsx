@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { approveSubmission, rejectSubmission, requestSubmissionRevision } from "@/app/actions/submissionActions";
-import { createCampaignWithEscrow, type CampaignInput } from "@/app/actions/campaignActions";
+import { createCampaignWithEscrow, saveTestCampaignDraft, type CampaignInput } from "@/app/actions/campaignActions";
 import { Button } from "@/components/ui/button";
 import { DeveloperInsights, type InsightSubmission } from "@/components/developer-insights";
 import { formatCents } from "@/lib/utils";
@@ -42,6 +42,19 @@ type Asset = {
   campaign: { id: string; title: string };
 };
 
+type CampaignDraft = {
+  id: string;
+  title: string;
+  platform: PlatformType;
+  appUrl: string;
+  iconUrl: string | null;
+  targetVibe: string;
+  description: string;
+  totalSlots: number;
+  bountyPerTaskUsd: number;
+  instructions: Array<{ stepNumber: number; instructionTitle: string; instructionDetail: string; proofType: TaskProofType }>;
+};
+
 function parseHttpUrl(value: string) {
   try {
     const url = new URL(value.trim());
@@ -53,14 +66,27 @@ function parseHttpUrl(value: string) {
 
 const vibes = ["Social & UGC", "Fitness & Wellness", "Niche Marketplace", "Creator Tools", "Fintech Trust", "AI Workflow"];
 const defaultTask = { instructionTitle: "Complete onboarding", instructionDetail: "Install the app, create an account, and capture the final onboarding screen.", proofType: TaskProofType.SCREENSHOT };
+const selectClass = "w-full rounded-2xl border border-stroke bg-black/28 px-4 py-3 text-white outline-none focus:border-aurum [color-scheme:dark]";
+const optionStyle = { backgroundColor: "#0E1017", color: "#F8FAFC" };
 
 export type DeveloperStudioView = "overview" | "new-drop" | "review-deck" | "asset-vault";
 
-export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, view }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; view: DeveloperStudioView }) {
+export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, view }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; view: DeveloperStudioView }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [highestStep, setHighestStep] = useState(1);
-  const [form, setForm] = useState<CampaignInput>({
+  const draftId = initialDraft?.id;
+  const [form, setForm] = useState<CampaignInput>(() => initialDraft ? {
+    title: initialDraft.title,
+    platform: initialDraft.platform,
+    appUrl: initialDraft.appUrl,
+    iconUrl: initialDraft.iconUrl || "",
+    targetVibe: initialDraft.targetVibe,
+    description: initialDraft.description,
+    totalSlots: initialDraft.totalSlots,
+    bountyPerTaskUsd: initialDraft.bountyPerTaskUsd,
+    instructions: initialDraft.instructions.map(({ instructionTitle, instructionDetail, proofType }) => ({ instructionTitle, instructionDetail, proofType })),
+  } : {
     title: "",
     platform: PlatformType.TESTFLIGHT,
     appUrl: "",
@@ -194,7 +220,11 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     setMessage(null);
     startTransition(async () => {
       try {
-        const result = await createCampaignWithEscrow(form);
+        const result = await createCampaignWithEscrow(form, draftId);
+        if (result.requiresPaymentSetup) {
+          router.push(`/account?tab=portfolio&draft=${encodeURIComponent(result.campaignId)}`);
+          return;
+        }
         if (result.checkoutUrl?.startsWith("http")) {
           window.location.href = result.checkoutUrl;
           return;
@@ -207,13 +237,36 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     });
   }
 
+  function saveNoChargeTestDraft() {
+    if (isUploadingIcon) return;
+    for (let stepToValidate = 1; stepToValidate <= 3; stepToValidate += 1) {
+      if (!validateStep(stepToValidate)) {
+        setStep(stepToValidate);
+        return;
+      }
+    }
+
+    setMessage(null);
+    startTransition(async () => {
+      try {
+        const draft = await saveTestCampaignDraft(form);
+        router.push(`/console?view=billing&testDraft=${encodeURIComponent(draft.campaignId)}`);
+        router.refresh();
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Could not save the no-charge test draft.");
+      }
+    });
+  }
+
   function review(submissionId: string, action: "approve" | "reject" | "revision", reason?: string) {
     setMessage(null);
     startTransition(async () => {
       try {
         if (action === "approve") {
           const result = await approveSubmission(submissionId);
-          setMessage(`Approved: ${formatCents(result.payoutCents)} and ${result.xpGain} REP released.`);
+          setMessage(result.payoutStatus === "TRANSFERRED"
+            ? `Approved: ${formatCents(result.payoutCents)} was transferred to the tester’s Stripe account and ${result.xpGain} REP was added.`
+            : `Approved: ${result.xpGain} REP was added. The ${formatCents(result.payoutCents)} payout is pending the tester’s Stripe setup.`);
         } else if (action === "revision") {
           await requestSubmissionRevision(submissionId, reason || "Please add clearer reproduction steps and supporting proof.");
           setMessage("Revision request sent to the tester.");
@@ -254,10 +307,10 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               <Field error={errors.title} label="App title" maxLength={90} required value={form.title} onChange={(value) => updateFormField("title", value)} />
               <label className="space-y-2 text-sm font-semibold text-white/72">
                 Platform
-                <select value={form.platform} onChange={(event) => updateFormField("platform", event.target.value as PlatformType)} className="w-full rounded-2xl border border-stroke bg-black/28 px-4 py-3 text-white outline-none focus:border-aurum">
-                  <option value={PlatformType.TESTFLIGHT}>TestFlight</option>
-                  <option value={PlatformType.WEB_STAGING}>Web URL</option>
-                  <option value={PlatformType.PLAY_STORE}>Staging APK / Play Store</option>
+                <select style={{ colorScheme: "dark" }} value={form.platform} onChange={(event) => updateFormField("platform", event.target.value as PlatformType)} className={selectClass}>
+                  <option style={optionStyle} value={PlatformType.TESTFLIGHT}>TestFlight</option>
+                  <option style={optionStyle} value={PlatformType.WEB_STAGING}>Web URL</option>
+                  <option style={optionStyle} value={PlatformType.PLAY_STORE}>Staging APK / Play Store</option>
                 </select>
               </label>
               <Field error={errors.appUrl} label="App / TestFlight URL" maxLength={2048} placeholder="https://..." required type="url" value={form.appUrl} onChange={(value) => updateFormField("appUrl", value)} />
@@ -279,8 +332,8 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               </div>
               <label className="space-y-2 text-sm font-semibold text-white/72">
                 Target audience / vibe
-                <select aria-invalid={Boolean(errors.targetVibe)} value={form.targetVibe} onChange={(event) => updateFormField("targetVibe", event.target.value)} className="w-full rounded-2xl border border-stroke bg-black/28 px-4 py-3 text-white outline-none focus:border-aurum">
-                  {vibes.map((vibe) => <option key={vibe}>{vibe}</option>)}
+                <select aria-invalid={Boolean(errors.targetVibe)} style={{ colorScheme: "dark" }} value={form.targetVibe} onChange={(event) => updateFormField("targetVibe", event.target.value)} className={selectClass}>
+                  {vibes.map((vibe) => <option key={vibe} style={optionStyle}>{vibe}</option>)}
                 </select>
                 {errors.targetVibe ? <span className="block text-xs font-normal text-rose-300">{errors.targetVibe}</span> : null}
               </label>
@@ -309,10 +362,10 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                     <Field error={errors[`instructionTitle-${index}`]} label="Instruction title" maxLength={90} required value={task.instructionTitle} onChange={(value) => updateTask(index, { instructionTitle: value })} />
                     <label className="space-y-2 text-sm font-semibold text-white/72">
                       Proof type
-                      <select value={task.proofType} onChange={(event) => updateTask(index, { proofType: event.target.value as TaskProofType })} className="w-full rounded-2xl border border-stroke bg-black/28 px-4 py-3 text-white outline-none focus:border-aurum">
-                        <option value={TaskProofType.SCREENSHOT}>Screenshot</option>
-                        <option value={TaskProofType.TEXT_FEEDBACK}>Text feedback</option>
-                        <option value={TaskProofType.ACTION_LINK}>Action link</option>
+                      <select style={{ colorScheme: "dark" }} value={task.proofType} onChange={(event) => updateTask(index, { proofType: event.target.value as TaskProofType })} className={selectClass}>
+                        <option style={optionStyle} value={TaskProofType.SCREENSHOT}>Screenshot</option>
+                        <option style={optionStyle} value={TaskProofType.TEXT_FEEDBACK}>Text feedback</option>
+                        <option style={optionStyle} value={TaskProofType.ACTION_LINK}>Action link</option>
                       </select>
                     </label>
                     <label className="space-y-2 text-sm font-semibold text-white/72 md:col-span-2">
@@ -343,6 +396,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               <Button size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending}>
                 <BadgeDollarSign className="size-5" /> Deposit Escrow & Launch
               </Button>
+              {canSaveTestDraft ? <Button className="w-full" disabled={isPending || isUploadingIcon} type="button" variant="ghost" onClick={saveNoChargeTestDraft}><CheckCircle2 className="size-4" /> Save test draft (no charge)</Button> : null}
             </div>
           )}
           <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4">

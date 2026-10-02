@@ -8,6 +8,7 @@ import { Resend } from "resend";
 import { isDiscordWebhookUrl, sendDiscordWebhookMessage } from "@/lib/discord";
 import { hashPassword, validatePassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
+import { getStripe } from "@/lib/stripe";
 
 const accountSettingsSchema = z.object({
   name: z.string().trim().max(80).optional(),
@@ -34,6 +35,103 @@ export type AccountSettingsInput = z.infer<typeof accountSettingsSchema>;
 export type NotificationPreferences = z.infer<typeof notificationPreferencesSchema>;
 export type SettingsActionResult = { ok: true } | { ok: false; message: string; fieldErrors?: Record<string, string> };
 export type WorkspaceRole = typeof UserRole.TESTER | typeof UserRole.DEVELOPER;
+export type StripeRedirectResult = { ok: true; url: string } | { ok: false; message: string };
+
+const stripeConnectCountries = ["US", "CA", "GB", "AU", "NZ", "IE", "DE", "FR", "NL", "ES", "IT", "SG"] as const;
+
+function stripeAppUrl(path: string) {
+  return new URL(path, process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://seedenv.com").toString();
+}
+
+export async function createStripeConnectOnboardingLink(country: string): Promise<StripeRedirectResult> {
+  const user = await getCurrentUser();
+  if (user.role !== UserRole.TESTER && user.role !== UserRole.DEVELOPER) return { ok: false, message: "A Tester or Developer workspace is required." };
+  if (!process.env.STRIPE_SECRET_KEY) return { ok: false, message: "Stripe setup is unavailable. Contact SeedEnv support." };
+  const parsedCountry = z.enum(stripeConnectCountries).safeParse(country);
+  if (!parsedCountry.success) return { ok: false, message: "Choose a supported country." };
+
+  try {
+    const stripe = getStripe();
+    let connectedAccountId = user.stripeConnectAccountId;
+    if (connectedAccountId) {
+      const existingAccount = await stripe.accounts.retrieve(connectedAccountId);
+      if (existingAccount.country !== parsedCountry.data) {
+        return { ok: false, message: "A Stripe account is already linked. Contact support to change its country." };
+      }
+    } else {
+      const account = await stripe.accounts.create({
+        type: "express",
+        country: parsedCountry.data,
+        email: user.email,
+        capabilities: { transfers: { requested: true } },
+        metadata: { seedenvUserId: user.id },
+      }, { idempotencyKey: `seedenv-connect-${user.id}` });
+      connectedAccountId = account.id;
+      await prisma.user.update({ where: { id: user.id }, data: { stripeConnectAccountId: connectedAccountId } });
+    }
+
+    const link = await stripe.accountLinks.create({
+      account: connectedAccountId,
+      refresh_url: stripeAppUrl("/account?tab=portfolio&stripeConnect=refresh"),
+      return_url: stripeAppUrl("/account?tab=portfolio&stripeConnect=return"),
+      type: "account_onboarding",
+    });
+    return { ok: true, url: link.url };
+  } catch (error) {
+    console.error("SeedEnv Stripe Connect onboarding failed:", error);
+    return { ok: false, message: "Stripe could not start payout setup. Check your Stripe Connect account and try again." };
+  }
+}
+
+export async function createStripePaymentMethodSetupLink(draftId?: string): Promise<StripeRedirectResult> {
+  const user = await getCurrentUser("DEVELOPER");
+  if (user.role !== UserRole.DEVELOPER) return { ok: false, message: "Switch to your Developer workspace to set up campaign funding." };
+  if (!process.env.STRIPE_SECRET_KEY) return { ok: false, message: "Stripe setup is unavailable. Contact SeedEnv support." };
+  if (draftId) {
+    const draft = await prisma.appCampaign.findFirst({ where: { id: draftId, developerId: user.id, status: "DRAFT" }, select: { id: true } });
+    if (!draft) return { ok: false, message: "That draft is unavailable for payment setup." };
+  }
+
+  try {
+    const stripe = getStripe();
+    let customerId = user.stripeCustomerId;
+    if (customerId) {
+      try {
+        const customer = await stripe.customers.retrieve(customerId);
+        if (customer.deleted) customerId = null;
+      } catch (error) {
+        const stripeCode = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+        if (stripeCode === "resource_missing") customerId = null;
+        else throw error;
+      }
+    }
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: user.name || user.username,
+        metadata: { seedenvUserId: user.id },
+      }, { idempotencyKey: `seedenv-customer-${user.id}` });
+      customerId = customer.id;
+      await prisma.user.update({ where: { id: user.id }, data: { stripeCustomerId: customerId } });
+    }
+
+    const draftQuery = draftId ? `&draft=${encodeURIComponent(draftId)}` : "";
+    const session = await stripe.checkout.sessions.create({
+      mode: "setup",
+      customer: customerId,
+      payment_method_types: ["card"],
+      setup_intent_data: { metadata: { seedenvUserId: user.id } },
+      success_url: stripeAppUrl(`/account?tab=portfolio&stripePayment=success${draftQuery}`),
+      cancel_url: stripeAppUrl(`/account?tab=portfolio&stripePayment=cancelled${draftQuery}`),
+      metadata: { type: "SEEDENV_PAYMENT_METHOD_SETUP", seedenvUserId: user.id },
+    });
+    if (!session.url) return { ok: false, message: "Stripe did not return a setup link. Please try again." };
+    return { ok: true, url: session.url };
+  } catch (error) {
+    console.error("SeedEnv Stripe payment setup failed:", error);
+    return { ok: false, message: "Stripe could not start payment-method setup. Please try again." };
+  }
+}
 
 export async function activateAccountWorkspace(role: WorkspaceRole): Promise<SettingsActionResult> {
   const user = await getCurrentUser();

@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       const event = getStripe().webhooks.constructEvent(rawBody, signature, webhookSecret);
       const result = await handleStripeWebhook({
         type: event.type,
-        data: { object: event.data.object as { id?: string; payment_intent?: string; metadata?: Record<string, string> } },
+        data: { object: event.data.object as { id?: string; payment_intent?: string; setup_intent?: string | { id: string } | null; customer?: string | { id: string } | null; metadata?: Record<string, string> } },
       });
       return NextResponse.json(result);
     } catch (error) {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const parsed = JSON.parse(rawBody) as { type: string; data: { object: { id?: string; payment_intent?: string; metadata?: Record<string, string> } } };
+    const parsed = JSON.parse(rawBody) as { type: string; data: { object: { id?: string; payment_intent?: string; setup_intent?: string | { id: string } | null; customer?: string | { id: string } | null; metadata?: Record<string, string> } } };
     return NextResponse.json(await handleStripeWebhook(parsed));
   } catch {
     return NextResponse.json({ message: "Invalid webhook payload" }, { status: 400 });

@@ -96,7 +96,12 @@ const githubCredentials = getGitHubCredentials();
 const googleCredentials = getGoogleCredentials();
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: {
+    ...PrismaAdapter(prisma),
+    async getUserByEmail(email) {
+      return prisma.user.findFirst({ where: { email: { equals: email.trim(), mode: "insensitive" } } });
+    },
+  },
   providers: [
     CredentialsProvider({
       id: "credentials",

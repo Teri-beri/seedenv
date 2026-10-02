@@ -18,7 +18,7 @@ const consoleViews = ["overview", "new-drop", "review-deck", "asset-vault", "bil
 type ConsoleView = (typeof consoleViews)[number];
 const reviewPageSize = 20;
 
-export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string }> }) {
+export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "DEVELOPER") redirect("/");
@@ -27,9 +27,16 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
 
   const security = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { passwordHash: true, _count: { select: { accounts: true } } },
+    select: { passwordHash: true, role: true, username: true, email: true, _count: { select: { accounts: true } } },
   });
   if (security && !security.passwordHash && security._count.accounts === 0) redirect("/onboarding/setup?next=/console");
+  const ownerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();
+  const canSaveTestDraft = Boolean(
+    security?.role === "DEVELOPER"
+    && security.username.trim().toLowerCase() === "teriberi"
+    && ownerEmail
+    && security.email.trim().toLowerCase() === ownerEmail,
+  );
 
   await ensurePreviewData();
   const campaignScope = { developerId: session.user.id };
@@ -109,6 +116,15 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   const checkoutCampaign = activeView === "billing" && params.campaign
     ? await prisma.appCampaign.findFirst({ where: { id: params.campaign, developerId: session.user.id }, select: { title: true, status: true } })
     : null;
+  const testDraftCampaign = activeView === "billing" && params.testDraft
+    ? await prisma.appCampaign.findFirst({ where: { id: params.testDraft, developerId: session.user.id, status: CampaignStatus.DRAFT }, select: { title: true } })
+    : null;
+  const launchDraft = activeView === "new-drop" && params.draft
+    ? await prisma.appCampaign.findFirst({
+        where: { id: params.draft, developerId: session.user.id, status: CampaignStatus.DRAFT },
+        include: { instructions: { orderBy: { stepNumber: "asc" } } },
+      })
+    : null;
   const [pendingPreviews, approvedPreviews, auditPreviews] = await Promise.all([
     Promise.all(pendingSubmissions.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
     Promise.all(approvedAssets.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
@@ -119,13 +135,13 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     <main className="terminal-grid min-h-screen bg-[radial-gradient(circle_at_12%_0%,rgba(109,40,217,0.2),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_50%,#090A0F_100%)] pb-16 text-white" id="console-top">
       <DeveloperHeader activeView={activeView} />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {activeView === "overview" ? <section className="mb-8 grid gap-6 lg:grid-cols-[1fr_420px]">
-          <div>
+        {activeView === "overview" ? <section className="mb-8 grid items-stretch gap-6 lg:grid-cols-[1fr_420px]">
+          <div className="flex h-full flex-col justify-between gap-6">
             <p className="text-xs uppercase tracking-[0.28em] text-amber-500">SeedEnv Console</p>
-            <h1 className="mt-3 max-w-4xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-5xl font-black leading-[0.98] tracking-tight text-transparent sm:text-6xl">
+            <h1 className="max-w-xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-2xl font-bold leading-snug tracking-tight text-transparent md:text-3xl">
               Campaign operations without the tester HUD clutter.
             </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-neutral-400">
+            <p className="max-w-xl text-sm leading-relaxed text-neutral-400">
               Launch seed missions, fund escrow, review proof, and export validated assets from one dedicated developer workspace.
             </p>
           </div>
@@ -175,7 +191,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
             <h2 className="mt-2 text-3xl font-black text-white">{activeView === "new-drop" ? "New Drop" : activeView === "review-deck" ? "Review Deck" : "Asset Vault"}</h2>
           </section>
         ) : null}
-        {activeView !== "billing" ? <DeveloperStudio submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} view={activeView} /> : null}
+        {activeView !== "billing" ? <DeveloperStudio key={launchDraft?.id || "new-drop"} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} view={activeView} /> : null}
 
         {activeView === "billing" ? <section className="space-y-5">
           <div className="flex flex-wrap items-end justify-between gap-4">
@@ -191,6 +207,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
 
           {params.escrow === "success" ? <p className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">{checkoutCampaign?.status === CampaignStatus.ACTIVE ? `Payment confirmed for ${checkoutCampaign.title}; the drop is active.` : `Checkout returned${checkoutCampaign ? ` for ${checkoutCampaign.title}` : ""}. Escrow remains pending until Stripe confirms the payment.`}</p> : null}
           {params.escrow === "cancelled" ? <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-200" role="status">Checkout was cancelled{checkoutCampaign ? ` for ${checkoutCampaign.title}` : ""}. No payment was confirmed.</p> : null}
+          {testDraftCampaign ? <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-100" role="status">Test draft saved for {testDraftCampaign.title}. No payment was taken, and it is not available to testers.</p> : null}
 
           <div className="grid gap-4 sm:grid-cols-3">
             <BillingMetric label="Completed escrow" value={formatCents(completedEscrowCents)} />

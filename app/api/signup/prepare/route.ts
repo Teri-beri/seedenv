@@ -32,10 +32,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: "Company or studio name is required for developer accounts." }, { status: 400 });
     }
 
+    const existingUser = await prisma.user.findFirst({
+      where: { email: { equals: input.email, mode: "insensitive" } },
+      select: { id: true, email: true },
+    });
+
     const existingUsername = await prisma.user.findFirst({
       where: {
         username: { equals: input.username, mode: "insensitive" },
-        email: { not: input.email },
+        ...(existingUser ? { id: { not: existingUser.id } } : { email: { not: input.email } }),
       },
       select: { id: true },
     });
@@ -53,7 +58,7 @@ export async function POST(request: NextRequest) {
     if (input.productUrl) params.set("productUrl", input.productUrl.trim());
 
     return NextResponse.json({
-      email: input.email,
+      email: existingUser?.email || input.email,
       onboardingParams: params.toString(),
       encodedEmail: encode(input.email),
     });

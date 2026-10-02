@@ -113,7 +113,7 @@ export function CompactSignupForm() {
 
       setMessage(result?.error
         ? "We could not send that access link. Please check your email and try again."
-        : "Access link sent. Check your inbox and spam folder to continue.");
+        : "Access link sent. It will open your existing workspace if you already have one, or finish setting up your selected workspace.");
     } catch (error) {
       console.error("SeedEnv signup failed:", error);
       setMessage(error instanceof Error ? error.message : "We could not start your SeedEnv account.");
@@ -235,7 +235,7 @@ export function CompactSignupForm() {
 
       {message && !isAuthError ? <p className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3 text-center text-xs leading-5 text-zinc-300" role="status">{message}</p> : null}
       {mode === "signup" ? (
-        <p className="pt-1 text-center text-sm text-zinc-500">Already have an account? <button className="font-semibold text-amber-400 hover:underline" onClick={() => { setMode("password"); setMessage(""); }} type="button">Sign in with password</button></p>
+        <p className="pt-1 text-center text-sm text-zinc-500">Already have an account? <button className="font-semibold text-amber-400 hover:underline" onClick={() => { setMode("password"); setMessage(""); }} type="button">Sign in</button></p>
       ) : (
         <p className="pt-1 text-center text-sm text-zinc-500">New to SeedEnv? <button className="font-semibold text-amber-400 hover:underline" onClick={() => { setMode("signup"); setMessage(""); }} type="button">Create an account</button></p>
       )}

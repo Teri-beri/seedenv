@@ -32,24 +32,16 @@ const campaignSchema = z.object({
 
 export type CampaignInput = z.infer<typeof campaignSchema>;
 
-export async function createCampaignWithEscrow(data: CampaignInput) {
-  const input = campaignSchema.parse(data);
-  const developer = await getCurrentUser("DEVELOPER");
-  if (developer.role !== "DEVELOPER" && developer.role !== "ADMIN") {
-    throw new Error("Only developers can launch SeedEnv drops.");
-  }
-  if (process.env.NODE_ENV === "production" && !process.env.STRIPE_SECRET_KEY) {
-    throw new Error("Stripe is required in production. No campaign or escrow record was created.");
-  }
-
+function buildCampaignData(input: CampaignInput, developerId: string, status: CampaignStatus) {
   const testerPayoutPoolUsd = input.totalSlots * input.bountyPerTaskUsd;
   const totalBudgetUsd = Number((testerPayoutPoolUsd / (1 - SEEDENV_PLATFORM_FEE_PERCENT)).toFixed(2));
   const platformFeeUsd = Number((totalBudgetUsd - testerPayoutPoolUsd).toFixed(2));
   const escrowTotalCents = usdToCents(totalBudgetUsd);
 
-  const campaign = await prisma.appCampaign.create({
+  return {
+    escrowTotalCents,
     data: {
-      developerId: developer.id,
+      developerId,
       title: input.title,
       platform: input.platform,
       appUrl: input.appUrl,
@@ -60,7 +52,7 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
       bountyPerTaskUsd: input.bountyPerTaskUsd,
       platformFeeUsd,
       totalSlots: input.totalSlots,
-      status: CampaignStatus.ESCROW_PENDING,
+      status,
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       instructions: {
         create: input.instructions.map((instruction, index) => ({
@@ -69,7 +61,84 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
         })),
       },
     },
+  };
+}
+
+async function requireDeveloper() {
+  const developer = await getCurrentUser("DEVELOPER");
+  if (developer.role !== "DEVELOPER" && developer.role !== "ADMIN") {
+    throw new Error("Only developers can manage SeedEnv drops.");
+  }
+  return developer;
+}
+
+async function saveCampaignDraft(developerId: string, input: CampaignInput, draftId?: string) {
+  const { data: draftData } = buildCampaignData(input, developerId, CampaignStatus.DRAFT);
+  if (!draftId) return prisma.appCampaign.create({ data: draftData });
+
+  const ownedDraft = await prisma.appCampaign.findFirst({
+    where: { id: draftId, developerId, status: CampaignStatus.DRAFT },
+    select: { id: true },
   });
+  if (!ownedDraft) throw new Error("This saved draft is unavailable or already launched.");
+
+  return prisma.$transaction(async (transaction) => {
+    await transaction.taskInstruction.deleteMany({ where: { campaignId: draftId } });
+    return transaction.appCampaign.update({ where: { id: draftId }, data: draftData });
+  });
+}
+
+export async function saveTestCampaignDraft(data: CampaignInput) {
+  const input = campaignSchema.parse(data);
+  const developer = await requireDeveloper();
+  const ownerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();
+  if (!ownerEmail || developer.email.trim().toLowerCase() !== ownerEmail || developer.username.trim().toLowerCase() !== "teriberi") {
+    throw new Error("No-charge test drafts are only available to the SeedEnv owner account.");
+  }
+
+  const { data: campaignData } = buildCampaignData(input, developer.id, CampaignStatus.DRAFT);
+  const campaign = await prisma.appCampaign.create({ data: campaignData });
+  return { campaignId: campaign.id, title: campaign.title, status: campaign.status, chargedCents: 0 };
+}
+
+export async function createCampaignWithEscrow(data: CampaignInput, draftId?: string) {
+  const input = campaignSchema.parse(data);
+  const developer = await requireDeveloper();
+  if (process.env.NODE_ENV === "production" && !process.env.STRIPE_SECRET_KEY) {
+    throw new Error("Stripe is required in production. No campaign or escrow record was created.");
+  }
+
+  if (process.env.STRIPE_SECRET_KEY) {
+    let hasSavedPaymentMethod = false;
+    if (developer.stripeCustomerId) {
+      try {
+        const customer = await getStripe().customers.retrieve(developer.stripeCustomerId);
+        hasSavedPaymentMethod = !customer.deleted && Boolean(customer.invoice_settings.default_payment_method);
+      } catch {
+        hasSavedPaymentMethod = false;
+      }
+    }
+    if (!hasSavedPaymentMethod) {
+      const draft = await saveCampaignDraft(developer.id, input, draftId);
+      return { campaignId: draft.id, checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true };
+    }
+  }
+
+  const { data: campaignData, escrowTotalCents } = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING);
+  let campaign;
+  if (draftId) {
+    const ownedDraft = await prisma.appCampaign.findFirst({
+      where: { id: draftId, developerId: developer.id, status: CampaignStatus.DRAFT },
+      select: { id: true },
+    });
+    if (!ownedDraft) throw new Error("This saved draft is unavailable or already launched.");
+    campaign = await prisma.$transaction(async (transaction) => {
+      await transaction.taskInstruction.deleteMany({ where: { campaignId: draftId } });
+      return transaction.appCampaign.update({ where: { id: draftId }, data: campaignData });
+    });
+  } else {
+    campaign = await prisma.appCampaign.create({ data: campaignData });
+  }
 
   await prisma.walletTransaction.create({
     data: {
@@ -90,6 +159,7 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
   try {
     session = await stripe.checkout.sessions.create({
       mode: "payment",
+      customer: developer.stripeCustomerId || undefined,
       payment_method_types: ["card"],
       line_items: [
         {
@@ -123,11 +193,26 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
   return { campaignId: campaign.id, checkoutUrl: session.url, escrowTotalCents };
 }
 
-export async function handleStripeWebhook(event: { type: string; data: { object: { id?: string; payment_intent?: string; metadata?: Record<string, string> } } }) {
+export async function handleStripeWebhook(event: { type: string; data: { object: { id?: string; payment_intent?: string; setup_intent?: string | { id: string } | null; customer?: string | { id: string } | null; metadata?: Record<string, string> } } }) {
   if (event.type !== "checkout.session.completed" && event.type !== "payment_intent.succeeded") return { ignored: true };
 
   const object = event.data.object;
   const metadata = object.metadata || {};
+  if (event.type === "checkout.session.completed" && metadata.type === "SEEDENV_PAYMENT_METHOD_SETUP") {
+    const customerId = typeof object.customer === "string" ? object.customer : object.customer?.id;
+    const setupIntentId = typeof object.setup_intent === "string" ? object.setup_intent : object.setup_intent?.id;
+    const userId = metadata.seedenvUserId;
+    if (!customerId || !setupIntentId || !userId) return { ignored: true };
+
+    const user = await prisma.user.findFirst({ where: { id: userId, stripeCustomerId: customerId }, select: { id: true } });
+    if (!user) return { ignored: true };
+    const setupIntent = await getStripe().setupIntents.retrieve(setupIntentId);
+    const paymentMethodId = typeof setupIntent.payment_method === "string" ? setupIntent.payment_method : setupIntent.payment_method?.id;
+    if (!paymentMethodId) return { ignored: true };
+    await getStripe().customers.update(customerId, { invoice_settings: { default_payment_method: paymentMethodId } });
+    return { paymentMethodSaved: true, userId };
+  }
+
   if (metadata.type !== "SEEDENV_CAMPAIGN_ESCROW" || !metadata.campaignId) return { ignored: true };
 
   const stripePaymentId = object.payment_intent || object.id || null;
