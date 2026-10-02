@@ -53,14 +53,14 @@ export function WorkspaceAccessSwitcher({
           return (
             <button
               aria-pressed={active}
-              className={`flex min-h-12 items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${active ? "border-amber-500/40 bg-amber-500/10 text-amber-200" : "border-[#2A2F3D] bg-[#090A0F]/55 text-neutral-300 hover:border-amber-500/30 hover:text-white"}`}
+              className={`grid min-h-[76px] w-full grid-cols-[minmax(0,1fr)_64px] items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${active ? "border-amber-500/40 bg-amber-500/10 text-amber-200" : "border-[#2A2F3D] bg-[#090A0F]/55 text-neutral-300 hover:border-amber-500/30 hover:text-white"}`}
               disabled={isPending || active}
               key={role}
               onClick={() => activate(role)}
               type="button"
             >
-              <span className="flex min-w-0 items-center gap-2"><Icon className="size-4 shrink-0" /><span>{enabled ? `${label} workspace` : `Create ${label.toLowerCase()} workspace`}</span></span>
-              <span className="shrink-0 text-xs font-medium">{isPending && !active ? <LoaderCircle className="size-4 animate-spin" /> : active ? <span className="inline-flex items-center gap-1"><Check className="size-3.5" /> Current</span> : enabled ? "Switch" : "Add"}</span>
+              <span className="flex min-w-0 items-center gap-2"><Icon className="size-4 shrink-0" /><span className="min-w-0 whitespace-normal leading-5">{enabled ? `${label} workspace` : `Create ${label.toLowerCase()} workspace`}</span></span>
+              <span className="flex min-w-[64px] shrink-0 flex-col items-center justify-center gap-1 text-[10px] font-semibold leading-none">{isPending && !active ? <LoaderCircle className="size-4 animate-spin" /> : active ? <><Check className="size-4" /><span>Current</span></> : <span>{enabled ? "Switch" : "Add"}</span>}</span>
             </button>
           );
         })}

@@ -96,6 +96,16 @@ select {
   background-size: 44px 44px;
 }
 
+.cursor-grid-trail-dot {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: #ff8c00;
+  box-shadow: 0 0 5px rgba(255, 140, 0, 0.14);
+  pointer-events: none;
+}
+
 .seedenv-ambient-grid {
   background-image:
     radial-gradient(circle at 0 0, rgba(255, 255, 255, 0.08) 1px, transparent 1.5px),

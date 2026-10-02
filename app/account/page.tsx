@@ -106,11 +106,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 </span>
               </Link>
             </div>
-            <nav className="flex gap-2">
-              {user.role === UserRole.TESTER ? <Link className="rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-amber-500/30 hover:text-white" href="/dashboard">Tester</Link> : null}
-              {user.role === UserRole.DEVELOPER ? <Link className="rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-amber-500/30 hover:text-white" href="/console">Developer</Link> : null}
-              {user.role === UserRole.ADMIN ? <Link className="rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-amber-500/30 hover:text-white" href="/admin">Admin</Link> : null}
-            </nav>
           </header>
 
           <nav aria-label="Account settings" className="mt-8 flex max-w-full gap-2 overflow-x-auto border-b border-[#1F2430] pb-2">

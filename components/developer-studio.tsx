@@ -2,7 +2,7 @@
 
 import { PlatformType, TaskProofType } from "@prisma/client";
 import { motion } from "framer-motion";
-import { ArrowDown, ArrowUp, BadgeDollarSign, Boxes, CheckCircle2, Download, ExternalLink, ImageIcon, Plus, Trash2, XCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, BadgeDollarSign, Boxes, CheckCircle2, Download, ExternalLink, ImageIcon, ImagePlus, LoaderCircle, Plus, Trash2, XCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -73,6 +73,9 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   });
   const [message, setMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isUploadingIcon, setIsUploadingIcon] = useState(false);
+  const [iconMessage, setIconMessage] = useState("");
+  const [iconFileName, setIconFileName] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const payoutPool = useMemo(() => form.totalSlots * form.bountyPerTaskUsd, [form.totalSlots, form.bountyPerTaskUsd]);
@@ -117,11 +120,43 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   }
 
   function continueWizard() {
+    if (isUploadingIcon) return;
     if (!validateStep(step)) return;
     const nextStep = Math.min(3, step + 1);
     setStep(nextStep);
     setHighestStep((current) => Math.max(current, nextStep));
     setMessage(null);
+  }
+
+  async function uploadCampaignIcon(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.type !== "image/png" && file.type !== "image/jpeg") {
+      setIconMessage("Choose a PNG or JPG image.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setIconMessage("Icon must be 2 MB or smaller.");
+      return;
+    }
+
+    setIconMessage("");
+    setIsUploadingIcon(true);
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      const response = await fetch("/api/console/campaign-icon", { method: "POST", body: formData });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || "Could not upload the app icon.");
+      updateFormField("iconUrl", result.iconUrl);
+      setIconFileName(file.name);
+      setIconMessage("App icon uploaded and added to the preview.");
+    } catch (error) {
+      setIconMessage(error instanceof Error ? error.message : "Could not upload the app icon.");
+    } finally {
+      setIsUploadingIcon(false);
+    }
   }
 
   function updateTask(index: number, patch: Partial<CampaignInput["instructions"][number]>) {
@@ -149,6 +184,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   }
 
   function launchCampaign() {
+    if (isUploadingIcon) return;
     for (let stepToValidate = 1; stepToValidate <= 3; stepToValidate += 1) {
       if (!validateStep(stepToValidate)) {
         setStep(stepToValidate);
@@ -225,7 +261,22 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                 </select>
               </label>
               <Field error={errors.appUrl} label="App / TestFlight URL" maxLength={2048} placeholder="https://..." required type="url" value={form.appUrl} onChange={(value) => updateFormField("appUrl", value)} />
-              <Field error={errors.iconUrl} label="App icon URL" maxLength={2048} placeholder="https://... (optional)" type="url" value={form.iconUrl || ""} onChange={(value) => updateFormField("iconUrl", value)} />
+              <div className="space-y-2 text-sm font-semibold text-white/72">
+                <p>App icon</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-[#090A0F]">
+                    {form.iconUrl ? <Image alt="Selected app icon preview" className="object-cover" fill sizes="48px" src={form.iconUrl} unoptimized /> : <ImagePlus className="size-5 text-neutral-500" />}
+                  </span>
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-stroke bg-black/28 px-3 py-2.5 text-xs font-semibold text-neutral-200 transition hover:border-amber-500/40 hover:text-white has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+                    {isUploadingIcon ? <LoaderCircle className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+                    {isUploadingIcon ? "Uploading…" : form.iconUrl ? "Replace icon" : "Choose icon file"}
+                    <input accept="image/png,image/jpeg,.png,.jpg,.jpeg" className="sr-only" disabled={isUploadingIcon} onChange={uploadCampaignIcon} type="file" />
+                  </label>
+                  {iconFileName ? <span className="max-w-full truncate text-xs font-normal text-neutral-500">{iconFileName}</span> : null}
+                </div>
+                <p className="text-xs font-normal text-neutral-500">PNG or JPG, up to 2 MB.</p>
+                {iconMessage ? <p className={`text-xs font-normal ${iconMessage.startsWith("App icon uploaded") ? "text-emerald-300" : "text-rose-300"}`} role="status">{iconMessage}</p> : null}
+              </div>
               <label className="space-y-2 text-sm font-semibold text-white/72">
                 Target audience / vibe
                 <select aria-invalid={Boolean(errors.targetVibe)} value={form.targetVibe} onChange={(event) => updateFormField("targetVibe", event.target.value)} className="w-full rounded-2xl border border-stroke bg-black/28 px-4 py-3 text-white outline-none focus:border-aurum">
@@ -295,8 +346,8 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
             </div>
           )}
           <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4">
-            <Button disabled={step === 1 || isPending} type="button" variant="ghost" onClick={() => { setStep((current) => Math.max(1, current - 1)); setErrors({}); }}>Back</Button>
-            {step < 3 ? <Button type="button" onClick={continueWizard} disabled={isPending}>Continue to {step === 1 ? "tasks" : "budget"}</Button> : <Button type="button" variant="ghost" onClick={() => setStep(1)}>Review details</Button>}
+            <Button disabled={step === 1 || isPending || isUploadingIcon} type="button" variant="ghost" onClick={() => { setStep((current) => Math.max(1, current - 1)); setErrors({}); }}>Back</Button>
+            {step < 3 ? <Button type="button" onClick={continueWizard} disabled={isPending || isUploadingIcon}>Continue to {step === 1 ? "tasks" : "budget"}</Button> : <Button type="button" variant="ghost" onClick={() => setStep(1)}>Review details</Button>}
           </div>
         </div>
         <LaunchPreview form={form} />

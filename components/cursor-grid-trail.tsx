@@ -4,88 +4,95 @@ import { useEffect, useRef } from "react";
 
 const cellSize = 44;
 const trailRadius = 56;
-const fadeDuration = 760;
-const trailIntensity = 0.13;
+const trailDuration = 760;
 
-type TrailDot = { x: number; y: number; intensity: number };
+function isGridVisibleAt(target: EventTarget | null) {
+  const element = target instanceof Element ? target : null;
+  const gridRoot = element?.closest("main");
+  if (!element || !gridRoot) return false;
+
+  const hasGrid = gridRoot.classList.contains("terminal-grid")
+    || Boolean(gridRoot.querySelector(".seedenv-ambient-grid, .seedenv-grid-flash, canvas"));
+  if (!hasGrid) return false;
+  if (element.closest("button, a, input, textarea, select, nav, header, [role='button'], [role='tab'], [role='switch'], .luxury-panel")) return false;
+
+  let current: Element | null = element;
+  while (current && current !== gridRoot) {
+    const backgroundColor = window.getComputedStyle(current).backgroundColor;
+    const rgba = backgroundColor.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)$/);
+    const alpha = rgba ? Number(rgba[1]) : backgroundColor === "transparent" ? 0 : 1;
+    if (alpha > 0.22) return false;
+    current = current.parentElement;
+  }
+
+  return true;
+}
 
 export function CursorGridTrail() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const dotsRef = useRef<Map<string, TrailDot>>(new Map());
-  const frameRef = useRef<number | null>(null);
-  const lastFrameRef = useRef(0);
+  const layerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d");
-    if (!canvas || !context) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !window.matchMedia("(any-pointer: fine)").matches) return;
+    const layer = layerRef.current;
+    if (!layer || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const trailLayer = layer;
+    const dots = new Map<string, HTMLSpanElement>();
+    const removalTimers = new Map<string, number>();
 
-    const resize = () => {
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
-      canvas.width = Math.ceil(window.innerWidth * pixelRatio);
-      canvas.height = Math.ceil(window.innerHeight * pixelRatio);
-      canvas.style.width = `${window.innerWidth}px`;
-      canvas.style.height = `${window.innerHeight}px`;
-      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-      dotsRef.current.clear();
-      context.clearRect(0, 0, window.innerWidth, window.innerHeight);
-    };
+    function removeDot(key: string, dot: HTMLSpanElement) {
+      if (dots.get(key) !== dot) return;
+      dot.remove();
+      dots.delete(key);
+      const timer = removalTimers.get(key);
+      if (timer !== undefined) window.clearTimeout(timer);
+      removalTimers.delete(key);
+    }
 
-    const render = (timestamp: number) => {
-      const elapsed = lastFrameRef.current ? timestamp - lastFrameRef.current : 16;
-      lastFrameRef.current = timestamp;
-      context.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    function handlePointerMove(event: PointerEvent) {
+      if (event.pointerType === "touch" || !isGridVisibleAt(event.target)) return;
 
-      for (const [key, dot] of dotsRef.current) {
-        dot.intensity = Math.max(0, dot.intensity - (elapsed / fadeDuration) * trailIntensity);
-        if (dot.intensity <= 0) {
-          dotsRef.current.delete(key);
-          continue;
-        }
-
-        context.save();
-        context.globalAlpha = dot.intensity;
-        context.shadowBlur = 5;
-        context.shadowColor = "rgba(255, 140, 0, 0.2)";
-        context.fillStyle = "#ff8c00";
-        context.beginPath();
-        context.arc(dot.x, dot.y, 1.6, 0, Math.PI * 2);
-        context.fill();
-        context.restore();
-      }
-
-      if (dotsRef.current.size) frameRef.current = window.requestAnimationFrame(render);
-      else {
-        frameRef.current = null;
-        lastFrameRef.current = 0;
-      }
-    };
-
-    const handlePointerMove = (event: PointerEvent) => {
-      if (event.pointerType === "touch") return;
       const centerX = Math.round(event.clientX / cellSize) * cellSize;
       const centerY = Math.round(event.clientY / cellSize) * cellSize;
       for (let x = centerX - cellSize; x <= centerX + cellSize; x += cellSize) {
         for (let y = centerY - cellSize; y <= centerY + cellSize; y += cellSize) {
           if (Math.hypot(event.clientX - x, event.clientY - y) > trailRadius) continue;
           const key = `${x}:${y}`;
-          const existing = dotsRef.current.get(key);
-          dotsRef.current.set(key, { x, y, intensity: Math.max(existing?.intensity || 0, trailIntensity) });
+          let dot = dots.get(key);
+          if (!dot) {
+            dot = document.createElement("span");
+            dot.className = "cursor-grid-trail-dot";
+            trailLayer.appendChild(dot);
+            dots.set(key, dot);
+          }
+
+          dot.style.left = `${x}px`;
+          dot.style.top = `${y}px`;
+          dot.getAnimations().forEach((animation) => animation.cancel());
+          const oldTimer = removalTimers.get(key);
+          if (oldTimer !== undefined) window.clearTimeout(oldTimer);
+          const currentDot = dot;
+          const animation = dot.animate(
+            [
+              { opacity: 0, transform: "translate(-50%, -50%) scale(0.7)" },
+              { opacity: 0.16, transform: "translate(-50%, -50%) scale(1)", offset: 0.15 },
+              { opacity: 0, transform: "translate(-50%, -50%) scale(1.1)" },
+            ],
+            { duration: trailDuration, easing: "ease-out", fill: "forwards" },
+          );
+          animation.onfinish = () => removeDot(key, currentDot);
+          removalTimers.set(key, window.setTimeout(() => removeDot(key, currentDot), trailDuration + 100));
         }
       }
-      if (frameRef.current === null) frameRef.current = window.requestAnimationFrame(render);
-    };
+    }
 
-    resize();
-    window.addEventListener("resize", resize);
     window.addEventListener("pointermove", handlePointerMove, { passive: true });
     return () => {
-      window.removeEventListener("resize", resize);
       window.removeEventListener("pointermove", handlePointerMove);
-      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+      dots.forEach((dot) => dot.getAnimations().forEach((animation) => animation.cancel()));
+      removalTimers.forEach((timer) => window.clearTimeout(timer));
+      removalTimers.clear();
+      trailLayer.replaceChildren();
     };
   }, []);
 
-  return <canvas aria-hidden="true" className="pointer-events-none fixed inset-0 z-20 opacity-70 mix-blend-screen" ref={canvasRef} />;
+  return <div aria-hidden="true" className="cursor-grid-trail-layer pointer-events-none fixed inset-0 z-20 overflow-hidden" ref={layerRef} />;
 }
