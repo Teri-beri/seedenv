@@ -11,7 +11,7 @@ const usernameSchema = z.string()
 
 const signupProfileSchema = z.object({
   role: z.enum([UserRole.TESTER, UserRole.DEVELOPER]),
-  email: z.string().trim().email("Enter a valid email address."),
+  email: z.string().trim().email("Enter a valid email address.").transform((value) => value.toLowerCase()),
   name: z.string().trim().min(2, "Display name is required.").max(80),
   username: usernameSchema,
   bio: z.string().trim().min(10, "Tell us a little more before joining.").max(240),

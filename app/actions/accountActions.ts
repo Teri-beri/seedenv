@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createHash, randomBytes } from "node:crypto";
-import { Prisma } from "@prisma/client";
+import { Prisma, UserRole } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth";
 import { Resend } from "resend";
 import { isDiscordWebhookUrl, sendDiscordWebhookMessage } from "@/lib/discord";
@@ -33,6 +33,22 @@ const discordWebhookUrlSchema = z.string().trim().url().refine(isDiscordWebhookU
 export type AccountSettingsInput = z.infer<typeof accountSettingsSchema>;
 export type NotificationPreferences = z.infer<typeof notificationPreferencesSchema>;
 export type SettingsActionResult = { ok: true } | { ok: false; message: string; fieldErrors?: Record<string, string> };
+export type WorkspaceRole = typeof UserRole.TESTER | typeof UserRole.DEVELOPER;
+
+export async function activateAccountWorkspace(role: WorkspaceRole): Promise<SettingsActionResult> {
+  const user = await getCurrentUser();
+  const parsedRole = z.enum([UserRole.TESTER, UserRole.DEVELOPER]).safeParse(role);
+  if (!parsedRole.success) return { ok: false, message: "Choose a valid SeedEnv workspace." };
+  if (user.role === UserRole.ADMIN) return { ok: false, message: "Admin accounts cannot switch to member workspaces." };
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: parsedRole.data === UserRole.TESTER
+      ? { role: UserRole.TESTER, testerWorkspaceEnabled: true }
+      : { role: UserRole.DEVELOPER, developerWorkspaceEnabled: true },
+  });
+  return { ok: true };
+}
 
 export async function updateAccountSettings(data: AccountSettingsInput): Promise<SettingsActionResult> {
   const user = await getCurrentUser();

@@ -40,20 +40,23 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   const nextPath = cleanNextPath(params.next);
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { role: true, passwordHash: true, _count: { select: { accounts: true } } },
+    select: { role: true, testerWorkspaceEnabled: true, developerWorkspaceEnabled: true, passwordHash: true, _count: { select: { accounts: true } } },
   });
 
   if (user && requestedRole && user.role !== UserRole.ADMIN) {
+    const hasWorkspace = user.testerWorkspaceEnabled || user.developerWorkspaceEnabled;
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
         role: requestedRole,
-        name: cleanText(params.name, undefined),
-        username: cleanText(params.username, "SeedEnv Member"),
-        bio: cleanText(params.bio, undefined),
-        portfolioUrl: cleanUrl(params.portfolioUrl),
-        companyName: requestedRole === UserRole.DEVELOPER ? cleanText(params.companyName, undefined) : null,
-        productUrl: requestedRole === UserRole.DEVELOPER ? cleanUrl(params.productUrl) : null,
+        testerWorkspaceEnabled: requestedRole === UserRole.TESTER || user.testerWorkspaceEnabled,
+        developerWorkspaceEnabled: requestedRole === UserRole.DEVELOPER || user.developerWorkspaceEnabled,
+        name: hasWorkspace ? undefined : cleanText(params.name, undefined),
+        username: hasWorkspace ? undefined : cleanText(params.username, "SeedEnv Member"),
+        bio: hasWorkspace ? undefined : cleanText(params.bio, undefined),
+        portfolioUrl: hasWorkspace ? undefined : cleanUrl(params.portfolioUrl),
+        companyName: !hasWorkspace && requestedRole === UserRole.DEVELOPER ? cleanText(params.companyName, undefined) : undefined,
+        productUrl: !hasWorkspace && requestedRole === UserRole.DEVELOPER ? cleanUrl(params.productUrl) : undefined,
       },
     });
   }

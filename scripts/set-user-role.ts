@@ -16,10 +16,15 @@ async function main() {
 
   if (!email) throw new Error("Missing --email user@example.com");
   if (!roleName || !(roleName in UserRole)) throw new Error(`Invalid --role. Use one of: ${Object.keys(UserRole).join(", ")}`);
+  const role = UserRole[roleName as keyof typeof UserRole];
 
   const user = await prisma.user.update({
     where: { email },
-    data: { role: UserRole[roleName as keyof typeof UserRole] },
+    data: {
+      role,
+      testerWorkspaceEnabled: role === UserRole.TESTER || undefined,
+      developerWorkspaceEnabled: role === UserRole.DEVELOPER || undefined,
+    },
     select: { id: true, email: true, role: true, username: true },
   });
 

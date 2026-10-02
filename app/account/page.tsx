@@ -7,9 +7,12 @@ import { redirect } from "next/navigation";
 import type { NotificationPreferences } from "@/app/actions/accountActions";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import AuthCheck from "@/components/AuthCheck";
+import { AnalyticsSummary, type AnalyticsSummaryData } from "@/components/analytics-summary";
 import { AccountSettingsForm } from "@/components/account-settings-form";
 import { NotificationSettingsForm } from "@/components/notification-settings-form";
 import { PasswordSettingsForm } from "@/components/password-settings-form";
+import { WorkspaceAccessSwitcher } from "@/components/workspace-access-switcher";
+import { getAnalyticsSummary } from "@/lib/analytics";
 import { prisma } from "@/lib/prisma";
 import { rankProgress } from "@/lib/rank";
 import { formatCents } from "@/lib/utils";
@@ -24,6 +27,7 @@ const accountTabs = [
 ] as const;
 
 type AccountTab = (typeof accountTabs)[number]["id"];
+type VisibleAccountTab = AccountTab | "site-performance";
 
 function normalizeNotificationPreferences(value: unknown): NotificationPreferences {
   const saved = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -38,7 +42,6 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/auth/signin?callbackUrl=/account");
   const params = await searchParams;
-  const activeTab: AccountTab = accountTabs.some((tab) => tab.id === params.tab) ? params.tab as AccountTab : "profile";
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -66,6 +69,23 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const earnedCents = approvedSubmissions.reduce((sum, submission) => sum + submission.payoutCents, 0);
   const rank = rankProgress(user.rankTier, user.xpPoints);
   const preferences = normalizeNotificationPreferences(user.notificationPreferences);
+  const analyticsOwnerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();
+  const canViewSitePerformance = Boolean(
+    analyticsOwnerEmail
+    && user.email.trim().toLowerCase() === analyticsOwnerEmail
+    && user.username.trim().toLowerCase() === "teriberi",
+  );
+  const visibleTabs = canViewSitePerformance
+    ? [...accountTabs, { id: "site-performance" as const, label: "Site Performance" }]
+    : accountTabs;
+  const activeTab: VisibleAccountTab = visibleTabs.some((tab) => tab.id === params.tab)
+    ? params.tab as VisibleAccountTab
+    : "profile";
+
+  let sitePerformance: AnalyticsSummaryData | null = null;
+  if (canViewSitePerformance) {
+    sitePerformance = await getAnalyticsSummary();
+  }
 
   return (
     <AuthCheck>
@@ -87,13 +107,14 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               </Link>
             </div>
             <nav className="flex gap-2">
-              <Link className="rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-violet-500/30 hover:text-white" href="/dashboard">Dashboard</Link>
-              <Link className="rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-violet-500/30 hover:text-white" href="/console">Console</Link>
+              {user.role === UserRole.TESTER ? <Link className="rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-amber-500/30 hover:text-white" href="/dashboard">Tester</Link> : null}
+              {user.role === UserRole.DEVELOPER ? <Link className="rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-amber-500/30 hover:text-white" href="/console">Developer</Link> : null}
+              {user.role === UserRole.ADMIN ? <Link className="rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-amber-500/30 hover:text-white" href="/admin">Admin</Link> : null}
             </nav>
           </header>
 
           <nav aria-label="Account settings" className="mt-8 flex max-w-full gap-2 overflow-x-auto border-b border-[#1F2430] pb-2">
-            {accountTabs.map((tab) => (
+            {visibleTabs.map((tab) => (
               <Link
                 aria-current={activeTab === tab.id ? "page" : undefined}
                 className={`shrink-0 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${activeTab === tab.id ? "border border-amber-500/30 bg-amber-500/10 text-amber-300" : "border border-transparent text-neutral-400 hover:border-[#2A2F3D] hover:text-white"}`}
@@ -108,7 +129,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           <section className="mt-6">
             {activeTab === "profile" ? (
               <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-                <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, bio: user.bio, portfolioUrl: user.portfolioUrl, companyName: user.companyName, productUrl: user.productUrl, githubUsername: user.githubUsername, discordUrl: user.discordUrl, twitterHandle: user.twitterHandle, emailVerified: Boolean(user.emailVerified), githubConnected: user.accounts.some((account) => account.provider === "github"), role: user.role }} />
+                <div className="space-y-6">
+                  <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, bio: user.bio, portfolioUrl: user.portfolioUrl, companyName: user.companyName, productUrl: user.productUrl, githubUsername: user.githubUsername, discordUrl: user.discordUrl, twitterHandle: user.twitterHandle, emailVerified: Boolean(user.emailVerified), githubConnected: user.accounts.some((account) => account.provider === "github"), role: user.role }} />
+                  {user.role !== UserRole.ADMIN ? <WorkspaceAccessSwitcher activeRole={user.role} testerEnabled={user.testerWorkspaceEnabled} developerEnabled={user.developerWorkspaceEnabled} /> : null}
+                </div>
                 <section className="luxury-panel h-fit rounded-2xl p-6">
                   <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Developer profile</p>
                   <h1 className="mt-3 text-3xl font-black text-white">Build trust before launch.</h1>
@@ -139,6 +163,16 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                   <p className="mt-1 text-sm text-neutral-400">Control email updates and real-time tester alerts.</p>
                 </div>
                 <NotificationSettingsForm initialPreferences={preferences} initialWebhookUrl={user.discordWebhookUrl || ""} />
+              </div>
+            ) : null}
+
+            {activeTab === "site-performance" && sitePerformance ? (
+              <div className="space-y-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-white">Site Performance</h1>
+                  <p className="mt-1 text-sm text-neutral-400">Private conversion and traffic metrics for the last 30 days.</p>
+                </div>
+                <AnalyticsSummary data={sitePerformance} />
               </div>
             ) : null}
 
@@ -223,7 +257,7 @@ function DeveloperPortfolio({ campaigns }: { campaigns: Array<{ id: string; titl
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-400">Deployment portfolio</p>
         <h2 className="mt-3 text-2xl font-bold text-white">Ready to launch your next build?</h2>
         <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-400">Deploy your app to recruit vetted beta testers and track live feedback.</p>
-        <Link className="mt-5 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-3 text-sm font-bold text-neutral-950 transition hover:bg-amber-400" href="/console#campaign-builder">
+        <Link className="mt-5 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-3 text-sm font-bold text-neutral-950 transition hover:bg-amber-400" href="/console?view=new-drop">
           + Deploy New Build <ArrowRight className="size-4" />
         </Link>
       </section>

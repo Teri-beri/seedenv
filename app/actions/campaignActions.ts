@@ -13,11 +13,16 @@ const taskInstructionSchema = z.object({
   proofType: z.nativeEnum(TaskProofType),
 });
 
+const httpUrlSchema = z.string().url().refine((value) => {
+  const protocol = new URL(value).protocol;
+  return protocol === "http:" || protocol === "https:";
+}, "URL must use HTTP or HTTPS.");
+
 const campaignSchema = z.object({
   title: z.string().min(4).max(90),
   platform: z.nativeEnum(PlatformType),
-  appUrl: z.string().url(),
-  iconUrl: z.string().url().optional().or(z.literal("")),
+  appUrl: httpUrlSchema,
+  iconUrl: httpUrlSchema.optional().or(z.literal("")),
   targetVibe: z.string().min(3).max(80),
   description: z.string().min(24).max(1400),
   totalSlots: z.number().int().min(5).max(500),
@@ -32,6 +37,9 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
   const developer = await getCurrentUser("DEVELOPER");
   if (developer.role !== "DEVELOPER" && developer.role !== "ADMIN") {
     throw new Error("Only developers can launch SeedEnv drops.");
+  }
+  if (process.env.NODE_ENV === "production" && !process.env.STRIPE_SECRET_KEY) {
+    throw new Error("Stripe is required in production. No campaign or escrow record was created.");
   }
 
   const testerPayoutPoolUsd = input.totalSlots * input.bountyPerTaskUsd;
@@ -74,8 +82,7 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
   });
 
   if (!process.env.STRIPE_SECRET_KEY) {
-    if (process.env.NODE_ENV === "production") throw new Error("Stripe is required in production.");
-    return { campaignId: campaign.id, checkoutUrl: `/console?previewEscrow=${campaign.id}`, escrowTotalCents };
+    return { campaignId: campaign.id, checkoutUrl: null, escrowTotalCents };
   }
 
   const stripe = getStripe();
@@ -97,8 +104,8 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
           },
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=success&campaign=${campaign.id}#billing`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=cancelled&campaign=${campaign.id}#billing`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?view=billing&escrow=success&campaign=${campaign.id}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?view=billing&escrow=cancelled&campaign=${campaign.id}`,
       metadata: {
         type: "SEEDENV_CAMPAIGN_ESCROW",
         campaignId: campaign.id,

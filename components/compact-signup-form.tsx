@@ -25,7 +25,7 @@ function authErrorMessage(value: string | null) {
 
 function getSafeCallback(value: string | null, role: SignupRole) {
   if (value?.startsWith("/")) return value;
-  return role === "DEVELOPER" ? "/console?intent=new-campaign" : "/dashboard";
+  return role === "DEVELOPER" ? "/console?view=new-drop" : "/dashboard";
 }
 
 function getOAuthCallback(value: string | null, role: SignupRole) {
@@ -132,7 +132,7 @@ export function CompactSignupForm() {
         email: email.trim(),
         password,
         redirect: false,
-        callbackUrl: getSafeCallback(searchParams.get("callbackUrl"), role),
+        callbackUrl: `/onboarding?role=${role}&next=${encodeURIComponent(getSafeCallback(searchParams.get("callbackUrl"), role))}`,
       });
       if (result?.error || !result?.url) {
         setMessage("Incorrect email or password. Too many attempts will temporarily lock sign-in.");

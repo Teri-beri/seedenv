@@ -1,10 +1,13 @@
 "use client";
 
-import { Boxes, CreditCard, Flame, Gamepad2, LayoutDashboard, Medal, PlusCircle, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { UserRole } from "@prisma/client";
+import { Boxes, BriefcaseBusiness, CreditCard, Flame, Gamepad2, LayoutDashboard, LoaderCircle, Medal, PlusCircle, Settings, ShieldCheck, Sprout, UserRound } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useState, useTransition } from "react";
+import { activateAccountWorkspace, type WorkspaceRole } from "@/app/actions/accountActions";
 import { Button } from "@/components/ui/button";
 
 const testerItems = [
@@ -15,37 +18,57 @@ const testerItems = [
 ];
 
 const developerItems = [
-  { label: "Console", href: "/console#console-top", icon: LayoutDashboard },
-  { label: "New Drop", href: "/console#campaign-builder", icon: PlusCircle },
-  { label: "Review Deck", href: "/console#review-deck", icon: ShieldCheck },
-  { label: "Asset Vault", href: "/console#asset-vault", icon: Boxes },
-  { label: "Billing", href: "/console#billing", icon: CreditCard },
+  { label: "Console", view: "overview", icon: LayoutDashboard },
+  { label: "New Drop", view: "new-drop", icon: PlusCircle },
+  { label: "Review Deck", view: "review-deck", icon: ShieldCheck },
+  { label: "Asset Vault", view: "asset-vault", icon: Boxes },
+  { label: "Billing", view: "billing", icon: CreditCard },
 ];
 
-export function RoleSwitcher() {
-  const pathname = usePathname();
+export function RoleSwitcher({ activeRole, testerWorkspaceEnabled, developerWorkspaceEnabled }: { activeRole: UserRole; testerWorkspaceEnabled: boolean; developerWorkspaceEnabled: boolean }) {
   const router = useRouter();
-  const [role, setRole] = useState<"tester" | "developer">(pathname.startsWith("/console") ? "developer" : "tester");
+  const { update } = useSession();
+  const [message, setMessage] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  function activate(role: WorkspaceRole) {
+    if (role === activeRole || isPending) return;
+    setMessage("");
+    startTransition(async () => {
+      const result = await activateAccountWorkspace(role);
+      if (!result.ok) {
+        setMessage(result.message);
+        return;
+      }
+      await update();
+      router.push(role === UserRole.DEVELOPER ? "/console" : "/dashboard");
+      router.refresh();
+    });
+  }
+
   return (
-    <div className="flex rounded-full border border-stroke bg-surface/80 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-      {(["tester", "developer"] as const).map((nextRole) => (
+    <div>
+      <div className="flex rounded-full border border-stroke bg-surface/80 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+      {([{ role: UserRole.TESTER, enabled: testerWorkspaceEnabled, icon: Sprout }, { role: UserRole.DEVELOPER, enabled: developerWorkspaceEnabled, icon: BriefcaseBusiness }] as const).map(({ role, enabled, icon: Icon }) => (
         <button
-          key={nextRole}
-          className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] transition ${role === nextRole ? "bg-aurum text-obsidian shadow-[0_10px_24px_rgba(245,158,11,0.18)]" : "text-muted hover:text-white"}`}
-          onClick={() => {
-            setRole(nextRole);
-            router.push(nextRole === "developer" ? "/console" : "/dashboard");
-          }}
+          aria-pressed={activeRole === role}
+          disabled={isPending || activeRole === role}
+          key={role}
+          className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] transition disabled:cursor-default ${activeRole === role ? "bg-aurum text-obsidian shadow-[0_10px_24px_rgba(245,158,11,0.18)]" : "text-muted hover:text-white"}`}
+          onClick={() => activate(role)}
           type="button"
         >
-          {nextRole}
+          {isPending && activeRole !== role ? <LoaderCircle className="size-3.5 animate-spin" /> : <Icon className="size-3.5" />}
+          {activeRole === role ? role === UserRole.TESTER ? "Tester" : "Developer" : enabled ? role === UserRole.TESTER ? "Switch to Tester" : "Switch to Developer" : role === UserRole.TESTER ? "Add Tester" : "Add Developer"}
         </button>
       ))}
+      </div>
+      {message ? <p className="mt-2 text-xs text-rose-300" role="alert">{message}</p> : null}
     </div>
   );
 }
 
-export function DeveloperHeader() {
+export function DeveloperHeader({ activeView }: { activeView: "overview" | "new-drop" | "review-deck" | "asset-vault" | "billing" }) {
   return (
     <header className="sticky top-0 z-30 border-b border-stroke bg-obsidian/95 px-3 py-3 backdrop-blur-xl sm:px-6 lg:px-8 lg:py-4">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -59,9 +82,9 @@ export function DeveloperHeader() {
           </div>
         </div>
         <nav aria-label="Developer console sections" className="-mx-3 flex max-w-full items-center gap-1 overflow-x-auto px-3 pb-1 sm:mx-0 sm:gap-2 sm:px-0 sm:pb-0">
-          {developerItems.map(({ label, href, icon: Icon }) => (
-            <Button className="shrink-0 whitespace-nowrap" key={label} variant="ghost" size="sm" asChild>
-              <Link href={href}>
+          {developerItems.map(({ label, view, icon: Icon }) => (
+            <Button className={`shrink-0 whitespace-nowrap ${activeView === view ? "border-amber-500/40 bg-amber-500/10 text-amber-200" : ""}`} key={label} variant="ghost" size="sm" asChild>
+              <Link aria-current={activeView === view ? "page" : undefined} href={`/console?view=${view}`}>
                 <Icon className="size-4" />
                 {label}
               </Link>

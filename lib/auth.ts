@@ -22,11 +22,15 @@ export async function getCurrentUser(roleHint: UserRole = "TESTER") {
 
   return prisma.user.upsert({
     where: { email: roleHint === "DEVELOPER" ? "preview.developer@seedenv.dev" : "preview.tester@seedenv.dev" },
-    update: { role: roleHint },
+    update: roleHint === "TESTER"
+      ? { role: roleHint, testerWorkspaceEnabled: true }
+      : { role: roleHint, developerWorkspaceEnabled: true },
     create: {
       email: roleHint === "DEVELOPER" ? "preview.developer@seedenv.dev" : "preview.tester@seedenv.dev",
       username: roleHint === "DEVELOPER" ? "PreviewBuilder" : "PreviewSeeder",
       role: roleHint,
+      testerWorkspaceEnabled: roleHint === "TESTER",
+      developerWorkspaceEnabled: roleHint === "DEVELOPER",
     },
   });
 }

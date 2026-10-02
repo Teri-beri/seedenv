@@ -25,12 +25,12 @@ export default async function OnboardingSetupPage({ searchParams }: { searchPara
   if (!user) redirect("/auth/signin?callbackUrl=/onboarding/setup");
 
   const params = await searchParams;
-  const fallback = user.role === "DEVELOPER" ? "/console?intent=new-campaign" : user.role === "ADMIN" ? "/admin" : "/dashboard";
+  const fallback = user.role === "DEVELOPER" ? "/console?view=new-drop" : user.role === "ADMIN" ? "/admin" : "/dashboard";
   const nextPath = cleanNextPath(params.next, fallback);
 
   return (
     <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[linear-gradient(180deg,#090A0F_0%,#0D1018_50%,#090A0F_100%)] px-4 py-10 text-white sm:py-12">
-      <GridBackground />
+      <GridBackground staticOnly />
       <div className="relative z-10 w-full max-w-2xl">
         <OnboardingWizard
           hasPassword={Boolean(user.passwordHash)}

@@ -1,5 +1,5 @@
 import { CampaignStatus } from "@prisma/client";
-import { ArrowUpRight, Crown, Flame, Radar, Trophy, WalletCards } from "lucide-react";
+import { Crown, Flame, Radar, Trophy, WalletCards } from "lucide-react";
 import { getServerSession } from "next-auth";
 import Image from "next/image";
 import { redirect } from "next/navigation";
@@ -34,7 +34,7 @@ export default async function DashboardPage() {
       include: { instructions: { orderBy: { stepNumber: "asc" } } },
       orderBy: [{ bountyPerTaskUsd: "desc" }, { createdAt: "desc" }],
     }),
-    prisma.user.findMany({ where: { role: "TESTER" }, orderBy: { xpPoints: "desc" }, take: 4 }),
+    prisma.user.findMany({ where: { testerWorkspaceEnabled: true }, orderBy: { xpPoints: "desc" }, take: 4 }),
   ]);
   const progress = rankProgress(tester.rankTier, tester.xpPoints);
 
@@ -52,10 +52,7 @@ export default async function DashboardPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <RoleSwitcher />
-          <a className="hidden rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-violet-500/30 hover:text-white sm:inline-flex" href="/console">
-            Developer Console <ArrowUpRight className="ml-2 size-4" />
-          </a>
+          <RoleSwitcher activeRole={tester.role} testerWorkspaceEnabled={tester.testerWorkspaceEnabled} developerWorkspaceEnabled={tester.developerWorkspaceEnabled} />
         </div>
       </div>
 

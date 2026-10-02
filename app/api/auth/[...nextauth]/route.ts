@@ -65,7 +65,7 @@ type GitHubEmail = {
 };
 
 async function getGitHubEmail(profile: GitHubProfile, accessToken?: string) {
-  if (profile.email) return profile.email;
+  if (profile.email) return profile.email.trim().toLowerCase();
   if (!accessToken) return `${profile.login}-${profile.id}@users.noreply.github.com`;
 
   try {
@@ -77,9 +77,9 @@ async function getGitHubEmail(profile: GitHubProfile, accessToken?: string) {
     });
     if (!response.ok) return `${profile.login}-${profile.id}@users.noreply.github.com`;
     const emails = await response.json() as GitHubEmail[];
-    return emails.find((email) => email.primary && email.verified)?.email
+    return (emails.find((email) => email.primary && email.verified)?.email
       || emails.find((email) => email.verified)?.email
-      || `${profile.login}-${profile.id}@users.noreply.github.com`;
+      || `${profile.login}-${profile.id}@users.noreply.github.com`).trim().toLowerCase();
   } catch {
     return `${profile.login}-${profile.id}@users.noreply.github.com`;
   }
@@ -217,7 +217,7 @@ export const authOptions: NextAuthOptions = {
         return {
           id: String(profile.sub),
           name: profile.name,
-          email: profile.email,
+          email: profile.email?.trim().toLowerCase() || null,
           image: profile.picture,
           role: UserRole.TESTER,
         };
@@ -232,8 +232,8 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         const shouldPromoteOwner = Boolean(user.email && analyticsOwnerEmail() === user.email.toLowerCase());
-        if (shouldPromoteOwner && user.role !== UserRole.DEVELOPER) {
-          await prisma.user.update({ where: { id: user.id }, data: { role: UserRole.DEVELOPER } });
+        if (shouldPromoteOwner) {
+          await prisma.user.update({ where: { id: user.id }, data: { role: UserRole.DEVELOPER, developerWorkspaceEnabled: true } });
         }
         token.role = shouldPromoteOwner ? UserRole.DEVELOPER : user.role || UserRole.TESTER;
       } else if (token.id) {

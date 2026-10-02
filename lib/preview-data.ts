@@ -8,13 +8,13 @@ export async function ensurePreviewData() {
 
   const developer = await prisma.user.upsert({
     where: { email: "preview.developer@seedenv.dev" },
-    update: { role: "DEVELOPER" },
-    create: { email: "preview.developer@seedenv.dev", username: "PreviewBuilder", role: "DEVELOPER" },
+    update: { role: "DEVELOPER", developerWorkspaceEnabled: true },
+    create: { email: "preview.developer@seedenv.dev", username: "PreviewBuilder", role: "DEVELOPER", developerWorkspaceEnabled: true },
   });
   await prisma.user.upsert({
     where: { email: "preview.tester@seedenv.dev" },
-    update: { walletBalanceCents: 1825, xpPoints: 1240, rankTier: "ALPHA_SEEDER", streakDays: 6 },
-    create: { email: "preview.tester@seedenv.dev", username: "PreviewSeeder", role: "TESTER", walletBalanceCents: 1825, xpPoints: 1240, rankTier: "ALPHA_SEEDER", streakDays: 6 },
+    update: { role: "TESTER", testerWorkspaceEnabled: true, walletBalanceCents: 1825, xpPoints: 1240, rankTier: "ALPHA_SEEDER", streakDays: 6 },
+    create: { email: "preview.tester@seedenv.dev", username: "PreviewSeeder", role: "TESTER", testerWorkspaceEnabled: true, walletBalanceCents: 1825, xpPoints: 1240, rankTier: "ALPHA_SEEDER", streakDays: 6 },
   });
 
   const campaigns = [

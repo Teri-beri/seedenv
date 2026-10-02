@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
-const cellSize = 40;
+const cellSize = 44;
 const trailRadius = 56;
 const fadeMs = 1000;
 const spawnPulseCount = 22;
@@ -17,7 +17,7 @@ function nearestGridPoint(value: number) {
   return Math.round(value / cellSize) * cellSize;
 }
 
-export function GridBackground() {
+export function GridBackground({ staticOnly = false }: { staticOnly?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const dotsRef = useRef<Map<string, Dot>>(new Map());
   const animationRef = useRef<number | null>(null);
@@ -50,6 +50,11 @@ export function GridBackground() {
       canvasElement.style.width = `${width}px`;
       canvasElement.style.height = `${height}px`;
       context2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (staticOnly) {
+        context2d.clearRect(0, 0, width, height);
+        drawGrid(width, height);
+        drawBaseDots(width, height);
+      }
     }
 
     function seedInitialPulse() {
@@ -138,6 +143,10 @@ export function GridBackground() {
     }
 
     resize();
+    if (staticOnly) {
+      window.addEventListener("resize", resize);
+      return () => window.removeEventListener("resize", resize);
+    }
     seedInitialPulse();
     window.addEventListener("resize", resize);
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
@@ -148,7 +157,7 @@ export function GridBackground() {
       window.removeEventListener("mousemove", handleMouseMove);
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, []);
+  }, [staticOnly]);
 
   return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-0" aria-hidden="true" />;
 }

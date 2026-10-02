@@ -1,12 +1,12 @@
-import { SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
-import { ArrowRight, CreditCard } from "lucide-react";
+import { CampaignStatus, PlatformType, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
+import { ArrowRight, Circle, CreditCard, Plus } from "lucide-react";
 import { getServerSession } from "next-auth";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import AuthCheck from "@/components/AuthCheck";
 import { DeveloperStudio } from "@/components/developer-studio";
 import { DeveloperHeader } from "@/components/navigation";
-import { AnalyticsSummary, type AnalyticsSummaryData } from "@/components/analytics-summary";
 import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
 import { getProofImageUrl } from "@/lib/storage";
@@ -14,11 +14,16 @@ import { formatCents } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ escrow?: string; campaign?: string }> }) {
+const consoleViews = ["overview", "new-drop", "review-deck", "asset-vault", "billing"] as const;
+type ConsoleView = (typeof consoleViews)[number];
+const reviewPageSize = 20;
+
+export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "DEVELOPER") redirect("/");
   const params = await searchParams;
+  const activeView: ConsoleView = consoleViews.includes(params.view as ConsoleView) ? params.view as ConsoleView : "overview";
 
   const security = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -28,26 +33,34 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
 
   await ensurePreviewData();
   const campaignScope = { developerId: session.user.id };
-  const analyticsOwnerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();
-  const canViewAnalytics = Boolean(analyticsOwnerEmail && session.user.email?.toLowerCase() === analyticsOwnerEmail);
-  const [pendingSubmissions, approvedAssets, campaigns, billingTransactions] = await Promise.all([
+  const pendingReviewWhere = {
+    status: SubmissionStatus.PENDING,
+    campaign: campaignScope,
+    OR: [{ proofImageUrl: { not: null } }, { feedbackText: { not: null } }],
+  };
+  const pendingReviewCount = activeView === "review-deck" ? await prisma.submission.count({ where: pendingReviewWhere }) : 0;
+  const reviewTotalPages = Math.max(1, Math.ceil(pendingReviewCount / reviewPageSize));
+  const requestedReviewPage = Number.parseInt(params.reviewPage || "1", 10);
+  const reviewPage = Number.isFinite(requestedReviewPage) ? Math.min(Math.max(requestedReviewPage, 1), reviewTotalPages) : 1;
+  const [pendingSubmissions, approvedAssets, campaigns, billingTransactions, completedEscrow, pendingEscrow, auditReports] = await Promise.all([
     prisma.submission.findMany({
-      where: { status: SubmissionStatus.PENDING, proofImageUrl: { not: null }, campaign: campaignScope },
+      where: pendingReviewWhere,
       include: { tester: true, campaign: { include: { instructions: { orderBy: { stepNumber: "asc" } } } } },
-      take: 5,
+      skip: (reviewPage - 1) * reviewPageSize,
+      take: reviewPageSize,
       orderBy: { createdAt: "asc" },
     }),
     prisma.submission.findMany({
-      where: { status: SubmissionStatus.APPROVED, campaign: campaignScope },
+      where: { status: SubmissionStatus.APPROVED, proofImageUrl: { not: null }, campaign: campaignScope },
       include: { tester: true, campaign: true },
       take: 12,
       orderBy: { reviewedAt: "desc" },
     }),
     prisma.appCampaign.findMany({
-      where: campaignScope,
+      where: { ...campaignScope, status: CampaignStatus.ACTIVE },
       orderBy: { createdAt: "desc" },
       take: 3,
-      select: { id: true, title: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true },
+      select: { id: true, title: true, platform: true, totalBudgetUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true },
     }),
     prisma.walletTransaction.findMany({
       where: { userId: session.user.id },
@@ -55,39 +68,58 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       take: 20,
       select: { id: true, amountCents: true, type: true, status: true, description: true, createdAt: true },
     }),
+    prisma.walletTransaction.aggregate({
+      where: { userId: session.user.id, type: TransactionType.ESCROW_DEPOSIT, status: TransactionStatus.COMPLETED },
+      _sum: { amountCents: true },
+    }),
+    prisma.walletTransaction.aggregate({
+      where: { userId: session.user.id, type: TransactionType.ESCROW_DEPOSIT, status: TransactionStatus.PENDING },
+      _sum: { amountCents: true },
+    }),
+    prisma.submission.findMany({
+      where: {
+        campaign: campaignScope,
+        OR: [{ feedbackText: { not: null } }, { proofImageUrl: { not: null } }],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 40,
+      select: {
+        id: true,
+        proofImageUrl: true,
+        recordingUrl: true,
+        feedbackText: true,
+        osBuild: true,
+        deviceModel: true,
+        screenResolution: true,
+        appBuildVersion: true,
+        networkType: true,
+        crashLogs: true,
+        networkLogs: true,
+        payoutCents: true,
+        status: true,
+        rejectionReason: true,
+        createdAt: true,
+        tester: { select: { username: true, avatarUrl: true } },
+        campaign: { select: { id: true, title: true } },
+      },
+    }),
   ]);
-  const completedEscrowCents = billingTransactions
-    .filter((transaction) => transaction.type === TransactionType.ESCROW_DEPOSIT && transaction.status === TransactionStatus.COMPLETED)
-    .reduce((total, transaction) => total + transaction.amountCents, 0);
-  const pendingEscrowCents = billingTransactions
-    .filter((transaction) => transaction.type === TransactionType.ESCROW_DEPOSIT && transaction.status === TransactionStatus.PENDING)
-    .reduce((total, transaction) => total + transaction.amountCents, 0);
-  const [pendingPreviews, approvedPreviews] = await Promise.all([
+  const completedEscrowCents = completedEscrow._sum.amountCents || 0;
+  const pendingEscrowCents = pendingEscrow._sum.amountCents || 0;
+  const checkoutCampaign = activeView === "billing" && params.campaign
+    ? await prisma.appCampaign.findFirst({ where: { id: params.campaign, developerId: session.user.id }, select: { title: true, status: true } })
+    : null;
+  const [pendingPreviews, approvedPreviews, auditPreviews] = await Promise.all([
     Promise.all(pendingSubmissions.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
     Promise.all(approvedAssets.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
+    Promise.all(auditReports.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
   ]);
-  let analytics: AnalyticsSummaryData | null = null;
-  if (canViewAnalytics) {
-    const since = new Date();
-    since.setDate(since.getDate() - 30);
-    const [pageViews, ctaClicks, signupStarts, uniqueSessions, referrerRows] = await Promise.all([
-      prisma.analyticsEvent.count({ where: { eventName: "page_view", createdAt: { gte: since } } }),
-      prisma.analyticsEvent.count({ where: { eventName: "cta_click", createdAt: { gte: since } } }),
-      prisma.analyticsEvent.count({ where: { eventName: "signup_start", createdAt: { gte: since } } }),
-      prisma.analyticsEvent.findMany({ where: { createdAt: { gte: since }, sessionKey: { not: null } }, distinct: ["sessionKey"], select: { sessionKey: true } }),
-      prisma.analyticsEvent.findMany({ where: { createdAt: { gte: since }, referrer: { not: null } }, select: { referrer: true } }),
-    ]);
-    const referrerCounts = new Map<string, number>();
-    referrerRows.forEach((row) => { if (row.referrer) referrerCounts.set(row.referrer, (referrerCounts.get(row.referrer) || 0) + 1); });
-    analytics = { pageViews, ctaClicks, signupStarts, uniqueSessions: uniqueSessions.length, topReferrers: [...referrerCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([referrer, count]) => ({ referrer, count })) };
-  }
-
   return (
     <AuthCheck role="DEVELOPER">
     <main className="terminal-grid min-h-screen bg-[radial-gradient(circle_at_12%_0%,rgba(109,40,217,0.2),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_50%,#090A0F_100%)] pb-16 text-white" id="console-top">
-      <DeveloperHeader />
+      <DeveloperHeader activeView={activeView} />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section className="mb-8 grid gap-6 lg:grid-cols-[1fr_420px]">
+        {activeView === "overview" ? <section className="mb-8 grid gap-6 lg:grid-cols-[1fr_420px]">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-amber-500">SeedEnv Console</p>
             <h1 className="mt-3 max-w-4xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-5xl font-black leading-[0.98] tracking-tight text-transparent sm:text-6xl">
@@ -98,41 +130,67 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
             </p>
           </div>
           <div className="luxury-panel rounded-2xl p-5 transition-all hover:border-violet-500/30">
-            <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Active Deployments</p>
-            <div className="mt-4 space-y-3">
-              {campaigns.map((campaign) => (
-                <div key={campaign.id} className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 backdrop-blur-md transition-all hover:border-violet-500/30">
-                  <div className="flex items-start justify-between gap-3">
-                    <h2 className="font-semibold text-white">{campaign.title}</h2>
-                    <span className="font-mono text-sm text-amber-500">${campaign.bountyPerTaskUsd.toFixed(2)}</span>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/8">
-                    <div className="h-full rounded-full bg-gradient-to-r from-violet-700 to-amber-500" style={{ width: `${(campaign.claimedSlots / campaign.totalSlots) * 100}%` }} />
-                  </div>
-                  <p className="mt-2 text-xs text-neutral-500">{campaign.completedSlots} complete / {campaign.claimedSlots} claimed / {campaign.totalSlots} total</p>
-                </div>
-              ))}
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Active Deployments</p>
+              {campaigns.length ? <span className="rounded-full border border-emerald-500/25 bg-emerald-950/30 px-2.5 py-1 text-xs font-semibold text-emerald-300">Live</span> : null}
             </div>
+            {campaigns.length ? (
+              <div className="mt-4 space-y-3">
+                {campaigns.map((campaign) => {
+                  const filledPercent = Math.min(100, Math.round((campaign.claimedSlots / campaign.totalSlots) * 100));
+                  const releasedUsd = Math.min(campaign.totalBudgetUsd, campaign.completedSlots * campaign.bountyPerTaskUsd);
+                  const lockedUsd = Math.max(0, campaign.totalBudgetUsd - releasedUsd);
+                  const platformLabel = campaign.platform === PlatformType.TESTFLIGHT ? "TestFlight" : campaign.platform === PlatformType.WEB_STAGING ? "Web" : "Play Store";
+                  return (
+                    <Link className="block rounded-xl border border-[#1F2430] bg-[#0E1017]/80 p-4 transition hover:border-amber-500/35 hover:bg-[#11141c]" href="/console?view=review-deck" key={campaign.id}>
+                      <div className="flex items-start justify-between gap-3">
+                        <h2 className="min-w-0 truncate font-semibold text-white">{campaign.title}</h2>
+                        <span className="shrink-0 rounded-full border border-white/10 px-2 py-1 text-[10px] font-semibold text-neutral-300">{platformLabel}</span>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-950/35 px-2.5 py-1 text-xs font-semibold text-emerald-300"><Circle className="size-2 fill-current" /> {campaign.claimedSlots} / {campaign.totalSlots} slots filled</span>
+                        <span className="text-xs text-neutral-500">{filledPercent}%</span>
+                      </div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${filledPercent}%` }} /></div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                        <p className="text-neutral-500">Escrow locked <span className="ml-1 font-mono text-neutral-200">${lockedUsd.toFixed(2)}</span></p>
+                        <p className="text-neutral-500">Released <span className="ml-1 font-mono text-emerald-300">${releasedUsd.toFixed(2)}</span></p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-4 flex min-h-64 flex-col items-start justify-center rounded-xl border border-dashed border-[#3A3F4C] bg-[#090A0F]/45 p-5">
+                <p className="text-lg font-bold text-white">No Active Runs</p>
+                <p className="mt-2 max-w-sm text-sm leading-6 text-neutral-400">Deploy a seed mission to recruit vetted beta testers and stream live telemetry.</p>
+                <Link className="mt-5 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-bold text-neutral-950 transition hover:bg-amber-400" href="/console?view=new-drop"><Plus className="size-4" /> Launch Drop</Link>
+              </div>
+            )}
           </div>
-        </section>
-        {analytics ? <AnalyticsSummary data={analytics} /> : null}
-        <div className="mt-8" />
-        <DeveloperStudio submissions={pendingPreviews} assets={approvedPreviews} />
+        </section> : null}
+        {activeView !== "overview" && activeView !== "billing" ? (
+          <section className="mb-6">
+            <p className="text-xs uppercase tracking-[0.28em] text-amber-500">SeedEnv Console</p>
+            <h2 className="mt-2 text-3xl font-black text-white">{activeView === "new-drop" ? "New Drop" : activeView === "review-deck" ? "Review Deck" : "Asset Vault"}</h2>
+          </section>
+        ) : null}
+        {activeView !== "billing" ? <DeveloperStudio submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} view={activeView} /> : null}
 
-        <section className="mt-12 scroll-mt-28 space-y-5" id="billing">
+        {activeView === "billing" ? <section className="space-y-5">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Billing</p>
               <h2 className="mt-2 text-3xl font-black text-white">Escrow &amp; payment history</h2>
               <p className="mt-2 text-sm text-neutral-400">Review Stripe-funded tester escrow and recent billing activity.</p>
             </div>
-            <a className="inline-flex items-center gap-2 rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-amber-500/40" href="/console#campaign-builder">
+            <a className="inline-flex items-center gap-2 rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-amber-500/40" href="/console?view=new-drop">
               Create a funded drop <ArrowRight className="size-4" />
             </a>
           </div>
 
-          {params.escrow === "success" ? <p className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">Stripe checkout completed. Escrow status will update after payment confirmation.</p> : null}
-          {params.escrow === "cancelled" ? <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-200" role="status">Checkout was cancelled. Your campaign remains in billing history with its current payment status.</p> : null}
+          {params.escrow === "success" ? <p className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">{checkoutCampaign?.status === CampaignStatus.ACTIVE ? `Payment confirmed for ${checkoutCampaign.title}; the drop is active.` : `Checkout returned${checkoutCampaign ? ` for ${checkoutCampaign.title}` : ""}. Escrow remains pending until Stripe confirms the payment.`}</p> : null}
+          {params.escrow === "cancelled" ? <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-200" role="status">Checkout was cancelled{checkoutCampaign ? ` for ${checkoutCampaign.title}` : ""}. No payment was confirmed.</p> : null}
 
           <div className="grid gap-4 sm:grid-cols-3">
             <BillingMetric label="Completed escrow" value={formatCents(completedEscrowCents)} />
@@ -164,7 +222,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
               <p className="p-6 text-sm text-neutral-400">No billing activity yet. Create a drop to configure tester slots and fund its escrow through Stripe Checkout.</p>
             )}
           </section>
-        </section>
+        </section> : null}
       </div>
     </main>
     </AuthCheck>

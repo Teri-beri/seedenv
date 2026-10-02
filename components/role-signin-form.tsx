@@ -57,7 +57,7 @@ const roleDetails: Record<SignupRole, {
     emailLabel: "Work Email",
     placeholder: "founder@company.com",
     button: "Join as Developer",
-    callback: "/console?intent=new-drop",
+    callback: "/console?view=new-drop",
     icon: <BriefcaseBusiness className="size-5" />,
     bullets: ["Create SeedEnv deployments", "Fund escrow-backed rewards", "Review proof and export assets"],
   },

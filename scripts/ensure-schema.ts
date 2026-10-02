@@ -35,6 +35,11 @@ const statements = [
     ADD COLUMN IF NOT EXISTS "twitter_handle" TEXT,
     ADD COLUMN IF NOT EXISTS "notification_preferences" JSONB NOT NULL DEFAULT '{"email_tester_feedback":true,"email_ledger_updates":true,"email_announcements":false}'::jsonb,
     ADD COLUMN IF NOT EXISTS "discord_webhook_url" TEXT`,
+  `ALTER TABLE "User"
+    ADD COLUMN IF NOT EXISTS "tester_workspace_enabled" BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS "developer_workspace_enabled" BOOLEAN NOT NULL DEFAULT FALSE`,
+  `UPDATE "User" SET "tester_workspace_enabled" = TRUE WHERE "role" = 'TESTER' AND "tester_workspace_enabled" = FALSE`,
+  `UPDATE "User" SET "developer_workspace_enabled" = TRUE WHERE "role" = 'DEVELOPER' AND "developer_workspace_enabled" = FALSE`,
   `UPDATE "User" SET "notification_preferences" = '{"email_tester_feedback":true,"email_ledger_updates":true,"email_announcements":false}'::jsonb WHERE "notification_preferences" IS NULL`,
   `ALTER TABLE "User" ALTER COLUMN "notification_preferences" SET NOT NULL`,
 ];

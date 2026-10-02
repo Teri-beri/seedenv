@@ -67,6 +67,8 @@ model User {
   image                  String?
   passwordHash           String?
   role                   UserRole            @default(TESTER)
+  testerWorkspaceEnabled Boolean             @default(false) @map("tester_workspace_enabled")
+  developerWorkspaceEnabled Boolean          @default(false) @map("developer_workspace_enabled")
   username               String              @default("SeedEnv Member")
   avatarUrl              String?
   bio                    String?             @db.VarChar(200)
