@@ -69,10 +69,15 @@ model User {
   role                   UserRole            @default(TESTER)
   username               String              @default("SeedEnv Member")
   avatarUrl              String?
-  bio                    String?
+  bio                    String?             @db.VarChar(200)
   portfolioUrl           String?
   companyName            String?
   productUrl             String?
+  githubUsername         String?             @map("github_username")
+  discordUrl             String?             @map("discord_url")
+  twitterHandle          String?             @map("twitter_handle")
+  notificationPreferences Json                @default("{\"email_tester_feedback\":true,\"email_ledger_updates\":true,\"email_announcements\":false}") @map("notification_preferences")
+  discordWebhookUrl      String?             @map("discord_webhook_url")
   walletBalanceCents     Int                 @default(0)
   xpPoints               Int                 @default(0)
   rankTier               RankTier            @default(ALPHA_SEEDER)

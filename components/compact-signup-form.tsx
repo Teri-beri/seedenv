@@ -154,7 +154,7 @@ export function CompactSignupForm() {
     }
     setLoading(true);
     setMessage("");
-    const result = await signIn("email", { email: email.trim(), redirect: false, callbackUrl: "/account#security" });
+    const result = await signIn("email", { email: email.trim(), redirect: false, callbackUrl: "/account?tab=security#security" });
     setMessage(result?.error
       ? "We could not send that link. Please try again."
       : "Sign-in link sent. Open it, then set a new password under Account > Security.");

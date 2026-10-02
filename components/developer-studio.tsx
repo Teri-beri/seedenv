@@ -116,7 +116,7 @@ export function DeveloperStudio({ submissions, assets }: { submissions: ReviewSu
     <section className="space-y-8">
       <DeveloperInsights submissions={submissions} />
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="luxury-panel rounded-2xl p-6 transition-all hover:border-violet-500/30">
+        <div className="luxury-panel scroll-mt-28 rounded-2xl p-6 transition-all hover:border-violet-500/30" id="campaign-builder">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-aurum">New Drop / Campaign</p>
@@ -254,7 +254,7 @@ function IconButton({ label, icon, onClick }: { label: string; icon: React.React
 function ReviewDeck({ submissions, onReview, isPending }: { submissions: ReviewSubmission[]; onReview: (id: string, action: "approve" | "reject" | "revision", reason?: string) => void; isPending: boolean }) {
   const active = submissions[0];
   return (
-    <div className="luxury-panel rounded-2xl p-6 transition-all hover:border-violet-500/30">
+    <div className="luxury-panel scroll-mt-28 rounded-2xl p-6 transition-all hover:border-violet-500/30" id="review-deck">
       <p className="text-xs uppercase tracking-[0.28em] text-aurum">Review Deck</p>
       <h2 className="mt-2 text-3xl font-black">Proof grading</h2>
       {active ? (
@@ -290,7 +290,7 @@ function ReviewDeck({ submissions, onReview, isPending }: { submissions: ReviewS
 
 function AssetVault({ assets }: { assets: Asset[] }) {
   return (
-    <div className="luxury-panel rounded-2xl p-6 transition-all hover:border-violet-500/30">
+    <div className="luxury-panel scroll-mt-28 rounded-2xl p-6 transition-all hover:border-violet-500/30" id="asset-vault">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-aurum">Asset Vault</p>

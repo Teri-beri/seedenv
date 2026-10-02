@@ -97,8 +97,8 @@ export async function createCampaignWithEscrow(data: CampaignInput) {
           },
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=success&campaign=${campaign.id}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=cancelled&campaign=${campaign.id}`,
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=success&campaign=${campaign.id}#billing`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?escrow=cancelled&campaign=${campaign.id}#billing`,
       metadata: {
         type: "SEEDENV_CAMPAIGN_ESCROW",
         campaignId: campaign.id,

@@ -15,11 +15,11 @@ const testerItems = [
 ];
 
 const developerItems = [
-  { label: "SeedEnv Console", icon: LayoutDashboard },
-  { label: "New Drop", icon: PlusCircle },
-  { label: "Review Deck", icon: ShieldCheck },
-  { label: "Asset Vault", icon: Boxes },
-  { label: "Billing", icon: CreditCard },
+  { label: "Console", href: "/console#console-top", icon: LayoutDashboard },
+  { label: "New Drop", href: "/console#campaign-builder", icon: PlusCircle },
+  { label: "Review Deck", href: "/console#review-deck", icon: ShieldCheck },
+  { label: "Asset Vault", href: "/console#asset-vault", icon: Boxes },
+  { label: "Billing", href: "/console#billing", icon: CreditCard },
 ];
 
 export function RoleSwitcher() {
@@ -47,9 +47,9 @@ export function RoleSwitcher() {
 
 export function DeveloperHeader() {
   return (
-    <header className="sticky top-0 z-30 hidden border-b border-stroke bg-obsidian/88 px-8 py-4 backdrop-blur-xl lg:block">
-      <div className="mx-auto flex max-w-7xl items-center justify-between">
-        <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 border-b border-stroke bg-obsidian/95 px-3 py-3 backdrop-blur-xl sm:px-6 lg:px-8 lg:py-4">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex shrink-0 items-center gap-3">
           <div className="relative size-11 overflow-hidden rounded-2xl border border-stroke bg-surface shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
             <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="44px" className="scale-125 object-cover" />
           </div>
@@ -58,19 +58,16 @@ export function DeveloperHeader() {
             <h1 className="text-lg font-black">Developer Console</h1>
           </div>
         </div>
-        <nav className="flex items-center gap-2">
-          {developerItems.map(({ label, icon: Icon }) => (
-            <Button key={label} variant="ghost" size="sm" asChild>
-              <Link href="/console">
+        <nav aria-label="Developer console sections" className="-mx-3 flex max-w-full items-center gap-1 overflow-x-auto px-3 pb-1 sm:mx-0 sm:gap-2 sm:px-0 sm:pb-0">
+          {developerItems.map(({ label, href, icon: Icon }) => (
+            <Button className="shrink-0 whitespace-nowrap" key={label} variant="ghost" size="sm" asChild>
+              <Link href={href}>
                 <Icon className="size-4" />
                 {label}
               </Link>
             </Button>
           ))}
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/dashboard">Tester Dashboard</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
+          <Button className="shrink-0 whitespace-nowrap" variant="ghost" size="sm" asChild>
             <Link href="/account">
               <Settings className="size-4" /> Account
             </Link>

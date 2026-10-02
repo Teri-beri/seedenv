@@ -3,10 +3,12 @@
 import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
+import { sendDiscordWebhookMessage } from "@/lib/discord";
+import { notificationEnabled, sendNotificationEmail } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { rankForXp, xpForBounty } from "@/lib/rank";
 import { uploadProofImage } from "@/lib/storage";
-import { usdToCents } from "@/lib/utils";
+import { formatCents, usdToCents } from "@/lib/utils";
 
 const proofSchema = z.object({
   proofImageBase64: z.string().optional(),
@@ -75,7 +77,10 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
   const tester = await getCurrentUser("TESTER");
   const input = proofSchema.parse(proofData);
 
-  const submission = await prisma.submission.findUnique({ where: { id: submissionId } });
+  const submission = await prisma.submission.findUnique({
+    where: { id: submissionId },
+    include: { campaign: { select: { title: true, developerId: true } } },
+  });
   if (!submission || submission.testerId !== tester.id) throw new Error("Submission not found.");
   if (submission.status !== SubmissionStatus.PENDING) throw new Error("This submission is no longer pending.");
   if (submission.expiresAt < new Date()) throw new Error("The 30-minute lock expired. Claim a fresh slot.");
@@ -104,7 +109,7 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
     });
   }
 
-  return prisma.submission.update({
+  const savedSubmission = await prisma.submission.update({
     where: { id: submissionId },
     data: {
       proofImageUrl,
@@ -120,12 +125,41 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
       networkLogs: input.networkLogs || null,
     },
   });
+
+  const developer = await prisma.user.findUnique({
+    where: { id: submission.campaign.developerId },
+    select: { email: true, notificationPreferences: true, discordWebhookUrl: true },
+  });
+  if (developer && notificationEnabled(developer.notificationPreferences, "email_tester_feedback", true)) {
+    const origin = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://seedenv.com";
+    await sendNotificationEmail(
+      developer.email,
+      `New tester feedback: ${submission.campaign.title}`,
+      `Tester ${tester.username} submitted feedback for ${submission.campaign.title}.\n\n${input.feedbackText.slice(0, 3000)}\n\nReview submissions: ${origin}/console`,
+    );
+  }
+  if (developer?.discordWebhookUrl) {
+    const message = [
+      `New tester feedback for **${submission.campaign.title}**`,
+      `Tester: ${tester.username}`,
+      input.feedbackText.slice(0, 1200),
+      `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://seedenv.com"}/console`,
+    ].join("\n");
+    try {
+      const response = await sendDiscordWebhookMessage(developer.discordWebhookUrl, message);
+      if (!response.ok) console.warn(`Discord feedback alert failed with HTTP ${response.status}.`);
+    } catch {
+      console.warn("Could not deliver Discord feedback alert.");
+    }
+  }
+
+  return savedSubmission;
 }
 
 export async function approveSubmission(submissionId: string) {
   const reviewer = await getCurrentUser("DEVELOPER");
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const submission = await tx.submission.findUnique({
       where: { id: submissionId },
       include: { campaign: true, tester: true },
@@ -164,8 +198,22 @@ export async function approveSubmission(submissionId: string) {
       },
     });
 
-    return { payoutCents: submission.payoutCents, xpGain };
+    return { payoutCents: submission.payoutCents, xpGain, testerId: submission.testerId };
   });
+
+  const tester = await prisma.user.findUnique({
+    where: { id: result.testerId },
+    select: { email: true, notificationPreferences: true },
+  });
+  if (tester && notificationEnabled(tester.notificationPreferences, "email_ledger_updates", true)) {
+    await sendNotificationEmail(
+      tester.email,
+      "Your SeedEnv payout was approved",
+      `Your ${formatCents(result.payoutCents)} tester payout has been approved and added to your SeedEnv ledger.`,
+    );
+  }
+
+  return { payoutCents: result.payoutCents, xpGain: result.xpGain };
 }
 
 export async function rejectSubmission(submissionId: string, reason: string) {

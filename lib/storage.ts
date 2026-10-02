@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -60,4 +61,44 @@ export async function uploadProofImage(input: {
   if (error) throw new Error(error.message);
 
   return `${proofPrefix}${input.path}`;
+}
+
+export async function uploadAvatarImage(input: {
+  buffer: Buffer;
+  contentType: "image/png" | "image/jpeg";
+  userId: string;
+}) {
+  const bucket = process.env.SUPABASE_AVATAR_BUCKET || "seedenv-avatars";
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Supabase storage is not configured for avatar uploads.");
+
+  const { data: existingBucket, error: bucketError } = await supabase.storage.getBucket(bucket);
+  if (bucketError) {
+    const { error: createError } = await supabase.storage.createBucket(bucket, {
+      public: true,
+      fileSizeLimit: "2MB",
+      allowedMimeTypes: ["image/png", "image/jpeg"],
+    });
+    if (createError) {
+      const { data: createdBucket, error: retryError } = await supabase.storage.getBucket(bucket);
+      if (retryError) throw new Error(createError.message);
+      if (!createdBucket.public) {
+        const { error } = await supabase.storage.updateBucket(bucket, { public: true });
+        if (error) throw new Error(error.message);
+      }
+    }
+  } else if (!existingBucket.public) {
+    const { error } = await supabase.storage.updateBucket(bucket, { public: true });
+    if (error) throw new Error(error.message);
+  }
+
+  const extension = input.contentType === "image/png" ? "png" : "jpg";
+  const path = `${input.userId}/${randomUUID()}.${extension}`;
+  const { error } = await supabase.storage.from(bucket).upload(path, input.buffer, {
+    contentType: input.contentType,
+    upsert: false,
+  });
+  if (error) throw new Error(error.message);
+
+  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
 }
