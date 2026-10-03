@@ -93,7 +93,7 @@ function Countdown({ expiresAt }: { expiresAt: Date | null }) {
   return <span>{minutes}:{String(seconds).padStart(2, "0")}</span>;
 }
 
-export function MissionExperience({ missions, assignments = noAssignments, completedCampaignIds = noCompletedCampaigns, initialNow = 0, applications = [], reputation = 0, discoveryPasses = 0 }: { missions: Mission[]; assignments?: Assignment[]; completedCampaignIds?: string[]; initialNow?: number; applications?: Array<{ campaignId: string; status: string; startBy: string | null }>; reputation?: number; discoveryPasses?: number }) {
+export function MissionExperience({ mode, missions, assignments = noAssignments, completedCampaignIds = noCompletedCampaigns, initialNow = 0, applications = [], reputation = 0, discoveryPasses = 0 }: { mode: "discover" | "missions"; missions: Mission[]; assignments?: Assignment[]; completedCampaignIds?: string[]; initialNow?: number; applications?: Array<{ campaignId: string; status: string; startBy: string | null }>; reputation?: number; discoveryPasses?: number }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const reducedMotion = useReducedMotion();
@@ -180,6 +180,10 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
   }, [resetProof, router]);
 
   const handleClaim = useCallback(async (mission: Mission) => {
+    if (mode === "discover") {
+      router.push(`/dashboard?view=missions&claim=${encodeURIComponent(mission.id)}`);
+      return;
+    }
     const assignment = assignments.find((item) => item.campaign.id === mission.id);
     if (assignment) {
       openAssignment(assignment);
@@ -199,7 +203,7 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
         setMessage(error instanceof Error ? error.message : "Could not claim this mission.");
       }
     });
-  }, [assignments, openAssignment, resetProof, router]);
+  }, [mode, assignments, openAssignment, resetProof, router]);
 
   useEffect(() => {
     if (!activeMission) return;
@@ -209,7 +213,7 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
   useEffect(() => {
     const claimId = searchParams.get("claim");
     if (!claimId || autoClaimedMission.current === claimId) return;
-    const mission = missions.find((item) => item.id === claimId);
+    const mission = missions.find((item) => item.id === claimId) || assignments.find((item) => item.campaign.id === claimId)?.campaign;
     if (!mission) return;
     if (completedCampaignIds.includes(mission.id)) return;
     const timeout = window.setTimeout(() => {
@@ -217,7 +221,7 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
       void handleClaim(mission);
     }, 0);
     return () => window.clearTimeout(timeout);
-  }, [missions, searchParams, completedCampaignIds, handleClaim]);
+  }, [missions, assignments, searchParams, completedCampaignIds, handleClaim]);
 
   async function handleFile(file: File | null) {
     if (!file) return;
@@ -274,7 +278,7 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
 
   return (
     <div className="mt-5 space-y-6">
-      <div className="grid gap-3 sm:grid-cols-2">
+      {mode === "missions" ? <div className="grid gap-3 sm:grid-cols-2">
         {assignments.filter((item) => item.submitted || activeAssignments.some((active) => active.id === item.id)).map((assignment) => (
           <button key={assignment.id} type="button" disabled={isPending} onClick={() => openAssignment(assignment)} className="flex min-w-0 w-full items-center gap-3 rounded-xl border border-[#2A2F3D] bg-black/15 p-4 text-left transition hover:border-violet-400/40 disabled:opacity-50">
             {assignment.submitted ? <CheckCircle2 className="size-5 shrink-0 text-emerald-400" /> : <Clock3 className="size-5 shrink-0 text-amber-400" />}
@@ -282,10 +286,10 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
             {!assignment.submitted && (!assignment.revisionRequested || (assignment.revisionStarted && new Date(assignment.expiresAt).getTime() > now)) ? <span className="font-mono text-xs text-amber-300"><Countdown expiresAt={new Date(assignment.expiresAt)} /></span> : null}
           </button>
         ))}
-        {!activeAssignments.length && !assignments.some((item) => item.submitted) ? <p className="rounded-xl border border-dashed border-[#2A2F3D] p-4 text-sm leading-6 text-neutral-500 sm:col-span-2">No missions in progress yet. Pick a mission below to start your first contribution.</p> : null}
-      </div>
-      <section id="tester-hub" className="scroll-mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px]" aria-label="Mission discovery and proof workspace">
-      <div className="min-w-0 space-y-4">
+        {!activeAssignments.length && !assignments.some((item) => item.submitted) ? <div className="rounded-xl border border-dashed border-[#2A2F3D] p-4 text-sm leading-6 text-neutral-500 sm:col-span-2"><p>No missions in progress yet.</p><Link href="/dashboard?view=discover" className="mt-2 inline-block font-semibold text-violet-200">Discover your next mission</Link></div> : null}
+      </div> : null}
+      <section id="tester-hub" className="scroll-mt-6" aria-label={mode === "discover" ? "Mission discovery" : "Mission proof workspace"}>
+      {mode === "discover" ? <div className="min-w-0 space-y-4">
         <div><h2 className="text-xl font-bold">Find your next mission</h2><p className="mt-1 text-sm text-neutral-400">Choose your platform, follow the brief, make an impact.</p></div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[#2A2F3D] bg-black/15 px-3"><Search className="size-4 shrink-0 text-neutral-500" /><span className="sr-only">Search missions</span><input className="min-w-0 w-full bg-transparent py-3 text-sm text-white outline-none placeholder:text-neutral-500" placeholder="Search apps, briefs, or interests..." value={query} onChange={(event) => setQuery(event.target.value)} /></label>
@@ -300,7 +304,7 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
         </div>
         <p className="text-xs text-neutral-500" role="status">{filteredMissions.length} {filteredMissions.length === 1 ? "mission" : "missions"} matching your interests</p>
         {!filteredMissions.length ? <div className="rounded-2xl border border-dashed border-[#2A2F3D] px-5 py-10 text-center"><Compass className="mx-auto size-8 text-violet-300" /><h3 className="mt-3 font-semibold">{missions.length ? "No matches just yet" : "New missions are on the way"}</h3><p className="mt-2 text-sm text-neutral-500">{missions.length ? "Try another platform or broaden your search." : "Check back for your next opportunity to help a developer launch."}</p>{missions.length ? <button type="button" onClick={() => { setFilter("all"); setQuery(""); }} className="mt-4 text-sm font-semibold text-amber-300">Clear filters</button> : null}</div> : null}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredMissions.map((mission, index) => {
             const spotsLeft = availableSlots(mission);
             const claimedPercent = mission.totalSlots > 0 ? Math.min(100, Math.max(0, mission.claimedSlots / mission.totalSlots * 100)) : 0;
@@ -350,9 +354,9 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
             );
           })}
         </div>
-      </div>
+      </div> : null}
 
-      <aside ref={scope} id="mission-workspace" className={`luxury-panel min-w-0 h-fit scroll-mt-6 rounded-2xl p-5 lg:sticky lg:top-6 lg:order-last ${activeMission ? "order-first" : ""}`} aria-label="Mission workspace">
+      {mode === "missions" ? <aside ref={scope} id="mission-workspace" className="luxury-panel min-w-0 h-fit scroll-mt-6 rounded-2xl p-5" aria-label="Mission workspace">
         {activeMission ? (
           <div className="space-y-5">
             <div className="flex items-start justify-between gap-3">
@@ -424,7 +428,7 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
             {message ? <p role="alert" className="mt-4 rounded-xl border border-rose-400/20 bg-rose-500/5 p-3 text-sm text-rose-200">{message}</p> : null}
           </div>
         )}
-      </aside>
+      </aside> : null}
       </section>
     </div>
   );

@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { rankForXp, rankProgress, xpForBounty } from "../lib/rank";
-import { approvalRate, availableSlots, discoverMissions, testerMilestones } from "../lib/tester-console";
+import { approvalRate, availableSlots, discoverMissions, resolveTesterView, testerMilestones, testerViews } from "../lib/tester-console";
+
+test("tester views are separate, bookmarkable, and accepted mission links open the mission desk", () => {
+  assert.deepEqual(testerViews.map((item) => item.id), ["discover", "missions", "reputation", "leaderboard"]);
+  for (const view of testerViews) assert.equal(resolveTesterView(view.id), view.id);
+  assert.equal(resolveTesterView(), "discover");
+  assert.equal(resolveTesterView("unknown"), "discover");
+  assert.equal(resolveTesterView("discover", "accepted-campaign"), "missions");
+  assert.equal(resolveTesterView(undefined, "legacy-claim-link"), "missions");
+});
 
 const missions = [
   { title: "Social launch", description: "Share useful feedback", targetVibe: "Community", platform: "WEB_STAGING", bountyPerTaskUsd: 4.99, totalSlots: 10, claimedSlots: 8 },

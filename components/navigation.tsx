@@ -1,20 +1,22 @@
 "use client";
 
 import { UserRole } from "@prisma/client";
-import { Boxes, BriefcaseBusiness, CreditCard, Flame, Gamepad2, LayoutDashboard, LoaderCircle, Medal, PlusCircle, Settings, ShieldCheck, Sprout, UserRound } from "lucide-react";
+import { Boxes, BriefcaseBusiness, CreditCard, Flame, Gamepad2, LayoutDashboard, LoaderCircle, Medal, PlusCircle, Settings, ShieldCheck, Sprout, Trophy, UserRound } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useTransition } from "react";
+import { resolveTesterView } from "@/lib/tester-console";
 import { activateAccountWorkspace, type WorkspaceRole } from "@/app/actions/accountActions";
 import { Button } from "@/components/ui/button";
 
 const testerItems = [
-  { label: "Discover", icon: Gamepad2, href: "/dashboard#tester-hub" },
-  { label: "My missions", icon: Flame, href: "/dashboard#active-missions" },
-  { label: "Reputation", icon: Medal, href: "/dashboard#reputation" },
-  { label: "Settings", icon: UserRound, href: "/account" },
+  { label: "Discover", icon: Gamepad2, href: "/dashboard?view=discover", view: "discover" },
+  { label: "My missions", icon: Flame, href: "/dashboard?view=missions", view: "missions" },
+  { label: "Reputation", icon: Medal, href: "/dashboard?view=reputation", view: "reputation" },
+  { label: "Leaderboard", icon: Trophy, href: "/dashboard?view=leaderboard", view: "leaderboard" },
+  { label: "Settings", icon: UserRound, href: "/account", view: null },
 ];
 
 const developerItems = [
@@ -103,20 +105,22 @@ export function DeveloperHeader({ activeView }: { activeView: "overview" | "new-
 
 export function TesterBottomNav() {
   const pathname = usePathname();
-  const [hash, setHash] = useState("");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const view = resolveTesterView(searchParams.get("view"), searchParams.get("claim"));
   useEffect(() => {
-    const sync = () => setHash(window.location.hash);
-    sync();
-    window.addEventListener("hashchange", sync);
-    return () => window.removeEventListener("hashchange", sync);
-  }, []);
+    if (pathname !== "/dashboard" || searchParams.has("view") || searchParams.has("claim")) return;
+    const legacyViews: Record<string, string> = { "#tester-hub": "discover", "#active-missions": "missions", "#reputation": "reputation", "#leaderboard": "leaderboard" };
+    const legacyView = legacyViews[window.location.hash];
+    if (legacyView) router.replace(`/dashboard?view=${legacyView}`);
+  }, [pathname, searchParams, router]);
   return (
     <nav aria-label="Tester app navigation" className="mobile-app-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-stroke bg-obsidian/94 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
-        {testerItems.map(({ label, icon: Icon, href }) => {
-          const active = pathname === "/account" ? href === "/account" : pathname === "/dashboard" && href === `/dashboard${hash || "#tester-hub"}`;
+      <div className="mx-auto grid max-w-lg grid-cols-5 gap-0.5">
+        {testerItems.map(({ label, icon: Icon, href, view: itemView }) => {
+          const active = pathname === "/account" ? href === "/account" : pathname === "/dashboard" && itemView === view;
           return (
-          <Link key={label} aria-current={active ? "location" : undefined} onClick={() => setHash(href.includes("#") ? `#${href.split("#")[1]}` : "")} className={`flex min-h-12 flex-col items-center justify-center rounded-2xl px-2 py-2 text-center text-[10px] font-semibold transition hover:bg-violet-500/10 hover:text-white ${active ? "bg-violet-500/15 text-violet-200" : "text-muted"}`} href={href}>
+          <Link key={label} aria-current={active ? "page" : undefined} className={`flex min-h-12 min-w-0 flex-col items-center justify-center rounded-2xl px-1 py-2 text-center text-[10px] font-semibold transition hover:bg-violet-500/10 hover:text-white ${active ? "bg-violet-500/15 text-violet-200" : "text-muted"}`} href={href}>
             <Icon className="mx-auto mb-1 size-4" />
             {label}
           </Link>

@@ -1,17 +1,18 @@
 import type { AppCampaign, Submission, TaskInstruction, User } from "@prisma/client";
 import { SubmissionStatus } from "@prisma/client";
-import { ArrowDown, ArrowRight, Award, CheckCircle2, CircleDot, Clock3, Compass, Medal, Settings, ShieldCheck, Sparkles, Trophy, WalletCards } from "lucide-react";
+import { ArrowRight, Award, CheckCircle2, CircleDot, Clock3, Compass, Medal, Settings, ShieldCheck, Sparkles, Trophy, WalletCards } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { MissionExperience } from "@/components/mission-experience";
 import { TesterBottomNav } from "@/components/navigation";
 import { rankForXp, rankProgress, rankThresholds } from "@/lib/rank";
-import { approvalRate, availableSlots, testerMilestones } from "@/lib/tester-console";
+import { approvalRate, availableSlots, testerMilestones, testerViews, type TesterView } from "@/lib/tester-console";
 import { formatCents } from "@/lib/utils";
 
 type ConsoleMission = Pick<AppCampaign, "id" | "title" | "appUrl" | "iconUrl" | "targetVibe" | "description" | "bountyPerTaskUsd" | "totalSlots" | "claimedSlots" | "completedSlots" | "platform" | "discoveryAllowed" | "discoveryMinRep"> & { instructions: TaskInstruction[] };
 
 export type TesterConsoleData = {
+  activeView: TesterView;
   tester: Pick<User, "id" | "username" | "xpPoints">;
   missions: ConsoleMission[];
   leaderboard: Array<Pick<User, "id" | "username" | "xpPoints">>;
@@ -26,7 +27,7 @@ export type TesterConsoleData = {
   discoveryPasses: number;
 };
 
-export function TesterConsole({ tester, missions, leaderboard, summary, recent, pending, approvedCampaigns, pendingPayoutCents, now, applications, questXp, discoveryPasses }: TesterConsoleData) {
+export function TesterConsole({ activeView, tester, missions, leaderboard, summary, recent, pending, approvedCampaigns, pendingPayoutCents, now, applications, questXp, discoveryPasses }: TesterConsoleData) {
   const approved = summary.find((item) => item.status === SubmissionStatus.APPROVED);
   const approvedCount = approved?._count._all || 0;
   const rejectedCount = summary.find((item) => item.status === SubmissionStatus.REJECTED)?._count._all || 0;
@@ -38,6 +39,7 @@ export function TesterConsole({ tester, missions, leaderboard, summary, recent, 
   const active = pending.filter((item) => item.revisionRequestedAt || (!item.feedbackText && !item.proofImageUrl && item.expiresAt > now));
   const completedIds = new Set(approvedCampaigns.map((item) => item.campaignId));
   const newMissions = missions.filter((mission) => availableSlots(mission) > 0 && !completedIds.has(mission.id) && !pending.some((item) => item.campaignId === mission.id));
+  const selectedView = testerViews.find((item) => item.id === activeView) || testerViews[0];
 
   return (
       <main className="mobile-app-shell mobile-tester-console terminal-grid min-h-screen bg-[radial-gradient(ellipse_at_top_left,rgba(109,40,217,0.16),transparent_40%),linear-gradient(180deg,#090A0F,#10131C_45%,#090A0F)] pb-28 text-white lg:pb-12">
@@ -50,10 +52,7 @@ export function TesterConsole({ tester, missions, leaderboard, summary, recent, 
               <span><span className="block text-xs font-semibold uppercase tracking-[0.25em] text-amber-500">SeedEnv</span><span className="block text-sm font-semibold text-neutral-200">Tester Console</span></span>
             </Link>
             <nav aria-label="Tester console" className="hidden items-center gap-6 text-sm text-neutral-400 lg:flex">
-              <a className="hover:text-white" href="#tester-hub">Discover</a>
-              <a className="hover:text-white" href="#active-missions">My missions</a>
-              <a className="hover:text-white" href="#reputation">Reputation</a>
-              <a className="hover:text-white" href="#leaderboard">Leaderboard</a>
+              {testerViews.map((item) => <Link key={item.id} aria-current={activeView === item.id ? "page" : undefined} className={activeView === item.id ? "font-semibold text-violet-200" : "hover:text-white"} href={`/dashboard?view=${item.id}`}>{item.label}</Link>)}
             </nav>
             <Link className="inline-flex items-center gap-2 rounded-xl border border-[#2A2F3D] px-3 py-2 text-sm font-semibold text-neutral-300 hover:border-amber-500/40 hover:text-white" href="/account">
               <Settings className="size-4" /> Settings
@@ -62,22 +61,30 @@ export function TesterConsole({ tester, missions, leaderboard, summary, recent, 
         </header>
 
         <div className="mobile-tester-content mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-300">Tester workspace</p>
+            <h1 className="mt-2 text-3xl font-black">{selectedView.label}</h1>
+            <p className="mt-2 text-sm leading-6 text-neutral-400">{selectedView.description}</p>
+          </div>
+          {activeView === "discover" ? <>
           <nav aria-label="Tester opportunities" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Link href="/quests" className="rounded-xl border border-violet-400/25 bg-violet-500/5 p-4 text-sm font-semibold">{questXp.toLocaleString()} Quest XP<span className="mt-1 block text-xs font-normal text-neutral-400">{discoveryPasses} passes / Daily quests & exchange</span></Link>
             <Link href="/applications" className="rounded-xl border border-stroke p-4 text-sm font-semibold">Applications<span className="mt-1 block text-xs font-normal text-neutral-400">Requests & accepted missions</span></Link>
             <Link href="/clippers" className="rounded-xl border border-violet-400/25 p-4 text-sm font-semibold">Clippers<span className="mt-1 block text-xs font-normal text-neutral-400">Creator briefs & paid videos</span></Link>
             <Link href="/community" className="rounded-xl border border-stroke p-4 text-sm font-semibold">Launch Circle<span className="mt-1 block text-xs font-normal text-neutral-400">App updates & conversations</span></Link>
           </nav>
-          <section className="mobile-tester-welcome grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+          <section className="mobile-tester-welcome">
             <div className="flex flex-col justify-center">
               <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-400"><CircleDot className="size-4" /> Your next great discovery starts here</p>
-              <h1 className="mt-4 break-words text-3xl font-black tracking-tight sm:text-4xl">Welcome back, <span className="text-amber-300">{tester.username}</span>.</h1>
+              <h2 className="mt-4 break-words text-2xl font-black tracking-tight">Welcome back, <span className="text-amber-300">{tester.username}</span>.</h2>
               <p className="mt-3 max-w-xl text-sm leading-7 text-neutral-400">Find promising apps. Share feedback that matters. Build a reputation developers can trust.</p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <a className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold text-black transition hover:bg-amber-400" href="#tester-hub"><Compass className="size-4" /> Explore missions <ArrowDown className="size-4" /></a>
-                <a className="inline-flex items-center gap-2 rounded-xl border border-[#2A2F3D] px-5 py-3 text-sm font-semibold text-neutral-300 hover:text-white" href="#active-missions">My missions <span className="rounded-md bg-violet-500/15 px-2 py-0.5 text-violet-200">{active.length + inReview.length}</span></a>
+                <Link className="inline-flex items-center gap-2 rounded-xl border border-[#2A2F3D] px-5 py-3 text-sm font-semibold text-neutral-300 hover:text-white" href="/dashboard?view=missions">My missions <span className="rounded-md bg-violet-500/15 px-2 py-0.5 text-violet-200">{active.length + inReview.length}</span><ArrowRight className="size-4" /></Link>
               </div>
             </div>
+          </section>
+          </> : null}
+          {activeView === "reputation" ? <>
             <section className="luxury-panel relative overflow-hidden rounded-2xl p-6" aria-label="Reputation overview">
               <div className="relative flex items-center justify-between gap-3">
                 <span className="inline-flex items-center gap-2 rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1.5 text-xs font-semibold text-violet-200"><ShieldCheck className="size-4" /> {progress.label}</span>
@@ -90,7 +97,6 @@ export function TesterConsole({ tester, missions, leaderboard, summary, recent, 
               </div>
               <p className="mt-3 text-xs leading-5 text-neutral-500">Earn REP when a developer approves your proof. Clear, useful feedback is your strongest signal.</p>
             </section>
-          </section>
 
           <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Tester statistics">
             <Stat icon={<WalletCards className="size-4" />} label="Lifetime earned" value={formatCents(approved?._sum.payoutCents || 0)} detail={`${formatCents(pendingPayoutCents)} awaiting payout`} />
@@ -98,21 +104,27 @@ export function TesterConsole({ tester, missions, leaderboard, summary, recent, 
             <Stat icon={<ShieldCheck className="size-4" />} label="Approval rate" value={quality === null ? "--" : `${quality}%`} detail={quality === null ? "Appears after your first review" : `${approvedCount + rejectedCount} developer reviews`} />
             <Stat icon={<Compass className="size-4" />} label="New opportunities" value={String(newMissions.length)} detail="Open missions you haven't claimed" />
           </section>
+          <Link href="/quests" className="inline-flex items-center gap-2 rounded-xl border border-violet-400/25 p-4 text-sm font-semibold text-violet-200">{questXp.toLocaleString()} Quest XP / {discoveryPasses} Discovery Passes / Open quests & exchange <ArrowRight className="size-4 shrink-0" /></Link>
+          <Link href="/account?tab=portfolio" className="inline-flex items-center gap-2 text-sm font-semibold text-amber-300">Manage rewards & payout setup <ArrowRight className="size-4" /></Link>
+          </> : null}
 
-          <section id="active-missions" className="scroll-mt-6 rounded-2xl border border-[#1F2430] bg-[#0E1017]/70 p-5 sm:p-6">
+          {activeView === "discover" || activeView === "missions" ? <section id="active-missions" className="scroll-mt-6 rounded-2xl border border-[#1F2430] bg-[#0E1017]/70 p-5 sm:p-6">
+            {activeView === "missions" ? <>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-500">Stay in the flow</p><h2 className="mt-2 text-xl font-bold">Your mission desk</h2></div>
               <span className="rounded-full border border-[#2A2F3D] px-3 py-1 text-xs text-neutral-400">{active.length} in progress / {inReview.length} in review</span>
             </div>
-            <MissionExperience missions={missions} assignments={pending.map((item) => ({
+            <Link href="/applications" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-violet-200">Manage applications & accepted invitations <ArrowRight className="size-4" /></Link>
+            </> : null}
+            <MissionExperience key={activeView} mode={activeView} missions={missions} assignments={pending.map((item) => ({
               id: item.id, campaign: item.campaign, expiresAt: item.expiresAt.toISOString(), submitted: !item.revisionRequestedAt && Boolean(item.feedbackText || item.proofImageUrl),
               revisionRequested: Boolean(item.revisionRequestedAt), revisionStarted: Boolean(item.revisionStartedAt), revisionNote: item.rejectionReason,
               feedbackText: item.feedbackText, proofPreviewUrl: item.proofPreviewUrl, hasScreenshot: Boolean(item.proofImageUrl),
               telemetry: { osBuild: item.osBuild || "", deviceModel: item.deviceModel || "", screenResolution: item.screenResolution || "", appBuildVersion: item.appBuildVersion || "", networkType: item.networkType || "", recordingUrl: item.recordingUrl || "", crashLogs: item.crashLogs || "", networkLogs: item.networkLogs || "" },
             }))} completedCampaignIds={approvedCampaigns.map((item) => item.campaignId)} initialNow={now.getTime()} applications={applications} reputation={tester.xpPoints} discoveryPasses={discoveryPasses} />
-          </section>
+          </section> : null}
 
-          <section id="reputation" className="grid scroll-mt-6 gap-6 lg:grid-cols-[1fr_1.1fr]">
+          {activeView === "reputation" ? <section id="reputation" className="grid scroll-mt-6 gap-6 lg:grid-cols-[1fr_1.1fr]">
             <div className="luxury-panel rounded-2xl p-6">
               <div className="flex items-center gap-2 text-violet-300"><Trophy className="size-5" /><p className="text-xs font-semibold uppercase tracking-[0.2em]">The reputation journey</p></div>
               <h2 className="mt-3 text-2xl font-bold">Small signals. Lasting credibility.</h2>
@@ -131,10 +143,9 @@ export function TesterConsole({ tester, missions, leaderboard, summary, recent, 
                 {milestones.map((milestone) => <div key={milestone.name} className={`rounded-xl border p-4 ${milestone.earned ? "border-amber-400/25 bg-amber-500/5" : "border-[#1F2430] bg-black/10"}`}><Medal className={`size-6 ${milestone.earned ? "text-amber-400" : "text-neutral-600"}`} /><h3 className="mt-3 text-sm font-semibold">{milestone.name}</h3><p className="mt-1 min-h-10 text-xs leading-5 text-neutral-500">{milestone.description}</p><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5"><div className={`h-full rounded-full ${milestone.earned ? "bg-amber-400" : "bg-violet-500"}`} style={{ width: `${milestone.percent}%` }} /></div><p className="mt-2 text-xs font-semibold text-neutral-400">{milestone.earned ? "Earned" : `${Math.min(milestone.current, milestone.target).toLocaleString()} / ${milestone.target.toLocaleString()}`}</p></div>)}
               </div>
             </div>
-          </section>
+          </section> : null}
 
-          <section className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
-            <div className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/70 p-6">
+          {activeView === "missions" ? <section className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/70 p-6">
               <h2 className="text-xl font-bold">Your recent activity</h2>
               <p className="mt-2 text-sm text-neutral-400">A clear record of your work and developer decisions.</p>
               <div className="mt-5 space-y-3">
@@ -144,8 +155,8 @@ export function TesterConsole({ tester, missions, leaderboard, summary, recent, 
                   return <div className="flex gap-3 rounded-xl border border-[#1F2430] p-4" key={item.id}><span className={`mt-0.5 ${item.status === "APPROVED" ? "text-emerald-400" : "text-neutral-500"}`}>{item.status === "APPROVED" ? <CheckCircle2 className="size-4" /> : <Clock3 className="size-4" />}</span><div className="min-w-0 flex-1"><p className="break-words text-sm font-semibold">{item.campaign.title}</p><p className="mt-1 text-xs text-neutral-500">{status}{item.status === "APPROVED" ? ` / ${formatCents(item.payoutCents)} earned` : ""}</p>{item.rejectionReason ? <p className="mt-2 break-words text-xs leading-5 text-rose-300">{item.rejectionReason}</p> : null}</div></div>;
                 }) : <div className="rounded-xl border border-dashed border-[#2A2F3D] p-6 text-center"><Sparkles className="mx-auto size-6 text-violet-300" /><p className="mt-3 text-sm font-semibold">Your first contribution belongs here.</p><p className="mt-2 text-xs leading-5 text-neutral-500">Explore a mission, follow the brief, and submit your own proof.</p></div>}
               </div>
-            </div>
-            <div id="leaderboard" className="scroll-mt-6 rounded-2xl border border-[#1F2430] bg-[#0E1017]/70 p-6">
+          </section> : null}
+          {activeView === "leaderboard" ? <section id="leaderboard" className="scroll-mt-6 rounded-2xl border border-[#1F2430] bg-[#0E1017]/70 p-6">
               <div className="flex items-center justify-between"><h2 className="text-xl font-bold">Community standouts</h2><Trophy className="size-5 text-amber-400" /></div>
               <p className="mt-2 text-sm text-neutral-400">Top contributors by lifetime reputation.</p>
               <ol className="mt-5 space-y-2">
@@ -154,8 +165,7 @@ export function TesterConsole({ tester, missions, leaderboard, summary, recent, 
               {!leaderboard.length ? <p className="mt-6 text-sm text-neutral-500">The leaderboard starts with the first approved mission. Help set the pace.</p> : null}
               <div className="mt-6 rounded-xl border border-[#1F2430] p-4"><p className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="size-4 text-emerald-400" /> Quality over quantity</p><p className="mt-2 text-xs leading-6 text-neutral-500">Describe what you tried, what you expected, and what happened. Original screenshots and reproducible feedback help developers make better products.</p></div>
               <Link href="/account?tab=portfolio" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-amber-300 hover:text-amber-200">View rewards & payout setup <ArrowRight className="size-4" /></Link>
-            </div>
-          </section>
+          </section> : null}
         </div>
         <TesterBottomNav />
       </main>

@@ -8,13 +8,16 @@ import { getCurrentUser } from "@/lib/auth";
 import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
 import { awardDailyCheckIn } from "@/lib/quest-ledger";
+import { resolveTesterView } from "@/lib/tester-console";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string; claim?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "TESTER") redirect(session.user.role === "DEVELOPER" ? "/console" : "/admin");
+  const params = await searchParams;
+  const activeView = resolveTesterView(params.view, params.claim);
 
   const security = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -69,7 +72,7 @@ export default async function DashboardPage() {
   const pendingWithPreviews = pending.map((item) => ({ ...item, proofPreviewUrl: item.revisionRequestedAt && item.proofImageUrl ? `/api/submissions/${item.id}/proof` : null }));
   return (
     <AuthCheck role="TESTER">
-      <TesterConsole tester={tester} missions={missions} leaderboard={leaderboard} summary={summary} recent={recent} pending={pendingWithPreviews} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ ...item, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} />
+      <TesterConsole activeView={activeView} tester={tester} missions={missions} leaderboard={leaderboard} summary={summary} recent={recent} pending={pendingWithPreviews} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ ...item, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} />
     </AuthCheck>
   );
 }

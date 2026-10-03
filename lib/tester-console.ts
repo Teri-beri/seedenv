@@ -1,6 +1,19 @@
 export type MissionFilter = "all" | "WEB_STAGING" | "TESTFLIGHT" | "PLAY_STORE" | "high-bounty";
 export type MissionSort = "reward" | "slots";
 
+export const testerViews = [
+  { id: "discover", label: "Discover", description: "Find apps and choose your next contribution." },
+  { id: "missions", label: "My missions", description: "Resume work, respond to revisions, and track developer reviews." },
+  { id: "reputation", label: "Reputation", description: "Your trusted REP, milestones, and earned rewards." },
+  { id: "leaderboard", label: "Leaderboard", description: "Meet the community's leading contributors." },
+] as const;
+export type TesterView = (typeof testerViews)[number]["id"];
+
+export function resolveTesterView(view?: string | null, claim?: string | null): TesterView {
+  if (claim) return "missions";
+  return testerViews.find((item) => item.id === view)?.id || "discover";
+}
+
 type DiscoverableMission = {
   title: string;
   description: string;

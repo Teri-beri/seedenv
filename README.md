@@ -79,7 +79,7 @@ On Android:
 
 ### Tester Console
 
-The tester dashboard brings together searchable mission discovery, platform and reward filters, resumable claims, pending reviews, recent activity, and payout setup. Mobile navigation links directly to discovery, the mission desk, reputation, and settings. Workspace switching remains available in Account settings.
+The tester dashboard has four separate, bookmarkable views on both desktop and phones: `/dashboard?view=discover` for mission search and opportunities, `view=missions` for resumable work, revisions, reviews and activity, `view=reputation` for REP, milestones and rewards, and `view=leaderboard` for community rankings. Only the selected view is rendered; navigation changes screens instead of jumping down one long page. Mobile navigation also includes Settings. Existing `?claim=...` links open My missions and start or resume the accepted mission there. Workspace switching remains available in Account settings.
 
 Account profile grids use a single shrinkable column on phones so developer previews and form fields cannot force a wider page; the existing desktop two-column layout is unchanged.
 
