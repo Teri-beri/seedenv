@@ -10,6 +10,9 @@ import { rankForXp, xpForBounty } from "@/lib/rank";
 import { uploadProofImage } from "@/lib/storage";
 import { getStripe } from "@/lib/stripe";
 import { formatCents, usdToCents } from "@/lib/utils";
+import { requireMember } from "@/lib/member";
+import { awardQuestXp, qualifyReferral, serializable } from "@/lib/quest-ledger";
+import { startAcceptedApplication } from "@/lib/mission-applications";
 
 const proofSchema = z.object({
   proofImageBase64: z.string().optional(),
@@ -34,19 +37,23 @@ function hasValidImageSignature(buffer: Buffer, mimeType: string) {
 }
 
 export async function claimTaskSlot(campaignId: string) {
-  const tester = await getCurrentUser("TESTER");
+  const tester = await requireMember("TESTER");
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
-  return prisma.$transaction(async (tx) => {
+  return serializable(async (tx) => {
     const campaign = await tx.appCampaign.findUnique({ where: { id: campaignId } });
-    if (!campaign || campaign.status !== CampaignStatus.ACTIVE) throw new Error("This mission is not accepting testers.");
-    if (campaign.claimedSlots >= campaign.totalSlots) throw new Error("This mission is fully claimed.");
+    if (!campaign || campaign.status !== CampaignStatus.ACTIVE || campaign.expiresAt <= new Date()) throw new Error("This mission is not accepting testers.");
 
     const existing = await tx.submission.findUnique({
       where: { campaignId_testerId: { campaignId, testerId: tester.id } },
     });
-    if (existing && existing.status === SubmissionStatus.PENDING) return existing;
+    if (existing && existing.status === SubmissionStatus.PENDING) {
+      if (existing.expiresAt <= new Date() && !existing.feedbackText && !existing.proofImageUrl) throw new Error("This claim has expired. Wait for the slot to be released.");
+      return existing;
+    }
     if (existing && existing.status === SubmissionStatus.APPROVED) throw new Error("You already completed this mission.");
+    if (campaign.claimedSlots >= campaign.totalSlots) throw new Error("This mission is fully claimed.");
+    await startAcceptedApplication(tx, tester.id, campaignId);
 
     const claimed = await tx.appCampaign.updateMany({
       where: { id: campaignId, claimedSlots: { lt: campaign.totalSlots } },
@@ -59,6 +66,18 @@ export async function claimTaskSlot(campaignId: string) {
       update: {
         status: SubmissionStatus.PENDING,
         rejectionReason: null,
+        reviewedAt: null,
+        proofImageUrl: null,
+        proofImageHash: null,
+        feedbackText: null,
+        recordingUrl: null,
+        osBuild: null,
+        deviceModel: null,
+        screenResolution: null,
+        appBuildVersion: null,
+        networkType: null,
+        crashLogs: null,
+        networkLogs: null,
         claimedAt: new Date(),
         expiresAt,
         payoutCents: usdToCents(campaign.bountyPerTaskUsd),
@@ -160,7 +179,7 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
 export async function approveSubmission(submissionId: string) {
   const reviewer = await getCurrentUser("DEVELOPER");
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await serializable(async (tx) => {
     const submission = await tx.submission.findUnique({
       where: { id: submissionId },
       include: { campaign: true, tester: true },
@@ -172,10 +191,11 @@ export async function approveSubmission(submissionId: string) {
     const xpGain = xpForBounty(submission.payoutCents);
     const nextXp = submission.tester.xpPoints + xpGain;
 
-    await tx.submission.update({
-      where: { id: submissionId },
+    const approval = await tx.submission.updateMany({
+      where: { id: submissionId, status: SubmissionStatus.PENDING },
       data: { status: SubmissionStatus.APPROVED, reviewedAt: new Date() },
     });
+    if (approval.count !== 1) throw new Error("This submission has already been reviewed.");
     await tx.appCampaign.update({
       where: { id: submission.campaignId },
       data: { completedSlots: { increment: 1 } },
@@ -188,6 +208,8 @@ export async function approveSubmission(submissionId: string) {
         lastActiveDate: new Date(),
       },
     });
+    await awardQuestXp(tx, submission.testerId, `approved:${submission.id}`, 25, "Developer-approved contribution");
+    await qualifyReferral(tx, submission.testerId);
     const payout = await tx.walletTransaction.create({
       data: {
         userId: submission.testerId,
@@ -320,7 +342,7 @@ export async function requestSubmissionRevision(submissionId: string, note: stri
 }
 
 export async function expireSlots() {
-  return prisma.$transaction(async (tx) => {
+  return serializable(async (tx) => {
     const expired = await tx.submission.findMany({
       where: { status: SubmissionStatus.PENDING, expiresAt: { lt: new Date() }, proofImageUrl: null, feedbackText: null },
       select: { id: true, campaignId: true },
@@ -330,7 +352,11 @@ export async function expireSlots() {
       await tx.submission.update({ where: { id: submission.id }, data: { status: SubmissionStatus.EXPIRED } });
       await tx.appCampaign.update({ where: { id: submission.campaignId }, data: { claimedSlots: { decrement: 1 } } });
     }
-
-    return { expiredCount: expired.length };
+    const applications = await tx.missionApplication.findMany({ where: { status: "ACCEPTED", startBy: { lte: new Date() } } });
+    for (const application of applications) {
+      await tx.missionApplication.update({ where: { id: application.id }, data: { status: "WITHDRAWN", passReserved: false } });
+      if (application.passReserved) await tx.user.update({ where: { id: application.testerId }, data: { discoveryPasses: { increment: 1 } } });
+    }
+    return { expiredCount: expired.length, expiredApplications: applications.length };
   });
 }

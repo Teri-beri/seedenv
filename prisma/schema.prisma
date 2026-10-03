@@ -47,6 +47,9 @@ enum SubmissionStatus {
 }
 
 enum TransactionType {
+  CLIPPER_DEPOSIT
+  CLIPPER_PAYOUT
+  CLIPPER_REFUND
   ESCROW_DEPOSIT
   BOUNTY_PAYOUT
   PLATFORM_FEE
@@ -87,6 +90,24 @@ model User {
   lastActiveDate         DateTime            @default(now())
   stripeCustomerId       String?
   stripeConnectAccountId String?
+  questXp                Int                 @default(0)
+  discoveryPasses        Int                 @default(0)
+  referralCode           String?             @unique
+  questTheme             String              @default("classic")
+  clipProfile            ClipProfile?
+  clipCampaigns          ClipCampaign[]
+  clipEngagements        ClipEngagement[]
+  clipMessages           ClipMessage[]
+  clipAssets             ClipAsset[]
+  clipSocialAccounts     ClipSocialAccount[]
+  clipOAuthStates        ClipOAuthState[]
+  questRewards           QuestReward[]
+  applications           MissionApplication[]
+  referralsSent          Referral[]          @relation("ReferralInviter")
+  referralReceived       Referral?           @relation("ReferralFriend")
+  posts                  CommunityPost[]
+  comments               CommunityComment[]
+  reports                CommunityReport[]
   campaigns              AppCampaign[]       @relation("DeveloperCampaigns")
   submissions            Submission[]        @relation("TesterSubmissions")
   transactions           WalletTransaction[]
@@ -159,6 +180,9 @@ model AppCampaign {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   expiresAt        DateTime
+  discoveryAllowed Boolean           @default(false)
+  discoveryMinRep  Int               @default(0)
+  applications     MissionApplication[]
 
   @@index([developerId, status])
   @@index([status, expiresAt])
@@ -173,9 +197,104 @@ model TaskInstruction {
   instructionTitle  String
   instructionDetail String
   proofType         TaskProofType
+  minimumRep        Int               @default(0)
 
   @@unique([campaignId, stepNumber])
   @@index([campaignId])
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+  STARTED
+}
+
+model QuestReward {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String
+  amount    Int
+  label     String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, key])
+  @@index([userId, createdAt])
+}
+
+model Referral {
+  id          String   @id @default(cuid())
+  inviterId   String
+  inviter     User     @relation("ReferralInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  friendId    String   @unique
+  friend      User     @relation("ReferralFriend", fields: [friendId], references: [id], onDelete: Cascade)
+  qualifiedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([inviterId, qualifiedAt])
+}
+
+model MissionApplication {
+  id           String            @id @default(cuid())
+  campaignId   String
+  campaign     AppCampaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  testerId     String
+  tester       User              @relation(fields: [testerId], references: [id], onDelete: Cascade)
+  note         String
+  status       ApplicationStatus @default(PENDING)
+  passReserved Boolean           @default(false)
+  startBy      DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([campaignId, testerId])
+  @@index([campaignId, status])
+}
+
+model CommunityPost {
+  id        String             @id @default(cuid())
+  authorId  String
+  author    User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body      String
+  hidden    Boolean            @default(false)
+  comments  CommunityComment[]
+  reports   CommunityReport[]
+  createdAt DateTime           @default(now())
+
+  @@index([hidden, createdAt])
+}
+
+model CommunityComment {
+  id        String        @id @default(cuid())
+  postId    String
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body      String
+  hidden    Boolean       @default(false)
+  reports   CommunityReport[]
+  createdAt DateTime      @default(now())
+
+  @@index([postId, createdAt])
+}
+
+model CommunityReport {
+  id         String            @id @default(cuid())
+  reporterId String
+  reporter   User              @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  postId     String?
+  post       CommunityPost?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  commentId  String?
+  comment    CommunityComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reason     String
+  resolved   Boolean           @default(false)
+  createdAt  DateTime          @default(now())
+
+  @@unique([reporterId, postId])
+  @@unique([reporterId, commentId])
+  @@index([resolved, createdAt])
 }
 
 model Submission {
@@ -224,6 +343,149 @@ model WalletTransaction {
   @@index([userId, createdAt])
   @@index([type, status])
   @@index([stripePaymentId])
+}
+
+model ClipProfile {
+  userId       String   @id
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio          String   @db.VarChar(1000)
+  portfolioUrl String
+  socialUrl    String
+  specialties  String   @db.VarChar(200)
+  updatedAt    DateTime @updatedAt
+}
+
+model ClipCampaign {
+  id           String   @id @default(cuid())
+  developerId  String
+  developer    User     @relation(fields: [developerId], references: [id], onDelete: Restrict)
+  title        String
+  appUrl       String
+  brief        String   @db.Text
+  platform     String
+  feeCents     Int
+  revisionLimit Int     @default(2)
+  deliveryDays Int      @default(7)
+  liveDays     Int      @default(30)
+  minimumRep   Int      @default(0)
+  open         Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  engagements  ClipEngagement[]
+  messages     ClipMessage[]
+  assets       ClipAsset[]
+
+  @@index([open, createdAt])
+  @@index([developerId, createdAt])
+}
+
+model ClipEngagement {
+  id           String   @id @default(cuid())
+  campaignId   String
+  campaign     ClipCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  creatorId    String
+  creator      User     @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  note         String   @db.VarChar(1500)
+  status       String   @default("APPLIED")
+  feeCents     Int
+  chargeCents  Int
+  termsVersion String   @default("clippers-v1-organic-90")
+  termsAcceptedAt DateTime
+  revisionCount Int     @default(0)
+  reviewNote   String?
+  dueAt        DateTime?
+  reviewDueAt  DateTime?
+  publishDueAt DateTime?
+  checkoutId   String?  @unique
+  fundingAttempt Int   @default(0)
+  paymentIntentId String? @unique
+  transferId   String?  @unique
+  payoutTransactionId String? @unique
+  payoutDestinationId String?
+  refundId     String?  @unique
+  draftId      String?
+  approvedDraftId String?
+  approvedAt   DateTime?
+  proofId      String?
+  publicationUrl String?
+  publicationId String?
+  publicationCode String @unique @default(cuid())
+  verificationMethod String?
+  verifiedAt   DateTime?
+  lastVerificationAt DateTime?
+  fundedAt     DateTime?
+  paidAt       DateTime?
+  licenseEndsAt DateTime?
+  disputeReason String? @db.VarChar(1500)
+  disputeOpenedBy String?
+  statusBeforeDispute String?
+  moderationNote String?
+  assets       ClipAsset[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([campaignId, creatorId])
+  @@index([creatorId, updatedAt])
+  @@index([campaignId, status])
+}
+
+model ClipMessage {
+  id           String   @id @default(cuid())
+  campaignId   String
+  campaign     ClipCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  authorId     String
+  author       User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body         String   @db.VarChar(2000)
+  createdAt    DateTime @default(now())
+
+  @@index([campaignId, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model ClipAsset {
+  id           String   @id @default(cuid())
+  campaignId   String
+  campaign     ClipCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  engagementId String?
+  engagement   ClipEngagement? @relation(fields: [engagementId], references: [id], onDelete: Restrict)
+  ownerId      String
+  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  kind         String
+  path         String   @unique
+  name         String
+  mimeType     String
+  sizeBytes    Int
+  ready        Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  @@index([campaignId, kind, createdAt])
+  @@index([ownerId, createdAt])
+}
+
+model ClipSocialAccount {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     String
+  providerId   String
+  displayName  String
+  accessToken  String   @db.Text
+  refreshToken String   @db.Text
+  expiresAt    DateTime
+  refreshExpiresAt DateTime
+  scope        String
+  updatedAt    DateTime @updatedAt
+
+  @@unique([provider, providerId])
+  @@unique([userId, provider])
+}
+
+model ClipOAuthState {
+  id           String   @id
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt    DateTime
+
+  @@index([expiresAt])
 }
 
 model AnalyticsEvent {

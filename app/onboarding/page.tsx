@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
+import { attachReferral } from "@/app/actions/questActions";
 
 const allowedNextPaths = ["/dashboard", "/console", "/admin"];
 
@@ -31,13 +32,13 @@ function cleanUrl(value: string | undefined) {
   }
 }
 
-export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ role?: string; next?: string; name?: string; username?: string; bio?: string; portfolioUrl?: string; companyName?: string; productUrl?: string }> }) {
+export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ role?: string; next?: string; name?: string; username?: string; bio?: string; portfolioUrl?: string; companyName?: string; productUrl?: string; ref?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/auth/signin");
 
   const params = await searchParams;
   const requestedRole = cleanRequestedRole(params.role);
-  const nextPath = cleanNextPath(params.next);
+  let nextPath = cleanNextPath(params.next);
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { role: true, testerWorkspaceEnabled: true, developerWorkspaceEnabled: true, passwordHash: true, _count: { select: { accounts: true } } },
@@ -72,6 +73,16 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   }
 
   if (user?.role === UserRole.ADMIN) redirect("/admin");
+  if (params.ref) {
+    const received = await prisma.referral.findUnique({ where: { friendId: session.user.id } });
+    if (!received) {
+      try { await attachReferral(params.ref); }
+      catch (error) {
+        console.error("SeedEnv signup referral could not be applied:", error);
+        nextPath = "/account?referralError=1";
+      }
+    }
+  }
   if (user && !user.passwordHash && user._count.accounts === 0) {
     redirect(`/onboarding/setup?next=${encodeURIComponent(nextPath)}`);
   }

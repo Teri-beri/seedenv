@@ -7,6 +7,7 @@ const sections = [
       { label: "Developers", text: "Organization details, project URLs, test build files/links, campaign specifications, and payout/funding preferences." },
       { label: "Testers", text: "Device specifications, operating system versions, testing hardware profiles, and feedback submissions." },
       { label: "Test Submissions & Proof Files", text: "Files uploaded to verify completed tasks, including bug reports, crash logs, system diagnostics, feedback notes, screenshots, and screen recordings." },
+      { label: "Clippers & Connected Social Accounts", text: "Creator biographies, portfolio and social profile URLs, campaign room messages, private video versions, publication evidence, agreement terms, and payment references. With your authorization, TikTok provides your account identifier, display name, and selected public-video metadata. Access and refresh tokens are encrypted at rest using a dedicated application key and are never shared with other members." },
       { label: "Payment & Transaction Details", text: "Payment processing, campaign escrow, and tester reward payouts are handled by third-party payment processors (such as Stripe). We do not store complete credit card numbers or banking account credentials directly on our servers; we retain only reference transaction tokens, payout status, and invoice histories." },
       { label: "Automated Technical Data", text: "IP addresses, browser type, device identifiers, session timestamps, and interaction events recorded via server logs and privacy-preserving analytics." },
     ],
@@ -27,6 +28,7 @@ const sections = [
     body: ["We do not sell, rent, or trade your personal information. We only share data in the following operational scenarios:"],
     bullets: [
       { label: "Between Developers and Testers", text: "When a tester submits proof of completion for a campaign, the associated developer receives access to the submitted feedback, uploaded proof files, screenshots/recordings, and tester platform username to verify campaign completion." },
+      { label: "Clippers Rooms & Reviews", text: "Creator applicants share their background and linked samples with the campaign developer. Invited creators and the developer share campaign-room messages and developer reference assets. Each creator's drafts and publication evidence are accessible only to that creator, the developer, and authorized administrators, through short-lived private asset links. Administrators can review agreement disputes." },
       { label: "Cloud Storage", text: "Secure hosting for uploaded tester proof files, screenshots, and campaign assets." },
       { label: "Authentication & Email", text: "Providers delivering transactional emails and secure magic-link sign-ins." },
       { label: "Payment & Escrow Processors", text: "Stripe for processing developer campaign deposits and tester reward payouts." },
@@ -49,6 +51,7 @@ const sections = [
       { label: "Correction", text: "Updating or amending inaccurate personal details through your account settings." },
       { label: "Deletion", text: "Requesting the deletion of your account and personal data, subject to legal or transactional retention obligations (e.g., historical tax or payment records)." },
       { label: "Communication Preferences", text: "Opting out of non-essential campaign notifications." },
+      { label: "Connected Social Access", text: "Disconnect TikTok in the Clippers workspace to revoke authorization and remove locally stored encrypted tokens. You may also revoke access in TikTok's account settings. Disconnecting does not delete existing contracts, paid-content obligations, or financial records required for disputes and legal compliance." },
     ],
   },
   {
@@ -68,7 +71,7 @@ export default function PrivacyPage() {
         <a className="inline-flex items-center rounded-lg border border-white/[0.08] bg-zinc-950/70 px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white" href="/auth/signin">← Back to sign up</a>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-400">SeedEnv</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight">Privacy Policy</h1>
-        <p className="mt-3 text-sm text-zinc-500">Last Updated: September 2026</p>
+        <p className="mt-3 text-sm text-zinc-500">Last Updated: October 2, 2026</p>
 
         <div className="mt-8 space-y-5 text-sm leading-7 text-zinc-400">
           <p>At <strong className="font-semibold text-zinc-200">SeedEnv</strong> (&quot;Company,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;), we respect your privacy and are committed to protecting the personal information you share with us.</p>

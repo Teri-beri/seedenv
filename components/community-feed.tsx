@@ -1,0 +1,25 @@
+"use client";
+
+import { useState } from "react";
+import { hideCommunityContent, publishComment, publishPost, reportCommunityContent } from "@/app/actions/communityActions";
+import { MemberAction } from "@/components/member-action";
+import Link from "next/link";
+
+type Author = { id: string; username: string; role: string; xpPoints: number };
+export type FeedPost = { id: string; body: string; createdAt: string; author: Author; _count: { comments: number }; comments: Array<{ id: string; body: string; author: Author }> };
+
+export function CommunityFeed({ posts, userId, developer, admin }: { posts: FeedPost[]; userId: string; developer: boolean; admin: boolean }) {
+  const [body, setBody] = useState("");
+  return <div className="space-y-5"><section className="rounded-2xl border border-violet-400/20 bg-violet-500/5 p-5"><h2 className="text-xl font-bold">Build in the open. Discuss with purpose.</h2><p className="mt-2 text-sm leading-6 text-neutral-400">A members-only space for app progress, launch updates, and constructive tester conversations. Posting and commenting do not earn REP or Quest XP.</p></section>{developer ? <section className="rounded-2xl border border-stroke bg-surface p-5"><label className="block font-semibold">Share an app update<textarea maxLength={1600} value={body} onChange={(event) => setBody(event.target.value)} className="mt-3 min-h-32 w-full rounded-xl border border-stroke bg-background p-3 font-normal" placeholder="What are you building? What changed? What feedback would help?" /></label><p className="my-2 text-xs text-neutral-500">{body.length} / 1,600 characters. Keep credentials and private user data out of posts.</p><MemberAction disabled={body.trim().length < 12} action={async () => { const result = await publishPost(body); setBody(""); return result; }}>Publish update</MemberAction></section> : null}{!posts.length ? <p className="rounded-2xl border border-dashed border-stroke p-8 text-center text-neutral-400">No updates yet. Developers can share the first launch story.</p> : null}{posts.map((post) => <Post key={post.id} post={post} userId={userId} admin={admin} />)}</div>;
+}
+
+function Post({ post, userId, admin }: { post: FeedPost; userId: string; admin: boolean }) {
+  const [comment, setComment] = useState("");
+  return <article className="rounded-2xl border border-stroke bg-surface p-5"><header className="flex flex-wrap justify-between gap-2"><div><p className="font-semibold">{post.author.username}<span className="ml-2 text-xs text-violet-300">Developer</span></p><p className="mt-1 text-xs text-neutral-500">{new Date(post.createdAt).toLocaleDateString()}</p></div>{post.author.id === userId || admin ? <MemberAction action={() => hideCommunityContent(post.id, "post")}>Remove update</MemberAction> : null}</header><p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-neutral-200">{post.body}</p><Report id={post.id} type="post" /><section className="mt-5 border-t border-stroke pt-4" aria-label="Comments"><p className="text-xs text-neutral-500">{post._count.comments} visible comments / showing latest {post.comments.length}</p>{post.comments.map((item) => <div key={item.id} className="mt-3 rounded-xl bg-background p-3"><p className="text-xs font-semibold text-violet-200">{item.author.username} / {item.author.role === "TESTER" ? `${item.author.xpPoints} REP` : item.author.role}</p><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-neutral-300">{item.body}</p><div className="mt-2 flex flex-wrap gap-2"><Report id={item.id} type="comment" />{item.author.id === userId || admin ? <MemberAction action={() => hideCommunityContent(item.id, "comment")}>Remove comment</MemberAction> : null}</div></div>)}{post._count.comments > post.comments.length ? <Link className="mt-3 inline-block text-sm text-amber-300" href={`/community/${post.id}`}>Read full discussion</Link> : null}<label className="mt-4 block text-sm">Add constructive feedback<textarea maxLength={800} className="mt-2 min-h-20 w-full rounded-xl border border-stroke bg-background p-3" value={comment} onChange={(event) => setComment(event.target.value)} /></label><div className="mt-3"><MemberAction disabled={comment.trim().length < 2} action={async () => { const result = await publishComment(post.id, comment); setComment(""); return result; }}>Comment</MemberAction></div></section></article>;
+}
+
+function Report({ id, type }: { id: string; type: "post" | "comment" }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  return <div className="mt-2"><button type="button" className="min-h-11 text-xs text-neutral-500 underline" onClick={() => setOpen(!open)}>{open ? "Cancel report" : "Report"}</button>{open ? <div className="space-y-2"><label className="block text-sm">Reason for report<input maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} className="mt-2 block w-full rounded-xl border border-stroke bg-background p-3" /></label><MemberAction disabled={reason.trim().length < 8} action={() => reportCommunityContent(id, type, reason)}>Send report</MemberAction></div> : null}</div>;
+}

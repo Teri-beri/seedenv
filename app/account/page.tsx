@@ -14,6 +14,7 @@ import { NotificationSettingsForm } from "@/components/notification-settings-for
 import { PasswordSettingsForm } from "@/components/password-settings-form";
 import { StripeSettingsCard } from "@/components/stripe-settings-card";
 import { WorkspaceAccessSwitcher } from "@/components/workspace-access-switcher";
+import { DeveloperBottomNav, TesterBottomNav } from "@/components/navigation";
 import { getAnalyticsSummary } from "@/lib/analytics";
 import { prisma } from "@/lib/prisma";
 import { rankProgress } from "@/lib/rank";
@@ -41,7 +42,7 @@ function normalizeNotificationPreferences(value: unknown): NotificationPreferenc
   };
 }
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string; draft?: string; stripePayment?: string; stripeConnect?: string }> }) {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string; draft?: string; stripePayment?: string; stripeConnect?: string; referralError?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/auth/signin?callbackUrl=/account");
   const params = await searchParams;
@@ -125,14 +126,14 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
   return (
     <AuthCheck>
-      <main className="terminal-grid min-h-screen bg-[radial-gradient(circle_at_12%_0%,rgba(109,40,217,0.2),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_50%,#090A0F_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
+      <main className="mobile-app-shell mobile-settings terminal-grid min-h-screen bg-[radial-gradient(circle_at_12%_0%,rgba(109,40,217,0.2),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_50%,#090A0F_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
-          <header className="flex flex-wrap items-center justify-between gap-4">
+          <header className="mobile-settings-header flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-4">
               <Link className="inline-flex items-center gap-2 rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-3 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-amber-500/40 hover:text-white" href={user.role === UserRole.DEVELOPER ? "/console" : user.role === UserRole.ADMIN ? "/admin" : "/dashboard"}>
                 <ArrowLeft className="size-4" /> Back
               </Link>
-              <Link className="flex items-center gap-3" href="/">
+              <Link className="mobile-settings-brand flex items-center gap-3" href="/">
                 <span className="relative size-12 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 shadow-lg shadow-amber-500/10">
                   <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="48px" className="scale-125 object-cover" priority />
                 </span>
@@ -145,7 +146,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             <AccountSignOutButton />
           </header>
 
-          <nav aria-label="Account settings" className="mt-8 flex max-w-full gap-2 overflow-x-auto border-b border-[#1F2430] pb-2">
+          <nav aria-label="Account settings" className="mobile-settings-tabs mt-8 flex max-w-full gap-2 overflow-x-auto border-b border-[#1F2430] pb-2">
             {visibleTabs.map((tab) => (
               <Link
                 aria-current={activeTab === tab.id ? "page" : undefined}
@@ -159,13 +160,19 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           </nav>
 
           <section className="mt-6">
+            {params.referralError === "1" ? <p role="alert" className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-200">Your sign-in succeeded, but the referral code could not be applied. Open Quest Center in your Tester workspace to enter a valid code. Referrals must be entered within seven days of joining and before your first approved task.</p> : null}
+            {user.role !== UserRole.ADMIN ? (
+              <div className="mb-6 max-w-3xl">
+                <WorkspaceAccessSwitcher activeRole={user.role} testerEnabled={user.testerWorkspaceEnabled} developerEnabled={user.developerWorkspaceEnabled} />
+              </div>
+            ) : null}
+
             {activeTab === "profile" ? (
               <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
                 <div className="space-y-6">
                   <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, bio: user.bio, portfolioUrl: user.portfolioUrl, companyName: user.companyName, productUrl: user.productUrl, githubUsername: user.githubUsername, discordUrl: user.discordUrl, twitterHandle: user.twitterHandle, emailVerified: Boolean(user.emailVerified), githubConnected: user.accounts.some((account) => account.provider === "github"), role: user.role }} />
-                  {user.role !== UserRole.ADMIN ? <WorkspaceAccessSwitcher activeRole={user.role} testerEnabled={user.testerWorkspaceEnabled} developerEnabled={user.developerWorkspaceEnabled} /> : null}
                 </div>
-                <section className="luxury-panel h-fit rounded-2xl p-6">
+                <section className="mobile-profile-summary luxury-panel h-fit rounded-2xl p-6">
                   <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Developer profile</p>
                   <h1 className="mt-3 text-3xl font-black text-white">Build trust before launch.</h1>
                   <p className="mt-3 max-w-xl text-sm leading-6 text-neutral-400">A clear studio identity, concise product brief, and connected social accounts help testers understand who is behind each build.</p>
@@ -270,6 +277,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             ) : null}
           </section>
         </div>
+        <div className="sm:hidden">
+          {user.role === UserRole.TESTER ? <TesterBottomNav /> : user.role === UserRole.DEVELOPER ? <DeveloperBottomNav /> : null}
+        </div>
       </main>
     </AuthCheck>
   );
@@ -288,7 +298,7 @@ function TesterPortfolio({ approvedCount, earnedCents, pendingCount, rankLabel, 
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric icon={<WalletCards className="size-5" />} label="Wallet" value={formatCents(walletCents)} />
-        <Metric icon={<Trophy className="size-5" />} label="XP" value={xp.toLocaleString()} />
+        <Metric icon={<Trophy className="size-5" />} label="Reputation (REP)" value={xp.toLocaleString()} />
         <Metric icon={<CheckCircle2 className="size-5" />} label="Approved" value={approvedCount.toLocaleString()} />
         <Metric icon={<Sprout className="size-5" />} label="Rank" value={rankLabel} />
       </div>

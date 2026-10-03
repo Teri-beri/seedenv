@@ -58,4 +58,5 @@ async function main() {
 
 main().catch((error) => {
   console.error("SeedEnv schema check failed:", error);
+  process.exitCode = 1;
 });

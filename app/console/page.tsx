@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import AuthCheck from "@/components/AuthCheck";
 import { DeveloperStudio } from "@/components/developer-studio";
-import { DeveloperHeader } from "@/components/navigation";
+import { DeveloperBottomNav, DeveloperHeader } from "@/components/navigation";
 import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
 import { getProofImageUrl } from "@/lib/storage";
@@ -132,8 +132,13 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   ]);
   return (
     <AuthCheck role="DEVELOPER">
-    <main className="terminal-grid min-h-screen bg-[radial-gradient(circle_at_12%_0%,rgba(109,40,217,0.2),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_50%,#090A0F_100%)] pb-16 text-white" id="console-top">
+    <main className="mobile-app-shell terminal-grid min-h-screen bg-[radial-gradient(circle_at_12%_0%,rgba(109,40,217,0.2),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_50%,#090A0F_100%)] pb-16 text-white" id="console-top">
       <DeveloperHeader activeView={activeView} />
+      <nav aria-label="Developer community and applications" className="mx-auto flex max-w-7xl flex-wrap gap-3 px-4 pt-5">
+        <Link href="/applications" className="rounded-xl border border-stroke px-4 py-3 text-sm text-amber-300">Tester applications & REP requirements</Link>
+        <Link href="/community" className="rounded-xl border border-stroke px-4 py-3 text-sm text-violet-200">Launch Circle / Post app updates</Link>
+        <Link href="/clippers" className="rounded-xl border border-stroke px-4 py-3 text-sm text-violet-200">Clippers / Creator collaborations</Link>
+      </nav>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {activeView === "overview" ? <section className="mb-8 grid items-stretch gap-6 lg:grid-cols-[1fr_420px]">
           <div className="flex h-full flex-col justify-between gap-6">
@@ -241,6 +246,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
           </section>
         </section> : null}
       </div>
+      <DeveloperBottomNav />
     </main>
     </AuthCheck>
   );

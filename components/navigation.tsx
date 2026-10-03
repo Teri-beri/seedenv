@@ -4,17 +4,17 @@ import { UserRole } from "@prisma/client";
 import { Boxes, BriefcaseBusiness, CreditCard, Flame, Gamepad2, LayoutDashboard, LoaderCircle, Medal, PlusCircle, Settings, ShieldCheck, Sprout, UserRound } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { activateAccountWorkspace, type WorkspaceRole } from "@/app/actions/accountActions";
 import { Button } from "@/components/ui/button";
 
 const testerItems = [
-  { label: "Seed Missions", icon: Gamepad2 },
-  { label: "Active Missions", icon: Flame },
-  { label: "Leaderboard", icon: Medal },
-  { label: "Account", icon: UserRound },
+  { label: "Discover", icon: Gamepad2, href: "/dashboard#tester-hub" },
+  { label: "My missions", icon: Flame, href: "/dashboard#active-missions" },
+  { label: "Reputation", icon: Medal, href: "/dashboard#reputation" },
+  { label: "Settings", icon: UserRound, href: "/account" },
 ];
 
 const developerItems = [
@@ -70,7 +70,7 @@ export function RoleSwitcher({ activeRole, testerWorkspaceEnabled, developerWork
 
 export function DeveloperHeader({ activeView }: { activeView: "overview" | "new-drop" | "review-deck" | "asset-vault" | "billing" }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-stroke bg-obsidian/95 px-3 py-3 backdrop-blur-xl sm:px-6 lg:px-8 lg:py-4">
+    <header className="mobile-app-header sticky top-0 z-30 border-b border-stroke bg-obsidian/95 px-3 py-3 backdrop-blur-xl sm:px-6 lg:px-8 lg:py-4">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex shrink-0 items-center gap-3">
           <div className="relative size-11 overflow-hidden rounded-2xl border border-stroke bg-surface shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
@@ -81,7 +81,7 @@ export function DeveloperHeader({ activeView }: { activeView: "overview" | "new-
             <h1 className="text-lg font-black">Developer Console</h1>
           </div>
         </div>
-        <nav aria-label="Developer console sections" className="-mx-3 flex max-w-full items-center gap-1 overflow-x-auto px-3 pb-1 sm:mx-0 sm:gap-2 sm:px-0 sm:pb-0">
+        <nav aria-label="Developer console sections" className="-mx-3 hidden max-w-full items-center gap-1 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex sm:gap-2 sm:px-0 sm:pb-0">
           {developerItems.map(({ label, view, icon: Icon }) => (
             <Button className={`shrink-0 whitespace-nowrap ${activeView === view ? "border-amber-500/40 bg-amber-500/10 text-amber-200" : ""}`} key={label} variant="ghost" size="sm" asChild>
               <Link aria-current={activeView === view ? "page" : undefined} href={`/console?view=${view}`}>
@@ -102,15 +102,39 @@ export function DeveloperHeader({ activeView }: { activeView: "overview" | "new-
 }
 
 export function TesterBottomNav() {
+  const pathname = usePathname();
+  const [hash, setHash] = useState("");
+  useEffect(() => {
+    const sync = () => setHash(window.location.hash);
+    sync();
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-stroke bg-obsidian/94 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
+    <nav aria-label="Tester app navigation" className="mobile-app-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-stroke bg-obsidian/94 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
       <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
-        {testerItems.map(({ label, icon: Icon }, index) => (
-          <Link key={label} className={`rounded-2xl px-2 py-2 text-center text-[10px] font-semibold ${index === 0 ? "bg-royal text-white shadow-[0_10px_24px_rgba(109,40,217,0.22)]" : "text-muted"}`} href={label === "Account" ? "/account" : "/dashboard"}>
+        {testerItems.map(({ label, icon: Icon, href }) => {
+          const active = pathname === "/account" ? href === "/account" : pathname === "/dashboard" && href === `/dashboard${hash || "#tester-hub"}`;
+          return (
+          <Link key={label} aria-current={active ? "location" : undefined} onClick={() => setHash(href.includes("#") ? `#${href.split("#")[1]}` : "")} className={`flex min-h-12 flex-col items-center justify-center rounded-2xl px-2 py-2 text-center text-[10px] font-semibold transition hover:bg-violet-500/10 hover:text-white ${active ? "bg-violet-500/15 text-violet-200" : "text-muted"}`} href={href}>
             <Icon className="mx-auto mb-1 size-4" />
             {label}
           </Link>
-        ))}
+        ); })}
+      </div>
+    </nav>
+  );
+}
+
+export function DeveloperBottomNav() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const view = searchParams.get("view") || "overview";
+  const items = [...developerItems.map((item) => ({ label: item.view === "overview" ? "Home" : item.view === "new-drop" ? "New" : item.view === "review-deck" ? "Review" : item.view === "asset-vault" ? "Assets" : "Billing", href: `/console?view=${item.view}`, icon: item.icon, active: pathname === "/console" && view === item.view })), { label: "Settings", href: "/account", icon: Settings, active: pathname === "/account" }];
+  return (
+    <nav aria-label="Developer app navigation" className="mobile-app-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-stroke bg-obsidian/95 px-1 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl sm:hidden">
+      <div className="grid grid-cols-6 gap-0.5">
+        {items.map(({ label, href, icon: Icon, active }) => <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold ${active ? "bg-amber-500/10 text-amber-300" : "text-neutral-400"}`}><Icon className="size-5" />{label}</Link>)}
       </div>
     </nav>
   );

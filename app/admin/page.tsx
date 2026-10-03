@@ -2,6 +2,7 @@ import { UserRole } from "@prisma/client";
 import { ShieldCheck, UsersRound, WalletCards } from "lucide-react";
 import { getServerSession } from "next-auth";
 import Image from "next/image";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import AuthCheck from "@/components/AuthCheck";
@@ -39,6 +40,9 @@ export default async function AdminPage() {
               {UserRole.ADMIN}
             </span>
           </header>
+          <nav aria-label="Administrator queues" className="mt-6">
+            <Link href="/clippers" className="inline-flex min-h-11 items-center rounded-xl border border-violet-500/30 px-4 py-3 text-sm text-violet-200">Clippers disputes & payment reconciliation</Link>
+          </nav>
 
           <section className="mt-14 max-w-4xl">
             <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Internal operations</p>

@@ -11,6 +11,7 @@ const taskInstructionSchema = z.object({
   instructionTitle: z.string().min(3).max(90),
   instructionDetail: z.string().min(12).max(900),
   proofType: z.nativeEnum(TaskProofType),
+  minimumRep: z.number().int().min(0).max(1000000).default(0),
 });
 
 const httpUrlSchema = z.string().url().refine((value) => {
@@ -28,6 +29,11 @@ const campaignSchema = z.object({
   totalSlots: z.number().int().min(5).max(500),
   bountyPerTaskUsd: z.number().min(1).max(100),
   instructions: z.array(taskInstructionSchema).min(1).max(12),
+  discoveryAllowed: z.boolean().default(false),
+  discoveryMinRep: z.number().int().min(0).max(1000000).default(0),
+}).refine((input) => !input.discoveryAllowed || input.discoveryMinRep <= Math.max(...input.instructions.map((item) => item.minimumRep)), {
+  message: "The Discovery REP floor cannot exceed the highest task requirement.",
+  path: ["discoveryMinRep"],
 });
 
 export type CampaignInput = z.infer<typeof campaignSchema>;
@@ -52,6 +58,8 @@ function buildCampaignData(input: CampaignInput, developerId: string, status: Ca
       bountyPerTaskUsd: input.bountyPerTaskUsd,
       platformFeeUsd,
       totalSlots: input.totalSlots,
+      discoveryAllowed: input.discoveryAllowed,
+      discoveryMinRep: input.discoveryMinRep,
       status,
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       instructions: {

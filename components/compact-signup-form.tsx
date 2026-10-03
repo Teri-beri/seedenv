@@ -108,7 +108,7 @@ export function CompactSignupForm() {
       const result = await signIn("email", {
         email: profile.email,
         redirect: false,
-        callbackUrl: `/onboarding?${profile.onboardingParams}&next=${encodeURIComponent(next)}`,
+        callbackUrl: `/onboarding?${profile.onboardingParams}&next=${encodeURIComponent(next)}${searchParams.get("ref") ? `&ref=${encodeURIComponent(searchParams.get("ref") || "")}` : ""}`,
       });
 
       setMessage(result?.error
@@ -132,7 +132,7 @@ export function CompactSignupForm() {
         email: email.trim(),
         password,
         redirect: false,
-        callbackUrl: `/onboarding?role=${role}&next=${encodeURIComponent(getSafeCallback(searchParams.get("callbackUrl"), role))}`,
+        callbackUrl: `/onboarding?role=${role}&next=${encodeURIComponent(getSafeCallback(searchParams.get("callbackUrl"), role))}${searchParams.get("ref") ? `&ref=${encodeURIComponent(searchParams.get("ref") || "")}` : ""}`,
       });
       if (result?.error || !result?.url) {
         setMessage("Incorrect email or password. Too many attempts will temporarily lock sign-in.");
@@ -166,8 +166,12 @@ export function CompactSignupForm() {
     setMessage("");
 
     try {
+      const baseCallback = provider === "github"
+        ? getOAuthCallback("/console", "DEVELOPER")
+        : getOAuthCallback(searchParams.get("callbackUrl"), role);
+      const callbackUrl = `${baseCallback}${searchParams.get("ref") ? `&ref=${encodeURIComponent(searchParams.get("ref") || "")}` : ""}`;
       const result = await signIn(provider, {
-        callbackUrl: getOAuthCallback(searchParams.get("callbackUrl"), role),
+        callbackUrl,
         redirect: false,
       });
       if (result?.error) {
@@ -215,6 +219,7 @@ export function CompactSignupForm() {
         <button aria-label="Continue with GitHub" className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800/50 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} onClick={() => continueWithProvider("github")} type="button"><GitHubMark /> {loading ? "Opening..." : "GitHub"}</button>
         <button aria-label="Continue with Google" className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800/50 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} onClick={() => continueWithProvider("google")} type="button"><GoogleMark /> Google</button>
       </div>
+      <p className="-mt-4 text-center text-xs leading-5 text-zinc-500">GitHub opens your Developer Console. Switch workspaces anytime in Account settings.</p>
 
       <div className="relative flex items-center justify-center"><div className="w-full border-t border-zinc-800" /><span className="absolute bg-[#0b0c10] px-3 text-xs font-mono uppercase tracking-wider text-zinc-500">or continue with email</span></div>
 

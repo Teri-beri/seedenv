@@ -53,14 +53,15 @@ export function WorkspaceAccessSwitcher({
           return (
             <button
               aria-pressed={active}
-              className={`grid min-h-[76px] w-full grid-cols-[minmax(0,1fr)_64px] items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${active ? "border-amber-500/40 bg-amber-500/10 text-amber-200" : "border-[#2A2F3D] bg-[#090A0F]/55 text-neutral-300 hover:border-amber-500/30 hover:text-white"}`}
+              aria-label={active ? `${label} workspace is active` : enabled ? `Switch to ${label} workspace` : `Create ${label.toLowerCase()} workspace`}
+              className={`flex min-h-[76px] min-w-0 w-full flex-col items-start justify-center gap-2 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition ${active ? "border-amber-500/40 bg-amber-500/10 text-amber-200" : "border-[#2A2F3D] bg-[#090A0F]/55 text-neutral-300 hover:border-amber-500/30 hover:text-white"}`}
               disabled={isPending || active}
               key={role}
               onClick={() => activate(role)}
               type="button"
             >
-              <span className="flex min-w-0 items-center gap-2"><Icon className="size-4 shrink-0" /><span className="min-w-0 whitespace-normal leading-5">{enabled ? `${label} workspace` : `Create ${label.toLowerCase()} workspace`}</span></span>
-              <span className="flex min-w-[64px] shrink-0 flex-col items-center justify-center gap-1 text-[10px] font-semibold leading-none">{isPending && !active ? <LoaderCircle className="size-4 animate-spin" /> : active ? <><Check className="size-4" /><span>Current</span></> : <span>{enabled ? "Switch" : "Add"}</span>}</span>
+              <span className="flex min-w-0 items-start gap-2"><Icon className="mt-0.5 size-4 shrink-0" /><span className="min-w-0 break-words whitespace-normal leading-5">{enabled ? `${label} workspace` : `Create ${label.toLowerCase()} workspace`}</span></span>
+              <span className="flex items-center gap-1 pl-6 text-xs font-medium leading-4">{isPending && !active ? <><LoaderCircle className="size-3 animate-spin" /> Switching...</> : active ? <><Check className="size-3" /><span>Current workspace</span></> : <span>{enabled ? `Switch to ${label.toLowerCase()}` : "Add workspace"}</span>}</span>
             </button>
           );
         })}

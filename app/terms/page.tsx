@@ -48,6 +48,16 @@ const sections = [
     ],
   },
   {
+    title: "Clippers Creator Agreements",
+    body: [
+      "Clippers is a separate paid-content collaboration area. Creators retain ownership of their videos. Upon successful payment, the developer receives a non-exclusive, 90-day organic repost license to the approved video. This specific license overrides the general feedback license for Clippers videos. Paid advertising, boosting, whitelisting, raw footage, and ownership transfer are excluded and require a separate agreement.",
+      "Each agreement records a fixed creator fee, revision limit, delivery deadline, publication platform, and minimum period the post must remain public. The developer pre-funds the fee and disclosed platform charge through Stripe. This marketplace payment flow is not represented as legal escrow. Draft approval alone does not release payment; publication evidence and verification are required, followed by developer confirmation that the published video matches the approved draft.",
+      "Developer review and payment release are due within 72 hours of submission, included revisions within three days of a revision request, and publication within seven days of draft approval. Creators must provide honest content, required sponsorship disclosure, and appropriate rights to music and other media. Views, conversions, and follower growth are not guaranteed. Deadlines and post-retention breaches require human dispute review; no automatic refund, payout forfeiture, or clawback is performed.",
+      "Either party may raise an agreement dispute for administrator review. Unreleased funds and further work are frozen during review. Developers may cancel before creator upload starts; later refunds require administrator review. Already initiated or completed transfers require payment-provider reconciliation and are not automatically reversed. Stripe charges, transfers, and bank payouts can have different settlement times. Creators should not start work until the agreement is marked funded.",
+      "Review watermarks are interface overlays, not burned-in file watermarks or copy protection. Drafts may not be reused without the agreed license. Social API verification establishes account ownership and selected post metadata, not visual identity, permanent availability, or compliance certification. Developers remain responsible for reviewing the actual public content. SeedEnv does not automatically publish to social accounts.",
+    ],
+  },
+  {
     title: "7. Prohibited Conduct",
     body: ["You agree not to:"],
     list: [
@@ -82,7 +92,7 @@ export default function TermsPage() {
         <a className="inline-flex items-center rounded-lg border border-white/[0.08] bg-zinc-950/70 px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white" href="/auth/signin">← Back to sign up</a>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-400">SeedEnv</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight">Terms of Service</h1>
-        <p className="mt-3 text-sm text-zinc-500">Last Updated: September 24, 2026</p>
+        <p className="mt-3 text-sm text-zinc-500">Last Updated: October 2, 2026</p>
 
         <div className="mt-8 space-y-5 text-sm leading-7 text-zinc-400">
           <p>Welcome to <strong className="font-semibold text-zinc-200">SeedEnv</strong> (&quot;Company,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). These Terms of Service (&quot;Terms&quot;) govern your access to and use of the SeedEnv website, applications, APIs, and related services (collectively, the &quot;Platform&quot;).</p>

@@ -12,6 +12,7 @@ import { createCampaignWithEscrow, saveTestCampaignDraft, type CampaignInput } f
 import { Button } from "@/components/ui/button";
 import { DeveloperInsights, type InsightSubmission } from "@/components/developer-insights";
 import { formatCents } from "@/lib/utils";
+import { microTaskTemplates } from "@/lib/micro-task-templates";
 
 type ReviewSubmission = {
   id: string;
@@ -52,7 +53,9 @@ type CampaignDraft = {
   description: string;
   totalSlots: number;
   bountyPerTaskUsd: number;
-  instructions: Array<{ stepNumber: number; instructionTitle: string; instructionDetail: string; proofType: TaskProofType }>;
+  discoveryAllowed: boolean;
+  discoveryMinRep: number;
+  instructions: Array<{ stepNumber: number; instructionTitle: string; instructionDetail: string; proofType: TaskProofType; minimumRep: number }>;
 };
 
 function parseHttpUrl(value: string) {
@@ -65,7 +68,7 @@ function parseHttpUrl(value: string) {
 }
 
 const vibes = ["Social & UGC", "Fitness & Wellness", "Niche Marketplace", "Creator Tools", "Fintech Trust", "AI Workflow"];
-const defaultTask = { instructionTitle: "Complete onboarding", instructionDetail: "Install the app, create an account, and capture the final onboarding screen.", proofType: TaskProofType.SCREENSHOT };
+const defaultTask = { instructionTitle: "Complete onboarding", instructionDetail: "Install the app, create an account, and capture the final onboarding screen.", proofType: TaskProofType.SCREENSHOT, minimumRep: 0 };
 const selectClass = "w-full rounded-2xl border border-stroke bg-black/28 px-4 py-3 text-white outline-none focus:border-aurum [color-scheme:dark]";
 const optionStyle = { backgroundColor: "#0E1017", color: "#F8FAFC" };
 
@@ -85,7 +88,9 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     description: initialDraft.description,
     totalSlots: initialDraft.totalSlots,
     bountyPerTaskUsd: initialDraft.bountyPerTaskUsd,
-    instructions: initialDraft.instructions.map(({ instructionTitle, instructionDetail, proofType }) => ({ instructionTitle, instructionDetail, proofType })),
+    instructions: initialDraft.instructions.map(({ instructionTitle, instructionDetail, proofType, minimumRep }) => ({ instructionTitle, instructionDetail, proofType, minimumRep })),
+    discoveryAllowed: initialDraft.discoveryAllowed,
+    discoveryMinRep: initialDraft.discoveryMinRep,
   } : {
     title: "",
     platform: PlatformType.TESTFLIGHT,
@@ -96,6 +101,8 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     totalSlots: 25,
     bountyPerTaskUsd: 4,
     instructions: [defaultTask],
+    discoveryAllowed: false,
+    discoveryMinRep: 0,
   });
   const [message, setMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -348,6 +355,14 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
 
           {step === 2 && (
             <div className="mt-6 space-y-3">
+              <label className="block text-sm font-semibold text-neutral-300">Add a micro-task template
+                <select value="" disabled={form.instructions.length >= 12} className={`mt-2 ${selectClass}`} onChange={(event) => {
+                  const template = microTaskTemplates.find(([id]) => id === event.target.value);
+                  if (!template) return;
+                  setForm((current) => ({ ...current, instructions: [...current.instructions, { instructionTitle: template[1], instructionDetail: template[2], proofType: TaskProofType.SCREENSHOT, minimumRep: 0 }] }));
+                }}><option value="">Choose from 24 testing activities</option>{microTaskTemplates.map(([id, title]) => <option key={id} value={id} style={optionStyle}>{title}</option>)}</select>
+                <span className="mt-2 block text-xs font-normal leading-6 text-neutral-500">Adapt the brief to your app. Rewards are issued for the whole approved mission, not once per step.</span>
+              </label>
               {form.instructions.map((task, index) => (
                 <motion.div key={index} layout className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-4 backdrop-blur-md transition-all hover:border-violet-500/30">
                   <div className="mb-3 flex items-center justify-between">
@@ -360,6 +375,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <Field error={errors[`instructionTitle-${index}`]} label="Instruction title" maxLength={90} required value={task.instructionTitle} onChange={(value) => updateTask(index, { instructionTitle: value })} />
+                    <label className="space-y-2 text-sm font-semibold text-white/72">Minimum tester REP<input type="number" min={0} max={1000000} value={task.minimumRep} onChange={(event) => updateTask(index, { minimumRep: Number(event.target.value) })} className={selectClass} /></label>
                     <label className="space-y-2 text-sm font-semibold text-white/72">
                       Proof type
                       <select style={{ colorScheme: "dark" }} value={task.proofType} onChange={(event) => updateTask(index, { proofType: event.target.value as TaskProofType })} className={selectClass}>
@@ -380,6 +396,11 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               <Button disabled={form.instructions.length >= 12} type="button" variant="ghost" onClick={() => setForm((current) => ({ ...current, instructions: [...current.instructions, defaultTask] }))}>
                 <Plus className="size-4" /> Add step
               </Button>
+              <div className="rounded-xl border border-stroke p-4">
+                <p className="text-xs leading-6 text-neutral-400">Applicants must meet the highest REP requirement among the campaign steps. You review all applications before testers start.</p>
+                <label className="mt-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={form.discoveryAllowed} onChange={(event) => setForm((current) => ({ ...current, discoveryAllowed: event.target.checked }))} />Allow Discovery Pass applicants</label>
+                {form.discoveryAllowed ? <label className="mt-3 block text-sm">Discovery REP floor<input type="number" min={0} max={1000000} value={form.discoveryMinRep} onChange={(event) => setForm((current) => ({ ...current, discoveryMinRep: Number(event.target.value) }))} className={`mt-2 ${selectClass}`} /></label> : null}
+              </div>
             </div>
           )}
 
