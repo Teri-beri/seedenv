@@ -7,7 +7,7 @@ import { TesterConsole } from "@/components/tester-console";
 import { getCurrentUser } from "@/lib/auth";
 import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
-import { claimDailyQuest } from "@/app/actions/questActions";
+import { awardDailyCheckIn } from "@/lib/quest-ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export default async function DashboardPage() {
   if (security && !security.passwordHash && security._count.accounts === 0) redirect("/onboarding/setup?next=/dashboard");
 
   await ensurePreviewData();
-  await claimDailyQuest();
+  await awardDailyCheckIn(session.user.id);
   const now = new Date();
   const [tester, missions, leaderboard, summary, recent, pending, approvedCampaigns, payouts, applications] = await Promise.all([
     getCurrentUser("TESTER"),
@@ -48,7 +48,7 @@ export default async function DashboardPage() {
       where: { testerId: session.user.id },
       orderBy: { claimedAt: "desc" },
       take: 6,
-      select: { id: true, status: true, feedbackText: true, proofImageUrl: true, rejectionReason: true, payoutCents: true, expiresAt: true, campaign: { select: { title: true } } },
+      select: { id: true, status: true, feedbackText: true, proofImageUrl: true, rejectionReason: true, revisionRequestedAt: true, payoutCents: true, expiresAt: true, campaign: { select: { title: true } } },
     }),
     prisma.submission.findMany({
       where: { testerId: session.user.id, status: SubmissionStatus.PENDING },
@@ -66,9 +66,10 @@ export default async function DashboardPage() {
     prisma.missionApplication.findMany({ where: { testerId: session.user.id }, select: { campaignId: true, status: true, startBy: true } }),
   ]);
 
+  const pendingWithPreviews = pending.map((item) => ({ ...item, proofPreviewUrl: item.revisionRequestedAt && item.proofImageUrl ? `/api/submissions/${item.id}/proof` : null }));
   return (
     <AuthCheck role="TESTER">
-      <TesterConsole tester={tester} missions={missions} leaderboard={leaderboard} summary={summary} recent={recent} pending={pending} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ ...item, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} />
+      <TesterConsole tester={tester} missions={missions} leaderboard={leaderboard} summary={summary} recent={recent} pending={pendingWithPreviews} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ ...item, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} />
     </AuthCheck>
   );
 }

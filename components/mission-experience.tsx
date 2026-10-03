@@ -6,7 +6,7 @@ import { ArrowUpRight, CheckCircle2, Clock3, Compass, Search, ShieldCheck, Spark
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { claimTaskSlot, submitTaskProof } from "@/app/actions/submissionActions";
+import { claimTaskSlot, startSubmissionRevision, submitTaskProof } from "@/app/actions/submissionActions";
 import { Button } from "@/components/ui/button";
 import { xpForBounty } from "@/lib/rank";
 import { availableSlots, discoverMissions, type MissionFilter, type MissionSort } from "@/lib/tester-console";
@@ -42,7 +42,8 @@ type Mission = {
   instructions: Instruction[];
 };
 
-type Assignment = { id: string; campaign: Mission; expiresAt: string; submitted: boolean };
+type ProofTelemetry = { osBuild: string; deviceModel: string; screenResolution: string; appBuildVersion: string; networkType: string; recordingUrl: string; crashLogs: string; networkLogs: string };
+type Assignment = { id: string; campaign: Mission; expiresAt: string; submitted: boolean; revisionRequested?: boolean; revisionStarted?: boolean; revisionNote?: string | null; feedbackText?: string | null; proofPreviewUrl?: string | null; hasScreenshot?: boolean; telemetry?: ProofTelemetry };
 
 const noAssignments: Assignment[] = [];
 const noCompletedCampaigns: string[] = [];
@@ -107,6 +108,8 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
   const [proofHash, setProofHash] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
   const [proofSubmitted, setProofSubmitted] = useState(false);
+  const [revisionNote, setRevisionNote] = useState<string | null>(null);
+  const [retainedScreenshot, setRetainedScreenshot] = useState(false);
   const [now, setNow] = useState(initialNow);
   const [telemetry, setTelemetry] = useState({ osBuild: "", deviceModel: "", screenResolution: "", appBuildVersion: "", networkType: "", recordingUrl: "", crashLogs: "", networkLogs: "" });
   const [message, setMessage] = useState<string | null>(null);
@@ -119,7 +122,7 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
   const xpGain = xpForBounty(payoutCents);
 
   const filteredMissions = useMemo(() => discoverMissions(missions, query, filter, sort), [missions, query, filter, sort]);
-  const activeAssignments = assignments.filter((item) => !item.submitted && new Date(item.expiresAt).getTime() > now);
+  const activeAssignments = assignments.filter((item) => !item.submitted && (item.revisionRequested || new Date(item.expiresAt).getTime() > now));
   const expired = Boolean(expiresAt && now > 0 && expiresAt.getTime() <= now);
 
   useEffect(() => {
@@ -137,16 +140,44 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
     setFeedback("");
     setTelemetry({ osBuild: "", deviceModel: "", screenResolution: "", appBuildVersion: "", networkType: "", recordingUrl: "", crashLogs: "", networkLogs: "" });
     setProofSubmitted(false);
+    setRevisionNote(null);
+    setRetainedScreenshot(false);
   }, []);
 
   const openAssignment = useCallback((assignment: Assignment) => {
+    if (assignment.revisionRequested && (!assignment.revisionStarted || new Date(assignment.expiresAt).getTime() <= Date.now())) {
+      startTransition(async () => {
+        try {
+          const updated = await startSubmissionRevision(assignment.id);
+          resetProof();
+          setActiveMission(assignment.campaign);
+          setSubmissionId(assignment.id);
+          setExpiresAt(new Date(updated.expiresAt));
+          setFeedback(updated.feedbackText || "");
+          setPreview(assignment.proofPreviewUrl || null);
+          setRetainedScreenshot(Boolean(updated.proofImageUrl));
+          setRevisionNote(updated.rejectionReason);
+          if (assignment.telemetry) setTelemetry(assignment.telemetry);
+          setMessage("Revision started. You have 30 minutes to update and submit your feedback.");
+          router.refresh();
+        } catch (error) { setMessage(error instanceof Error ? error.message : "Could not start this revision."); }
+      });
+      return;
+    }
     resetProof();
     setMessage(null);
     setActiveMission(assignment.campaign);
     setSubmissionId(assignment.id);
     setExpiresAt(new Date(assignment.expiresAt));
     setProofSubmitted(assignment.submitted);
-  }, [resetProof]);
+    if (assignment.revisionRequested) {
+      setRevisionNote(assignment.revisionNote || null);
+      setRetainedScreenshot(Boolean(assignment.hasScreenshot));
+      setFeedback(assignment.feedbackText || "");
+      setPreview(assignment.proofPreviewUrl || null);
+      if (assignment.telemetry) setTelemetry(assignment.telemetry);
+    }
+  }, [resetProof, router]);
 
   const handleClaim = useCallback(async (mission: Mission) => {
     const assignment = assignments.find((item) => item.campaign.id === mission.id);
@@ -220,16 +251,14 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
 
   async function handleSubmit() {
     if (proofSubmitted || expired) return;
-    if (!submissionId || !selectedFile || !preview || !proofHash) {
+    if (!submissionId || (!retainedScreenshot && (!selectedFile || !preview || !proofHash))) {
       setMessage("Add a proof screenshot before submitting.");
       return;
     }
     startTransition(async () => {
       try {
         await submitTaskProof(submissionId, {
-          proofImageBase64: preview,
-          proofImageMimeType: selectedFile.type,
-          proofImageHash: proofHash,
+          ...(selectedFile && preview && proofHash ? { proofImageBase64: preview, proofImageMimeType: selectedFile.type, proofImageHash: proofHash } : {}),
           feedbackText: feedback,
           ...telemetry,
         });
@@ -249,8 +278,8 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
         {assignments.filter((item) => item.submitted || activeAssignments.some((active) => active.id === item.id)).map((assignment) => (
           <button key={assignment.id} type="button" disabled={isPending} onClick={() => openAssignment(assignment)} className="flex min-w-0 w-full items-center gap-3 rounded-xl border border-[#2A2F3D] bg-black/15 p-4 text-left transition hover:border-violet-400/40 disabled:opacity-50">
             {assignment.submitted ? <CheckCircle2 className="size-5 shrink-0 text-emerald-400" /> : <Clock3 className="size-5 shrink-0 text-amber-400" />}
-            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{assignment.campaign.title}</span><span className="mt-1 block text-xs text-neutral-500">{assignment.submitted ? "Proof received / awaiting developer review" : "Resume your claimed mission"}</span></span>
-            {!assignment.submitted ? <span className="font-mono text-xs text-amber-300"><Countdown expiresAt={new Date(assignment.expiresAt)} /></span> : null}
+            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{assignment.campaign.title}</span><span className="mt-1 block text-xs text-neutral-500">{assignment.revisionRequested ? assignment.revisionStarted && new Date(assignment.expiresAt).getTime() > now ? "Resume requested revision" : "Start revision / fresh 30-minute window" : assignment.submitted ? "Proof received / awaiting developer review" : "Resume your claimed mission"}</span></span>
+            {!assignment.submitted && (!assignment.revisionRequested || (assignment.revisionStarted && new Date(assignment.expiresAt).getTime() > now)) ? <span className="font-mono text-xs text-amber-300"><Countdown expiresAt={new Date(assignment.expiresAt)} /></span> : null}
           </button>
         ))}
         {!activeAssignments.length && !assignments.some((item) => item.submitted) ? <p className="rounded-xl border border-dashed border-[#2A2F3D] p-4 text-sm leading-6 text-neutral-500 sm:col-span-2">No missions in progress yet. Pick a mission below to start your first contribution.</p> : null}
@@ -277,7 +306,7 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
             const claimedPercent = mission.totalSlots > 0 ? Math.min(100, Math.max(0, mission.claimedSlots / mission.totalSlots * 100)) : 0;
             const assignment = assignments.find((item) => item.campaign.id === mission.id);
             const completed = completedCampaignIds.includes(mission.id);
-            const resumable = assignment && !assignment.submitted && new Date(assignment.expiresAt).getTime() > now;
+            const resumable = assignment && !assignment.submitted && (assignment.revisionRequested || new Date(assignment.expiresAt).getTime() > now);
             const application = applications.find((item) => item.campaignId === mission.id);
             const accepted = application?.status === "ACCEPTED" && application.startBy && new Date(application.startBy).getTime() > now;
             const requiredRep = Math.max(0, ...mission.instructions.map((item) => item.minimumRep || 0));
@@ -336,9 +365,10 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
             {proofSubmitted ? (
               <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-5"><CheckCircle2 className="size-8 text-emerald-400" /><h3 className="mt-3 text-lg font-bold">Your feedback is with the developer.</h3><p className="mt-2 text-sm leading-6 text-neutral-400">If approved, you will earn {formatCents(payoutCents)} and {xpGain} REP. You can explore another mission while this one is reviewed.</p></div>
             ) : expired ? (
-              <div className="rounded-xl border border-rose-400/20 bg-rose-500/5 p-4 text-sm leading-6 text-rose-200">This claim has expired. The mission can be claimed again after the expired slot is released.</div>
+              <div className="rounded-xl border border-rose-400/20 bg-rose-500/5 p-4 text-sm leading-6 text-rose-200">{revisionNote ? "The revision editing window expired. Close this workspace and choose Start revision again. Your existing proof is preserved." : "This claim has expired. The mission can be claimed again after the expired slot is released."}</div>
             ) : (
             <>
+              {revisionNote ? <p className="whitespace-pre-wrap break-words rounded-xl border border-amber-400/25 p-4 text-sm leading-6 text-amber-200">{revisionNote}</p> : null}
               <div className="inline-flex items-center rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 font-mono text-sm text-amber-500">
                 <Clock3 className="mr-1 inline size-4" /> <Countdown expiresAt={expiresAt} />
                 <span className="ml-2 font-sans text-xs text-neutral-400">to submit proof</span>
@@ -362,9 +392,9 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
             </ol>
             <label className="block cursor-pointer rounded-2xl border border-dashed border-amber-400/30 bg-[#0E1017]/80 p-5 text-center backdrop-blur-md transition-all hover:border-violet-500/30 focus-within:ring-2 focus-within:ring-amber-400/50">
               <input className="sr-only" aria-label="Choose proof screenshot" type="file" disabled={isPending} accept="image/png,image/jpeg,image/webp" onChange={(event) => void handleFile(event.target.files?.[0] || null)} />
-              {preview ? <Image src={preview} alt="Proof preview" width={640} height={420} className="max-h-56 w-full rounded-2xl object-cover" /> : <UploadCloud className="mx-auto size-10 text-aurum" />}
+              {preview ? <Image src={preview} unoptimized alt="Proof preview" width={640} height={420} className="max-h-56 w-full rounded-2xl object-cover" /> : <UploadCloud className="mx-auto size-10 text-aurum" />}
               <p className="mt-3 font-semibold text-white">Upload proof screenshot</p>
-              <p className="mt-1 text-xs text-white/48">SHA-256 dedupe runs in your browser before upload.</p>
+              <p className="mt-1 text-xs text-white/48">{retainedScreenshot && !selectedFile ? "Existing screenshot retained. Choose a file only if you need to replace it." : "PNG, JPEG, WebP up to 5MB. Screenshot hashes are verified on upload."}</p>
             </label>
             <div className="grid gap-3 rounded-2xl border border-stroke bg-black/24 p-4 sm:grid-cols-2">
               {([["osBuild", "OS & build", "iOS 18.2"], ["deviceModel", "Device model", "iPhone 15 Pro"], ["screenResolution", "Screen resolution", "1179 x 2556"], ["appBuildVersion", "App build", "1.4.0 (82)"], ["networkType", "Network type", "Wi-Fi / 5G"]] as const).map(([key, label, placeholder]) => <label className="text-xs font-mono uppercase tracking-[0.12em] text-white/48" key={key}>{label}<input className="mt-1.5 w-full rounded-lg border border-stroke bg-[#0E1017] px-3 py-2 text-sm font-sans normal-case tracking-normal text-white outline-none focus:border-aurum" onChange={(event) => setTelemetry((current) => ({ ...current, [key]: event.target.value }))} placeholder={placeholder} value={telemetry[key]} /></label>)}
@@ -372,7 +402,7 @@ export function MissionExperience({ missions, assignments = noAssignments, compl
             </div>
             <label className="block text-sm font-semibold">Your feedback<textarea value={feedback} maxLength={2000} minLength={12} onChange={(event) => setFeedback(event.target.value)} placeholder="What did you try? What did you expect? What actually happened? Include steps to reproduce a bug." className="mt-2 min-h-32 w-full rounded-2xl border border-stroke bg-black/24 p-4 text-sm font-normal text-white outline-none placeholder:text-white/34 focus:border-aurum" /><span className="mt-1 block text-xs font-normal text-neutral-500">At least 12 characters / {feedback.length} of 2,000</span></label>
             <div className="grid gap-3 sm:grid-cols-2"><textarea value={telemetry.crashLogs} onChange={(event) => setTelemetry((current) => ({ ...current, crashLogs: event.target.value }))} placeholder="Crash logs (optional)" className="min-h-24 w-full rounded-xl border border-stroke bg-[#0E1017] p-3 font-mono text-xs text-emerald-300 outline-none focus:border-aurum" /><textarea value={telemetry.networkLogs} onChange={(event) => setTelemetry((current) => ({ ...current, networkLogs: event.target.value }))} placeholder="Network logs (optional)" className="min-h-24 w-full rounded-xl border border-stroke bg-[#0E1017] p-3 font-mono text-xs text-emerald-300 outline-none focus:border-aurum" /></div>
-            <Button className="w-full" onClick={handleSubmit} disabled={isPending || !proofHash || feedback.trim().length < 12}>
+            <Button className="w-full" onClick={handleSubmit} disabled={isPending || (!proofHash && !retainedScreenshot) || feedback.trim().length < 12}>
               <CheckCircle2 className="size-4" /> {isPending ? "Submitting..." : "Submit for review"}
             </Button>
             </>

@@ -15,6 +15,8 @@ import { formatCents } from "@/lib/utils";
 import { microTaskTemplates } from "@/lib/micro-task-templates";
 
 type ReviewSubmission = {
+  revisionRequestedAt?: Date | null;
+  rejectionReason?: string | null;
   id: string;
   proofImageUrl: string | null;
   recordingUrl: string | null;
@@ -573,12 +575,14 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                   <span className="block truncate text-sm font-semibold text-white">{submission.campaign.title}</span>
                   <span className="mt-1 block truncate text-xs text-neutral-500">{submission.tester.username} · {submission.id.slice(-8)}</span>
                   <span className="mt-2 block font-mono text-xs text-amber-300">{formatCents(submission.payoutCents)}</span>
+                  {submission.revisionRequestedAt ? <span className="mt-2 block text-xs text-violet-300">Awaiting tester revision</span> : null}
                 </button>
               ))}
             </div>
           </aside>
 
           <article className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-5 sm:p-6">
+            {active.revisionRequestedAt ? <p className="mb-5 whitespace-pre-wrap break-words rounded-xl border border-violet-400/25 p-4 text-sm leading-6 text-violet-200">{active.rejectionReason}{"\n"}The tester chooses when to start a fresh 30-minute editing window. Approval becomes available after resubmission.</p> : null}
             <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
               <div className="space-y-4">
                 <div>
@@ -633,8 +637,8 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                   </div>
                 ) : (
                   <div className="grid gap-2 sm:grid-cols-3">
-                    <Button disabled={isPending} type="button" onClick={() => setDecision("approve")}><CheckCircle2 className="size-4" /> Approve &amp; Release</Button>
-                    <Button disabled={isPending} type="button" variant="ghost" onClick={() => { setDecision("revision"); setRevisionNote(""); setError(""); }}>Request Revision</Button>
+                    <Button disabled={isPending || Boolean(active.revisionRequestedAt)} type="button" onClick={() => setDecision("approve")}><CheckCircle2 className="size-4" /> Approve &amp; Release</Button>
+                    <Button disabled={isPending || Boolean(active.revisionRequestedAt)} type="button" variant="ghost" onClick={() => { setDecision("revision"); setRevisionNote(""); setError(""); }}>Request Revision</Button>
                     <Button disabled={isPending} type="button" variant="danger" onClick={() => { setDecision("reject"); setError(""); }}><XCircle className="size-4" /> Reject</Button>
                   </div>
                 )}

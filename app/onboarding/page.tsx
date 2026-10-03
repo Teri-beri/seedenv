@@ -3,7 +3,8 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import { attachReferral } from "@/app/actions/questActions";
+import { saveMemberReferral } from "@/lib/quest-ledger";
+import { requireMember } from "@/lib/member";
 
 const allowedNextPaths = ["/dashboard", "/console", "/admin"];
 
@@ -76,7 +77,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   if (params.ref) {
     const received = await prisma.referral.findUnique({ where: { friendId: session.user.id } });
     if (!received) {
-      try { await attachReferral(params.ref); }
+      try { await saveMemberReferral(await requireMember(), params.ref); }
       catch (error) {
         console.error("SeedEnv signup referral could not be applied:", error);
         nextPath = "/account?referralError=1";

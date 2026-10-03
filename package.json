@@ -12,6 +12,7 @@
     "start": "tsx scripts/ensure-schema.ts && next start",
     "lint": "eslint",
     "test:tester": "node --import tsx --test scripts/tester-console.test.ts",
+    "test:launch": "node --conditions=react-server --experimental-test-module-mocks --import tsx --test scripts/launch-readiness.test.ts",
     "test:quests": "node --import tsx --test scripts/quest-rules.test.ts scripts/quest-ledger.integration.test.ts",
     "test:clippers": "node --conditions=react-server --experimental-test-module-mocks --import tsx --test scripts/clipper-rules.test.ts scripts/clipper-lifecycle.integration.test.ts scripts/clipper-payments.integration.test.ts scripts/clipper-tiktok.integration.test.ts scripts/clipper-storage.integration.test.ts",
     "setup:clippers-storage": "tsx scripts/setup-clippers-storage.ts",

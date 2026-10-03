@@ -1,6 +1,7 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type User } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { referralMonthlyLimit, referralQuestXp } from "@/lib/quest-rules";
+import { dailyQuestXp, referralMonthlyLimit, referralQuestXp, utcDay } from "@/lib/quest-rules";
 import { exchangeItems } from "@/lib/quest-rules";
 import { randomBytes } from "node:crypto";
 
@@ -21,6 +22,27 @@ export async function awardQuestXp(tx: Prisma.TransactionClient, userId: string,
   if (result.count === 0) return false;
   await tx.user.update({ where: { id: userId }, data: { questXp: { increment: amount } } });
   return true;
+}
+
+export async function awardDailyCheckIn(userId: string) {
+  return serializable(async (tx) => {
+    await qualifyReferral(tx, userId);
+    return awardQuestXp(tx, userId, `daily:${utcDay(new Date())}`, dailyQuestXp, "Daily tester check-in");
+  });
+}
+
+export async function saveMemberReferral(member: Pick<User, "id" | "role" | "createdAt">, code: string) {
+  if (member.role === "ADMIN") throw new Error("Referrals are for member accounts.");
+  const normalized = z.string().trim().min(8).max(32).regex(/^[a-zA-Z0-9]+$/).parse(code).toUpperCase();
+  await serializable(async (tx) => {
+    if (Date.now() - member.createdAt.getTime() > 7 * 86400000) throw new Error("Referral codes must be entered within seven days of joining.");
+    if (await tx.referral.findUnique({ where: { friendId: member.id } })) throw new Error("Your account already has an inviter.");
+    if (await tx.submission.count({ where: { testerId: member.id, status: "APPROVED" } })) throw new Error("Enter your referral before your first approved task.");
+    const inviter = await tx.user.findUnique({ where: { referralCode: normalized } });
+    if (!inviter || inviter.id === member.id) throw new Error("Enter another tester's valid referral code.");
+    if (await tx.referral.findUnique({ where: { friendId: inviter.id }, select: { inviterId: true } }).then((entry) => entry?.inviterId === member.id)) throw new Error("Reciprocal referrals are not eligible.");
+    await tx.referral.create({ data: { inviterId: inviter.id, friendId: member.id } });
+  });
 }
 
 export async function spendQuestXp(tx: Prisma.TransactionClient, userId: string, id: string) {

@@ -2,6 +2,8 @@
 
 import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
 import { z } from "zod";
+import { createHash } from "node:crypto";
+import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { sendDiscordWebhookMessage } from "@/lib/discord";
 import { notificationEnabled, sendNotificationEmail } from "@/lib/notifications";
@@ -13,13 +15,14 @@ import { formatCents, usdToCents } from "@/lib/utils";
 import { requireMember } from "@/lib/member";
 import { awardQuestXp, qualifyReferral, serializable } from "@/lib/quest-ledger";
 import { startAcceptedApplication } from "@/lib/mission-applications";
+import { assertProofEditable, needsRevision, rejectProof, requestProofRevision, startProofRevision } from "@/lib/submission-lifecycle";
 
 const proofSchema = z.object({
-  proofImageBase64: z.string().optional(),
+  proofImageBase64: z.string().max(7 * 1024 * 1024).optional(),
   proofImageMimeType: z.string().regex(/^image\/(png|jpe?g|webp)$/).optional(),
   proofImageHash: z.string().min(16).max(128).optional(),
-  feedbackText: z.string().min(12).max(2000),
-  recordingUrl: z.string().url().optional().or(z.literal("")),
+  feedbackText: z.string().trim().min(12).max(2000),
+  recordingUrl: z.string().url().refine((value) => /^https?:\/\//i.test(value), "Recording links must use HTTP or HTTPS.").optional().or(z.literal("")),
   osBuild: z.string().max(120).optional().or(z.literal("")),
   deviceModel: z.string().max(120).optional().or(z.literal("")),
   screenResolution: z.string().max(80).optional().or(z.literal("")),
@@ -66,6 +69,8 @@ export async function claimTaskSlot(campaignId: string) {
       update: {
         status: SubmissionStatus.PENDING,
         rejectionReason: null,
+        revisionRequestedAt: null,
+        revisionStartedAt: null,
         reviewedAt: null,
         proofImageUrl: null,
         proofImageHash: null,
@@ -94,7 +99,7 @@ export async function claimTaskSlot(campaignId: string) {
 }
 
 export async function submitTaskProof(submissionId: string, proofData: z.infer<typeof proofSchema>) {
-  const tester = await getCurrentUser("TESTER");
+  const tester = await requireMember("TESTER");
   const input = proofSchema.parse(proofData);
 
   const submission = await prisma.submission.findUnique({
@@ -103,12 +108,23 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
   });
   if (!submission || submission.testerId !== tester.id) throw new Error("Submission not found.");
   if (submission.status !== SubmissionStatus.PENDING) throw new Error("This submission is no longer pending.");
-  if (submission.expiresAt < new Date()) throw new Error("The 30-minute lock expired. Claim a fresh slot.");
+  assertProofEditable(submission);
 
-  if (input.proofImageHash) {
+  let buffer: Buffer | undefined;
+  let hash: string | undefined;
+  if (Boolean(input.proofImageBase64) !== Boolean(input.proofImageMimeType)) throw new Error("Provide both the screenshot and its image type.");
+  if (input.proofImageBase64 && input.proofImageMimeType) {
+    buffer = Buffer.from(input.proofImageBase64.replace(/^data:image\/\w+;base64,/, ""), "base64");
+    if (buffer.byteLength > 5 * 1024 * 1024) throw new Error("Proof screenshots must be under 5MB.");
+    if (!hasValidImageSignature(buffer, input.proofImageMimeType)) throw new Error("Proof upload does not match its declared image type.");
+    hash = createHash("sha256").update(buffer).digest("hex");
+    if (input.proofImageHash && input.proofImageHash !== hash) throw new Error("Screenshot hash did not match the uploaded image. Select the file again.");
+  }
+  if (!buffer && !submission.proofImageUrl) throw new Error("Add a proof screenshot before submitting.");
+  if (hash) {
     const duplicate = await prisma.submission.findFirst({
       where: {
-        proofImageHash: input.proofImageHash,
+        proofImageHash: hash,
         id: { not: submissionId },
         status: { in: [SubmissionStatus.PENDING, SubmissionStatus.APPROVED] },
       },
@@ -117,11 +133,7 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
   }
 
   let proofImageUrl: string | undefined;
-  if (input.proofImageBase64 && input.proofImageMimeType) {
-    const base64 = input.proofImageBase64.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64, "base64");
-    if (buffer.byteLength > 5 * 1024 * 1024) throw new Error("Proof screenshots must be under 5MB.");
-    if (!hasValidImageSignature(buffer, input.proofImageMimeType)) throw new Error("Proof upload does not match its declared image type.");
+  if (buffer && input.proofImageMimeType) {
     proofImageUrl = await uploadProofImage({
       buffer,
       contentType: input.proofImageMimeType,
@@ -129,11 +141,15 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
     });
   }
 
-  const savedSubmission = await prisma.submission.update({
-    where: { id: submissionId },
-    data: {
+  const savedSubmission = await serializable(async (tx) => {
+    const current = await tx.submission.findUniqueOrThrow({ where: { id: submissionId } });
+    if (current.status !== SubmissionStatus.PENDING || current.testerId !== tester.id) throw new Error("This submission has already been reviewed.");
+    if (current.revisionRequestedAt?.getTime() !== submission.revisionRequestedAt?.getTime() || current.revisionStartedAt?.getTime() !== submission.revisionStartedAt?.getTime()) throw new Error("Your revision changed during upload. Reload and retry.");
+    assertProofEditable(current);
+    if (hash && await tx.submission.findFirst({ where: { proofImageHash: hash, id: { not: submissionId }, status: { in: ["PENDING", "APPROVED"] } } })) throw new Error("This screenshot was already submitted to SeedEnv.");
+    return tx.submission.update({ where: { id: submissionId }, data: {
       proofImageUrl,
-      proofImageHash: input.proofImageHash,
+      proofImageHash: hash,
       feedbackText: input.feedbackText,
       recordingUrl: input.recordingUrl || null,
       osBuild: input.osBuild || null,
@@ -143,8 +159,13 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
       networkType: input.networkType || null,
       crashLogs: input.crashLogs || null,
       networkLogs: input.networkLogs || null,
-    },
+      revisionRequestedAt: null,
+      revisionStartedAt: null,
+      rejectionReason: null,
+    } });
   });
+  revalidatePath("/dashboard");
+  revalidatePath("/console");
 
   const developer = await prisma.user.findUnique({
     where: { id: submission.campaign.developerId },
@@ -177,7 +198,7 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
 }
 
 export async function approveSubmission(submissionId: string) {
-  const reviewer = await getCurrentUser("DEVELOPER");
+  const reviewer = await requireMember("DEVELOPER");
 
   const result = await serializable(async (tx) => {
     const submission = await tx.submission.findUnique({
@@ -187,6 +208,7 @@ export async function approveSubmission(submissionId: string) {
     if (!submission || submission.status !== SubmissionStatus.PENDING) throw new Error("Pending submission not found.");
     if (submission.campaign.developerId !== reviewer.id && reviewer.role !== "ADMIN") throw new Error("You cannot review this submission.");
     if (!submission.feedbackText && !submission.proofImageUrl) throw new Error("Proof must be submitted before approval.");
+    if (needsRevision(submission)) throw new Error("Wait for the tester to submit the requested revision before approving.");
 
     const xpGain = xpForBounty(submission.payoutCents);
     const nextXp = submission.tester.xpPoints + xpGain;
@@ -239,6 +261,8 @@ export async function approveSubmission(submissionId: string) {
     );
   }
 
+  revalidatePath("/dashboard");
+  revalidatePath("/console");
   return { payoutCents: result.payoutCents, xpGain: result.xpGain, payoutStatus: payoutSent ? "TRANSFERRED" as const : "PENDING" as const };
 }
 
@@ -306,39 +330,26 @@ export async function releasePendingTesterPayouts() {
 }
 
 export async function rejectSubmission(submissionId: string, reason: string) {
-  const reviewer = await getCurrentUser("DEVELOPER");
-  const safeReason = z.enum(["Blurry Image", "Irrelevant Content", "Incomplete Steps", "Low Effort", "Generic Feedback", "Did not follow test script", "Incomplete video proof"]).parse(reason);
-
-  return prisma.$transaction(async (tx) => {
-    const submission = await tx.submission.findUnique({ where: { id: submissionId }, include: { campaign: true } });
-    if (!submission || submission.status !== SubmissionStatus.PENDING) throw new Error("Pending submission not found.");
-    if (submission.campaign.developerId !== reviewer.id && reviewer.role !== "ADMIN") throw new Error("You cannot review this submission.");
-
-    await tx.submission.update({
-      where: { id: submissionId },
-      data: { status: SubmissionStatus.REJECTED, rejectionReason: safeReason, reviewedAt: new Date() },
-    });
-    await tx.appCampaign.update({
-      where: { id: submission.campaignId },
-      data: { claimedSlots: { decrement: 1 } },
-    });
-
-    return { rejected: true, reason: safeReason };
-  });
+  const reviewer = await requireMember("DEVELOPER");
+  const result = await serializable((tx) => rejectProof(tx, reviewer.id, reviewer.role === "ADMIN", submissionId, reason));
+  revalidatePath("/dashboard");
+  revalidatePath("/console");
+  return result;
 }
 
 export async function requestSubmissionRevision(submissionId: string, note: string) {
-  const reviewer = await getCurrentUser("DEVELOPER");
-  const safeNote = z.string().trim().min(8).max(300).parse(note);
-  const submission = await prisma.submission.findUnique({ where: { id: submissionId }, include: { campaign: true } });
-  if (!submission || submission.status !== SubmissionStatus.PENDING) throw new Error("Pending submission not found.");
-  if (submission.campaign.developerId !== reviewer.id && reviewer.role !== "ADMIN") throw new Error("You cannot request revisions for this submission.");
+  const reviewer = await requireMember("DEVELOPER");
+  const result = await serializable((tx) => requestProofRevision(tx, reviewer.id, reviewer.role === "ADMIN", submissionId, note));
+  revalidatePath("/dashboard");
+  revalidatePath("/console");
+  return result;
+}
 
-  return prisma.submission.update({
-    where: { id: submissionId },
-    data: { rejectionReason: `Revision requested: ${safeNote}` },
-    select: { id: true, rejectionReason: true },
-  });
+export async function startSubmissionRevision(submissionId: string) {
+  const tester = await requireMember("TESTER");
+  const result = await serializable((tx) => startProofRevision(tx, tester.id, submissionId));
+  revalidatePath("/dashboard");
+  return result;
 }
 
 export async function expireSlots() {

@@ -16,8 +16,8 @@ export type TesterConsoleData = {
   missions: ConsoleMission[];
   leaderboard: Array<Pick<User, "id" | "username" | "xpPoints">>;
   summary: Array<{ status: SubmissionStatus; _count: { _all: number }; _sum: { payoutCents: number | null } }>;
-  recent: Array<Pick<Submission, "id" | "status" | "feedbackText" | "proofImageUrl" | "rejectionReason" | "payoutCents" | "expiresAt"> & { campaign: { title: string } }>;
-  pending: Array<Pick<Submission, "id" | "campaignId" | "feedbackText" | "proofImageUrl" | "expiresAt"> & { campaign: ConsoleMission }>;
+  recent: Array<Pick<Submission, "id" | "status" | "feedbackText" | "proofImageUrl" | "rejectionReason" | "revisionRequestedAt" | "payoutCents" | "expiresAt"> & { campaign: { title: string } }>;
+  pending: Array<Submission & { campaign: ConsoleMission; proofPreviewUrl: string | null }>;
   approvedCampaigns: Array<{ campaignId: string }>;
   pendingPayoutCents: number;
   now: Date;
@@ -34,8 +34,8 @@ export function TesterConsole({ tester, missions, leaderboard, summary, recent, 
   const rank = rankForXp(tester.xpPoints);
   const progress = rankProgress(rank, tester.xpPoints);
   const milestones = testerMilestones(approvedCount, tester.xpPoints);
-  const inReview = pending.filter((item) => Boolean(item.feedbackText || item.proofImageUrl));
-  const active = pending.filter((item) => !item.feedbackText && !item.proofImageUrl && item.expiresAt > now);
+  const inReview = pending.filter((item) => !item.revisionRequestedAt && Boolean(item.feedbackText || item.proofImageUrl));
+  const active = pending.filter((item) => item.revisionRequestedAt || (!item.feedbackText && !item.proofImageUrl && item.expiresAt > now));
   const completedIds = new Set(approvedCampaigns.map((item) => item.campaignId));
   const newMissions = missions.filter((mission) => availableSlots(mission) > 0 && !completedIds.has(mission.id) && !pending.some((item) => item.campaignId === mission.id));
 
@@ -104,7 +104,12 @@ export function TesterConsole({ tester, missions, leaderboard, summary, recent, 
               <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-500">Stay in the flow</p><h2 className="mt-2 text-xl font-bold">Your mission desk</h2></div>
               <span className="rounded-full border border-[#2A2F3D] px-3 py-1 text-xs text-neutral-400">{active.length} in progress / {inReview.length} in review</span>
             </div>
-            <MissionExperience missions={missions} assignments={pending.map((item) => ({ id: item.id, campaign: item.campaign, expiresAt: item.expiresAt.toISOString(), submitted: Boolean(item.feedbackText || item.proofImageUrl) }))} completedCampaignIds={approvedCampaigns.map((item) => item.campaignId)} initialNow={now.getTime()} applications={applications} reputation={tester.xpPoints} discoveryPasses={discoveryPasses} />
+            <MissionExperience missions={missions} assignments={pending.map((item) => ({
+              id: item.id, campaign: item.campaign, expiresAt: item.expiresAt.toISOString(), submitted: !item.revisionRequestedAt && Boolean(item.feedbackText || item.proofImageUrl),
+              revisionRequested: Boolean(item.revisionRequestedAt), revisionStarted: Boolean(item.revisionStartedAt), revisionNote: item.rejectionReason,
+              feedbackText: item.feedbackText, proofPreviewUrl: item.proofPreviewUrl, hasScreenshot: Boolean(item.proofImageUrl),
+              telemetry: { osBuild: item.osBuild || "", deviceModel: item.deviceModel || "", screenResolution: item.screenResolution || "", appBuildVersion: item.appBuildVersion || "", networkType: item.networkType || "", recordingUrl: item.recordingUrl || "", crashLogs: item.crashLogs || "", networkLogs: item.networkLogs || "" },
+            }))} completedCampaignIds={approvedCampaigns.map((item) => item.campaignId)} initialNow={now.getTime()} applications={applications} reputation={tester.xpPoints} discoveryPasses={discoveryPasses} />
           </section>
 
           <section id="reputation" className="grid scroll-mt-6 gap-6 lg:grid-cols-[1fr_1.1fr]">
@@ -135,7 +140,7 @@ export function TesterConsole({ tester, missions, leaderboard, summary, recent, 
               <div className="mt-5 space-y-3">
                 {recent.length ? recent.map((item) => {
                   const submitted = Boolean(item.feedbackText || item.proofImageUrl);
-                  const status = item.status === "APPROVED" ? "Approved" : item.status === "REJECTED" ? "Not approved" : item.status === "EXPIRED" || (!submitted && item.expiresAt <= now) ? "Expired" : submitted ? "In review" : "In progress";
+                  const status = item.status === "APPROVED" ? "Approved" : item.status === "REJECTED" ? "Not approved" : item.revisionRequestedAt ? "Revision requested" : item.status === "EXPIRED" || (!submitted && item.expiresAt <= now) ? "Expired" : submitted ? "In review" : "In progress";
                   return <div className="flex gap-3 rounded-xl border border-[#1F2430] p-4" key={item.id}><span className={`mt-0.5 ${item.status === "APPROVED" ? "text-emerald-400" : "text-neutral-500"}`}>{item.status === "APPROVED" ? <CheckCircle2 className="size-4" /> : <Clock3 className="size-4" />}</span><div className="min-w-0 flex-1"><p className="break-words text-sm font-semibold">{item.campaign.title}</p><p className="mt-1 text-xs text-neutral-500">{status}{item.status === "APPROVED" ? ` / ${formatCents(item.payoutCents)} earned` : ""}</p>{item.rejectionReason ? <p className="mt-2 break-words text-xs leading-5 text-rose-300">{item.rejectionReason}</p> : null}</div></div>;
                 }) : <div className="rounded-xl border border-dashed border-[#2A2F3D] p-6 text-center"><Sparkles className="mx-auto size-6 text-violet-300" /><p className="mt-3 text-sm font-semibold">Your first contribution belongs here.</p><p className="mt-2 text-xs leading-5 text-neutral-500">Explore a mission, follow the brief, and submit your own proof.</p></div>}
               </div>

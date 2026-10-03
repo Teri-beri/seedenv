@@ -28,6 +28,7 @@ export async function publishComment(postId: string, body: string) {
     await tx.communityComment.create({ data: { postId, authorId: member.id, body: text } });
   });
   revalidatePath("/community");
+  revalidatePath("/community/[id]", "page");
   return "Comment added.";
 }
 
@@ -57,6 +58,7 @@ export async function hideCommunityContent(id: string, type: "post" | "comment")
     await tx.communityReport.updateMany({ where: type === "post" ? { postId: id } : { commentId: id }, data: { resolved: true } });
   });
   revalidatePath("/community");
+  revalidatePath("/community/[id]", "page");
   return "Content removed.";
 }
 

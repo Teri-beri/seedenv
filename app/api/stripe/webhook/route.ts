@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { handleStripeWebhook } from "@/app/actions/campaignActions";
+import type Stripe from "stripe";
+import { handleStripeWebhook } from "@/lib/campaign-payments";
 import { getStripe } from "@/lib/stripe";
 
 export async function POST(request: NextRequest) {
@@ -7,27 +8,21 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get("stripe-signature");
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (process.env.STRIPE_SECRET_KEY && webhookSecret && signature) {
-    try {
-      const event = getStripe().webhooks.constructEvent(rawBody, signature, webhookSecret);
-      const result = await handleStripeWebhook({
-        type: event.type,
-        data: { object: event.data.object as { id?: string; payment_intent?: string; setup_intent?: string | { id: string } | null; customer?: string | { id: string } | null; metadata?: Record<string, string> } },
-      });
-      return NextResponse.json(result);
-    } catch (error) {
-      return NextResponse.json({ message: error instanceof Error ? error.message : "Invalid webhook" }, { status: 400 });
-    }
+  if (!process.env.STRIPE_SECRET_KEY || !webhookSecret) {
+    console.error("SeedEnv campaign webhook signing is not configured.");
+    return NextResponse.json({ message: "Stripe webhook signing is not configured." }, { status: 503 });
   }
-
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ message: "Stripe webhook signing is not configured." }, { status: 500 });
-  }
-
+  if (!signature) return NextResponse.json({ message: "Stripe signature required." }, { status: 400 });
+  let event: Stripe.Event;
   try {
-    const parsed = JSON.parse(rawBody) as { type: string; data: { object: { id?: string; payment_intent?: string; setup_intent?: string | { id: string } | null; customer?: string | { id: string } | null; metadata?: Record<string, string> } } };
-    return NextResponse.json(await handleStripeWebhook(parsed));
+    event = getStripe().webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch {
-    return NextResponse.json({ message: "Invalid webhook payload" }, { status: 400 });
+    return NextResponse.json({ message: "Invalid Stripe signature." }, { status: 400 });
+  }
+  try {
+    return NextResponse.json(await handleStripeWebhook({ type: event.type, data: { object: { id: "id" in event.data.object ? event.data.object.id : undefined } } }));
+  } catch (error) {
+    console.error("SeedEnv campaign webhook processing failed:", event.id, error);
+    return NextResponse.json({ message: "Payment processing failed; Stripe may retry." }, { status: 500 });
   }
 }

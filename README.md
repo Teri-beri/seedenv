@@ -65,10 +65,11 @@ On Android:
 
 ## Core Flows
 
-- Developers create campaigns in `ESCROW_PENDING`, fund tester payout pool plus 20% SeedEnv fee, then Stripe webhook activates the campaign.
-- Testers claim active seed missions atomically. A pending submission locks one slot for 30 minutes.
-- Proof submission validates feedback, client-side SHA-256 hashes screenshots, rejects duplicate hashes, uploads proof media, and leaves proof pending for review.
-- Approvals credit tester wallet balance, award XP, update rank tier, and write a completed wallet transaction.
+- Developers create campaigns in `ESCROW_PENDING`. The developer charge is the tester payout pool divided by 0.92 (an 8% share of the total charge). Signed Checkout completion retrieves the Stripe session and verifies settled USD amount, developer ownership, and the exact pending ledger before activation. Duplicate events cannot reactivate paused or completed campaigns. Subscribe `/api/stripe/webhook` to `checkout.session.completed` and `checkout.session.async_payment_succeeded`; unsigned local payment simulations are no longer accepted.
+- Testers apply to active missions, developers accept, and testers Start atomically to lock a slot for 30 minutes.
+- Proof submission validates feedback and image signatures, computes SHA-256 server-side, rejects duplicate screenshots, uploads proof media, and leaves proof pending for review. The 8MB action body limit accommodates a base64-encoded 5MB screenshot plus bounded feedback and telemetry; image size remains limited to 5MB.
+- A developer revision request preserves submitted evidence. The tester chooses Start revision to begin a fresh 30-minute editing window, can reuse or replace the screenshot, and retains feedback and telemetry. Resuming a live window does not reset its timer; an expired editing window can be restarted without consuming another slot or pass. Approval is blocked until revised proof is submitted. Apply the additive `20261004_submission_revisions` migration before running this release.
+- Approvals award REP and Quest XP, update rank tier, and create a pending bounty ledger entry. Only a successful Stripe transfer completes the ledger and credits the tester wallet; failed/unconfigured transfers remain visibly pending.
 - Rejections return the claimed slot to the public pool.
 - `/api/cron/expire-slots` expires abandoned 30-minute locks.
 - `/api/assets/download?campaignId=...` exports approved proof media and a manifest as a zip.
@@ -80,9 +81,13 @@ On Android:
 
 The tester dashboard brings together searchable mission discovery, platform and reward filters, resumable claims, pending reviews, recent activity, and payout setup. Mobile navigation links directly to discovery, the mission desk, reputation, and settings. Workspace switching remains available in Account settings.
 
+Account profile grids use a single shrinkable column on phones so developer previews and form fields cannot force a wider page; the existing desktop two-column layout is unchanged.
+
 Reputation (REP) uses the existing `xpPoints` balance: each approved mission earns `max(75, round(payout dollars * 32))` points. Rank thresholds are Alpha Seeder at 0, Core Validator at 1,500, and Apex Architect at 6,000. Milestones reflect actual approved missions and reputation; they do not award extra points. Approval rate counts approved and rejected developer reviews only. Lifetime earnings count approved mission rewards, while awaiting-payout totals come from pending bounty ledger transactions. No streak multipliers or random bonuses are promised.
 
 Run `npm run test:tester` to check discovery filters, reward sorting, reputation thresholds, approval rates, and milestones.
+
+Run `npm run test:launch` for revision and campaign-payment regressions. Set `RUN_LAUNCH_DB_TESTS=1` to exercise actual Server Actions, daily-credit idempotency, revision ownership/window/evidence preservation, payout-pending behavior, and settled/duplicate/stale payment events in an intentionally rolled-back transaction. Storage, notifications, and Stripe are mocked; tests send no money, emails, or provider uploads.
 
 On phones below 640px, account settings use a two-column section picker and stacked workspace-button labels/statuses. Tester and developer screens provide persistent bottom navigation with safe-area spacing; forms use 16px text to avoid automatic iOS input zoom. The tester welcome area is compact on phones. Desktop placements are unchanged, apart from the workspace-button overlap fix.
 

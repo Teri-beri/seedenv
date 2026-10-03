@@ -168,7 +168,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             ) : null}
 
             {activeTab === "profile" ? (
-              <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
                 <div className="space-y-6">
                   <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, bio: user.bio, portfolioUrl: user.portfolioUrl, companyName: user.companyName, productUrl: user.productUrl, githubUsername: user.githubUsername, discordUrl: user.discordUrl, twitterHandle: user.twitterHandle, emailVerified: Boolean(user.emailVerified), githubConnected: user.accounts.some((account) => account.provider === "github"), role: user.role }} />
                 </div>

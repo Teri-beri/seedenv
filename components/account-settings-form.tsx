@@ -111,7 +111,7 @@ export function AccountSettingsForm({ initial }: AccountSettingsFormProps) {
         <span className="rounded-full border border-violet-500/30 bg-violet-950/40 px-3 py-1 text-xs font-semibold text-violet-100">{initial.role}</span>
       </div>
 
-      <div className="mt-5 grid gap-4">
+      <div className="mt-5 grid grid-cols-1 gap-4">
         <label className="space-y-2 text-sm font-semibold text-neutral-300">
           Email
           <input className="w-full rounded-lg border border-[#2A2F3D] bg-[#090A0F] px-4 py-3 text-neutral-500" disabled value={initial.email} />

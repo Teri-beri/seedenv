@@ -316,6 +316,8 @@ model Submission {
   networkLogs     String?           @db.Text
   status          SubmissionStatus @default(PENDING)
   rejectionReason String?
+  revisionRequestedAt DateTime?
+  revisionStartedAt DateTime?
   payoutCents     Int
   claimedAt       DateTime         @default(now())
   expiresAt       DateTime
