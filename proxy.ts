@@ -11,7 +11,6 @@ const protectedRoutes = [
   { prefix: "/clippers", role: null, strictRole: false },
   { prefix: "/quests", role: "TESTER", strictRole: false },
   { prefix: "/applications", role: null, strictRole: false },
-  { prefix: "/community", role: null, strictRole: false },
   { prefix: "/account", role: null, strictRole: false },
   { prefix: "/dashboard", role: "TESTER", strictRole: false },
   { prefix: "/console", role: "DEVELOPER", strictRole: false },
@@ -48,5 +47,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/clippers/:path*", "/quests/:path*", "/applications/:path*", "/community/:path*", "/account/:path*", "/dashboard/:path*", "/console/:path*", "/admin/:path*"],
+  matcher: ["/clippers/:path*", "/quests/:path*", "/applications/:path*", "/account/:path*", "/dashboard/:path*", "/console/:path*", "/admin/:path*"],
 };

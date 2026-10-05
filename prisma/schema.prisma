@@ -262,6 +262,7 @@ model CommunityPost {
   author    User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
   body      String
   hidden    Boolean            @default(false)
+  publicVisible Boolean         @default(false)
   comments  CommunityComment[]
   reports   CommunityReport[]
   createdAt DateTime           @default(now())

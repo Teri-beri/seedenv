@@ -2,9 +2,9 @@ import Link from "next/link";
 import Image from "next/image";
 
 const columns = [
-  { title: "Product", links: [["Live Cohorts", "/#live-cohorts"], ["Developer Platform", "/#developers"], ["Native Console (PWA)", "/#native-console"], ["Pricing Calculator", "/#pricing"]] },
+  { title: "Product", links: [["Live Cohorts", "/?view=cohorts"], ["Launch Circle", "/?view=circle"], ["Developer Platform", "/?view=developers"], ["Native Console (PWA)", "/?view=mobile"], ["Pricing Calculator", "/?view=pricing"]] },
   { title: "Developers", links: [["TestFlight Setup Guide", "/docs#testflight"], ["Telemetry Format", "/docs#telemetry"], ["Escrow & Fees", "/docs#escrow"], ["Documentation", "/docs"]] },
-  { title: "Validators", links: [["Capability Tiers", "/#validators"], ["Payout Schedule (Stripe)", "/docs#payouts"], ["Guidelines & NDA", "/docs#guidelines"]] },
+  { title: "Validators", links: [["Capability Tiers", "/?view=validators"], ["Payout Schedule (Stripe)", "/docs#payouts"], ["Guidelines & NDA", "/docs#guidelines"]] },
   { title: "Trust & Legal", links: [["Terms of Service", "/terms"], ["Privacy Policy", "/privacy"], ["Security Disclosure", "/security"], ["Operational Status", "https://status.seedenv.com"]] },
 ];
 

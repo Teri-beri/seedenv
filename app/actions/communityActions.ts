@@ -5,15 +5,17 @@ import { z } from "zod";
 import { requireMember } from "@/lib/member";
 import { serializable } from "@/lib/quest-ledger";
 
-export async function publishPost(body: string) {
+export async function publishPost(body: string, publicVisible = false) {
   const member = await requireMember("DEVELOPER");
   const text = z.string().trim().min(12).max(1600).parse(body);
+  const visibility = z.boolean().parse(publicVisible);
   await serializable(async (tx) => {
     const count = await tx.communityPost.count({ where: { authorId: member.id, createdAt: { gte: new Date(Date.now() - 86400000) } } });
     if (count >= 5) throw new Error("You can publish up to five app updates per rolling 24 hours.");
-    await tx.communityPost.create({ data: { authorId: member.id, body: text } });
+    await tx.communityPost.create({ data: { authorId: member.id, body: text, publicVisible: visibility } });
   });
   revalidatePath("/community");
+  revalidatePath("/");
   return "App update published.";
 }
 
@@ -29,6 +31,7 @@ export async function publishComment(postId: string, body: string) {
   });
   revalidatePath("/community");
   revalidatePath("/community/[id]", "page");
+  revalidatePath("/");
   return "Comment added.";
 }
 
@@ -59,6 +62,7 @@ export async function hideCommunityContent(id: string, type: "post" | "comment")
   });
   revalidatePath("/community");
   revalidatePath("/community/[id]", "page");
+  revalidatePath("/");
   return "Content removed.";
 }
 

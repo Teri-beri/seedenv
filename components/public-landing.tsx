@@ -13,6 +13,9 @@ import { PublicFooter } from "@/components/public-footer";
 import { quoteCampaignFunding, SEEDENV_PLATFORM_FEE_PERCENT } from "@/lib/pricing";
 import { availableSlots, discoverMissions, type MissionFilter } from "@/lib/tester-console";
 import { formatCents } from "@/lib/utils";
+import { landingViews, landingViewHref, type LandingView } from "@/lib/landing-views";
+import { PublicLaunchCircle } from "@/components/public-launch-circle";
+import type { FeedPost } from "@/components/community-feed";
 
 type Mission = {
   id: string;
@@ -55,7 +58,7 @@ const reportPreview = JSON.stringify({
   attachments: ["reproduction.mp4", "network.har", "crash.log"],
 }, null, 2);
 
-export function PublicLanding({ missions, viewer, directoryUnavailable = false }: { missions: Mission[]; viewer: Viewer; directoryUnavailable?: boolean }) {
+export function PublicLanding({ missions, viewer, directoryUnavailable = false, view = "overview", circlePosts = [], circleUnavailable = false }: { missions: Mission[]; viewer: Viewer; directoryUnavailable?: boolean; view?: LandingView; circlePosts?: FeedPost[]; circleUnavailable?: boolean }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [authRequest, setAuthRequest] = useState<AuthRequest | null>(null);
@@ -92,18 +95,20 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
             <span className="hidden font-mono text-xs text-zinc-500 sm:inline">Human QA infrastructure</span>
           </Link>
           <nav className="flex items-center gap-4" aria-label="Landing navigation">
-            <a href="#developers" className="hidden min-h-11 items-center text-sm text-zinc-400 hover:text-white md:inline-flex">Developers</a>
-            <a href="#validators" className="hidden min-h-11 items-center text-sm text-zinc-400 hover:text-white md:inline-flex">Validators</a>
-            <a href="#live-cohorts" className="hidden min-h-11 items-center text-sm text-zinc-400 hover:text-white sm:inline-flex">Live cohorts</a>
             {signedIn ? <Link href={workspaceHref} className={secondaryAction}>Console <ArrowRight className="size-4" /></Link> : (
               <button type="button" className={secondaryAction} onClick={() => setAuthRequest({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Access SeedEnv" })}>Sign In <ArrowRight className="size-4" /></button>
             )}
           </nav>
         </div>
+        <nav aria-label="Landing sections" className="mx-auto flex max-w-7xl gap-1 overflow-x-auto border-t border-white/5 px-4 py-2 sm:px-6 lg:px-8">
+          {landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} aria-current={view === item.id ? "page" : undefined} className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 text-sm transition-colors ${view === item.id ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}>{item.label}</Link>)}
+        </nav>
       </header>
 
-      <main>
-        <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg,rgba(255,255,255,0.025) 1px, transparent 1px)", backgroundSize: "40px 40px" }}>
+      <main className="terminal-grid">
+        {view !== "overview" ? <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8"><Link href="/" className="text-xs text-zinc-500 hover:text-white">SeedEnv / Overview</Link><h1 className="mt-3 text-3xl font-semibold text-white">{landingViews.find((item) => item.id === view)?.title}</h1></div> : null}
+        {view === "overview" ? <>
+        <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg,rgba(255,255,255,0.025) 1px, transparent 1px)", backgroundSize: "44px 44px" }}>
           <div className="min-w-0">
             <div className="inline-flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 font-mono text-xs text-emerald-300">
               <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
@@ -114,7 +119,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
             <p className="mt-5 max-w-3xl text-base leading-7 text-zinc-400">Production-grade human testing cohorts before public App Store distribution. Define scenarios and review real-device evidence.</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={developerHref} className={primaryAction} onClick={() => trackAnalytics("signup_start", { role: "DEVELOPER", callbackUrl: "/console?view=new-drop" })}>Deploy a Cohort <ArrowRight className="size-4" /></Link>
-              <a href="#live-cohorts" className={secondaryAction}>Explore Live Board <ChevronRight className="size-4" /></a>
+              <Link href={landingViewHref("cohorts")} className={secondaryAction}>Explore Live Board <ChevronRight className="size-4" /></Link>
             </div>
             <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 font-mono text-xs text-zinc-400">
               <span className="flex items-center gap-2"><Smartphone className="size-4 text-emerald-400" /> TestFlight / Play Console</span>
@@ -124,7 +129,17 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
         </section>
 
         <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8" aria-label="Live validation showcase"><LiveShowcase /></section>
+        <section className="mx-auto grid max-w-7xl gap-4 px-4 pb-12 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8" aria-label="Platform sections">
+          {[
+            { id: "developers" as const, title: "Developers", text: "Define scenarios and review release evidence." },
+            { id: "validators" as const, title: "Validators", text: "Technical onboarding and verified progression." },
+            { id: "cohorts" as const, title: "Active Cohorts", text: "Browse available apps and testing work." },
+            { id: "pricing" as const, title: "Pricing", text: "Calculate reward pools and platform fees." },
+          ].map((item) => <Link key={item.id} href={landingViewHref(item.id)} className="rounded-lg border border-white/10 bg-[#171923] p-5 transition-colors hover:border-emerald-500/40"><span className="flex items-center justify-between gap-3 text-sm font-medium text-white">{item.title}<ArrowRight className="size-4 text-emerald-400" /></span><p className="mt-3 text-sm leading-6 text-zinc-400">{item.text}</p></Link>)}
+        </section>
+        </> : null}
 
+        {view === "developers" ? (
         <section id="developers" className="scroll-mt-24 border-y border-white/10 bg-[#171923]/40">
           <div className={sectionClass}>
             <p className={labelClass}>For developers</p>
@@ -136,7 +151,9 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
             </div>
           </div>
         </section>
+        ) : null}
 
+        {view === "validators" ? (
         <section id="validators" className={`${sectionClass} scroll-mt-24`}>
           <div className="flex flex-wrap items-end justify-between gap-5">
             <div><p className={labelClass}>For validators</p><h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">Progression &amp; Verification Protocol</h2></div>
@@ -155,7 +172,9 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
             ].map(([title, text]) => <div key={title}><p className="font-mono text-xs text-emerald-400">{title}</p><p className="mt-3 text-sm leading-6 text-zinc-400">{text}</p></div>)}
           </div>
         </section>
+        ) : null}
 
+        {view === "cohorts" ? (
         <section id="live-cohorts" className="scroll-mt-24 border-y border-white/10 bg-[#171923]/30">
           <div className={sectionClass}>
             <div className="flex flex-wrap items-end justify-between gap-5">
@@ -179,15 +198,19 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
             )}
           </div>
         </section>
+        ) : null}
 
-        <DeveloperPricing href={developerHref} />
+        {view === "pricing" ? <DeveloperPricing href={developerHref} /> : null}
+        {view === "circle" ? <PublicLaunchCircle posts={circlePosts} signedIn={signedIn} unavailable={circleUnavailable} /> : null}
 
+        {view === "mobile" ? (
         <section id="native-console" className="scroll-mt-24 border-y border-white/10 bg-[#171923]/30">
           <div className={`${sectionClass} flex flex-wrap items-center justify-between gap-6`}>
             <div><p className={labelClass}>Mobile & web</p><h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">SeedEnv Mobile Console (PWA)</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">A browser-based workspace for reviewing scenarios, submitting evidence, and tracking verification.</p></div>
             <button type="button" className={secondaryAction} onClick={() => requestAccess({ role: "TESTER", callbackUrl: "/dashboard", title: "Open validator console" })}>Open Console <ArrowRight className="size-4" /></button>
           </div>
         </section>
+        ) : null}
       </main>
 
       <PublicFooter />

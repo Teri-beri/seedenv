@@ -6,6 +6,7 @@ import { billingDetailsSchema, supportRequestSchema, type BillingDetails, type S
 import { requireMember } from "@/lib/member";
 import { prisma } from "@/lib/prisma";
 import { serializable } from "@/lib/quest-ledger";
+import { sendNotificationEmail } from "@/lib/notifications";
 
 export async function saveCompanyBillingDetails(data: BillingDetails) {
   const parsed = billingDetailsSchema.safeParse(data);
@@ -32,7 +33,12 @@ export async function submitSupportRequest(data: SupportRequest) {
       return tx.supportTicket.create({ data: { ...parsed.data, userId: user.id, role: user.role, userAgent: (requestHeaders.get("user-agent") || "Unknown browser").slice(0, 500) } });
     });
     if (!ticket) return { ok: false as const, message: "You have reached the support submission limit. Try again later or contact terimus@seedenv.com." };
-    return { ok: true as const, ticketId: ticket.id };
+    const emailNotified = await sendNotificationEmail(
+      "terimus@seedenv.com",
+      `[SeedEnv Support] ${parsed.data.category}: ${parsed.data.subject}`,
+      `Support reference: ${ticket.id}\nCategory: ${parsed.data.category}\nMember: ${user.email || "See support queue"}\nUser ID: ${user.id}\nRole: ${user.role}\nRoute: ${parsed.data.route}\nBrowser/OS: ${(requestHeaders.get("user-agent") || "Unknown browser").slice(0, 500)}\n\n${parsed.data.message}`,
+    );
+    return { ok: true as const, ticketId: ticket.id, emailNotified };
   } catch {
     return { ok: false as const, message: "Your request was not submitted. Sign in and try again, or contact terimus@seedenv.com." };
   }

@@ -75,9 +75,9 @@ export function DeveloperHeader({ activeView }: { activeView: "overview" | "new-
     <header className="mobile-app-header sticky top-0 z-30 border-b border-stroke bg-obsidian/95 px-3 py-3 backdrop-blur-xl sm:px-6 lg:px-8 lg:py-4">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex shrink-0 items-center gap-3">
-          <div className="relative size-11 overflow-hidden rounded-2xl border border-stroke bg-surface shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
+          <Link href="/" aria-label="SeedEnv public landing" className="relative size-11 overflow-hidden rounded-2xl border border-stroke bg-surface shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
             <Image src="/seedenv-logo-v3.png" alt="SeedEnv" fill sizes="44px" className="object-contain" />
-          </div>
+          </Link>
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-aurum">SeedEnv</p>
             <h1 className="text-lg font-black">Developer Console</h1>

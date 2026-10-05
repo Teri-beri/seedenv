@@ -70,10 +70,13 @@ test("support identity is server-derived, rate-limited, durable, and admin-resol
   let signedIn = true;
   let recent = 0;
   let writes = 0;
+  let emailAvailable = true;
+  const recipients: string[] = [];
   let recorded: Record<string, unknown> = {};
   const queue = { count: async () => recent, create: async ({ data }: { data: Record<string, unknown> }) => { recorded = data; writes++; return { id: "support-test" }; }, update: async () => { writes++; return { id: "support-test" }; } };
   const modules = [
     mock.module("../lib/member.ts", { namedExports: { requireMember: async (required?: string) => { if (!signedIn || required && role !== required) throw new Error("Access denied."); return { id: "real-owner", role }; } } }),
+    mock.module("../lib/notifications.ts", { namedExports: { sendNotificationEmail: async (to: string) => { recipients.push(to); return emailAvailable; } } }),
     mock.module("next/headers", { namedExports: { headers: async () => new Headers({ "user-agent": "Server browser / macOS" }) } }),
     mock.module("next/cache", { namedExports: { revalidatePath: () => undefined } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: { supportTicket: queue, billingProfile: { upsert: async () => { writes++; } } } } }),
@@ -86,6 +89,7 @@ test("support identity is server-derived, rate-limited, durable, and admin-resol
     assert.equal(recorded.userId, "real-owner");
     assert.equal(recorded.role, "TESTER");
     assert.equal(recorded.userAgent, "Server browser / macOS");
+    assert.deepEqual(recipients, ["terimus@seedenv.com"]);
     recent = 5;
     assert.equal((await actions.submitSupportRequest(payload)).ok, false);
     assert.equal(writes, 1);
@@ -100,6 +104,11 @@ test("support identity is server-derived, rate-limited, durable, and admin-resol
     assert.equal((await actions.saveCompanyBillingDetails(company)).ok, false);
     role = "DEVELOPER";
     assert.equal((await actions.saveCompanyBillingDetails(company)).ok, true);
+    recent = 0;
+    emailAvailable = false;
+    const savedWithoutEmail = await actions.submitSupportRequest(payload);
+    assert.equal(savedWithoutEmail.ok, true);
+    assert.equal(savedWithoutEmail.emailNotified, false);
   } finally { for (const item of modules.reverse()) item.restore(); }
 });
 

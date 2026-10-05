@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { PublicLanding } from "@/components/public-landing";
 import { prisma } from "@/lib/prisma";
+import { resolveLandingView } from "@/lib/landing-views";
+import { publicLaunchCircle } from "@/lib/public-launch-circle";
 
 export const dynamic = "force-dynamic";
 
@@ -22,8 +24,10 @@ async function getOptionalViewer() {
   }
 }
 
-export default async function Home() {
-  const [directory, viewer] = await Promise.all([
+export default async function Home({ searchParams }: { searchParams?: Promise<{ view?: string }> } = {}) {
+  const params = await searchParams;
+  const view = resolveLandingView(params?.view);
+  const [directory, viewer, circle] = await Promise.all([
     prisma.appCampaign.findMany({
       where: { status: CampaignStatus.ACTIVE, expiresAt: { gt: new Date() } },
       select: {
@@ -44,7 +48,8 @@ export default async function Home() {
       return { missions: [], unavailable: true };
     }),
     getOptionalViewer(),
+    view === "circle" ? publicLaunchCircle() : Promise.resolve({ posts: [], unavailable: false }),
   ]);
 
-  return <PublicLanding missions={directory.missions} viewer={viewer} directoryUnavailable={directory.unavailable} />;
+  return <PublicLanding missions={directory.missions} viewer={viewer} directoryUnavailable={directory.unavailable} view={view} circlePosts={circle.posts} circleUnavailable={circle.unavailable} />;
 }

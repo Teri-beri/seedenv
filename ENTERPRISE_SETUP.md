@@ -4,8 +4,21 @@
 
 The additive migration `20261005_enterprise_billing_support` adds BillingProfile,
 SupportTicket, and WalletTransaction checkout snapshots. Review the migration
-and back up the database, then run `npx prisma migrate deploy` as the existing
-deployment start command does. It was not applied by this implementation.
+and back up the database. Production `npm start` now runs `prisma migrate deploy`
+before schema checks, the existing seed step, and `next start`; Render must use
+`npm run start`. The migration was not applied locally by this implementation.
+
+The reported Prisma P2022 error (`WalletTransaction.campaignId` missing) confirms
+production code ran before the billing migration. The Account page now selects
+only its displayed legacy transaction fields; that compatibility fix does not
+replace the required migration for billing and support modules.
+
+Migration failure stops startup rather than serving incompatible code. If Prisma
+reports P3005 (an existing database without migration history) or P3009 (a failed
+prior migration), inspect and reconcile the history against the actual schema
+with a backup first. Do not reset the database, blindly mark unapplied migrations
+applied, or bypass the startup gate. This repository contains additive migrations
+for an existing SeedEnv database, not a fresh-database bootstrap migration.
 
 ## Billing
 
@@ -44,10 +57,25 @@ hour are allowed inside a serializable transaction. Credentials must not be
 included in reports. The Privacy page discloses the new collection.
 
 Administrators triage open requests at `/admin/support` and can mark them resolved.
-Replies use the member's recorded email; guests/access/security reports can use
-the existing legal contact `terimus@seedenv.com`. This release stores requests
-durably; it does not assume an unconfigured outbound support mailbox or promise
-an automated response SLA. Set a retention policy and staff the queue.
+Requests also notify `terimus@seedenv.com` using the existing Resend API key and
+verified AUTH_EMAIL_FROM sender. Failed/unconfigured delivery does not erase the
+ticket; the drawer reports delivery availability separately. Replies use the
+member's recorded email; guests/access/security reports can contact the mailbox
+directly. Set a retention policy, verify mailbox delivery, and staff the queue.
+
+## Public Launch Circle
+
+The additive `20261005_public_launch_circle` migration marks existing posts
+private by default. New developer updates include an explicit public-visibility
+choice; public updates and their visible comments appear at `/?view=circle`.
+Public `/community` and discussion reads exclude private/hidden content when no
+member session is available. Publishing, commenting, reports, and moderation
+still require authenticated server actions and existing rate limits.
+
+Guest comment actions offer Developer/Tester sign-in choices with the exact
+discussion callback. Members with both workspaces must choose their participation
+workspace before composing; switching stays in Launch Circle rather than jumping
+to a console. No old members-only posts are published automatically.
 
 ## Public Status
 

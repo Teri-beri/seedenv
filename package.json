@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "npm install --include=dev && prisma generate && next build",
     "build:local": "prisma generate && next build",
-    "start": "tsx scripts/ensure-schema.ts && next start",
+    "start": "prisma migrate deploy && tsx scripts/ensure-schema.ts && npm run seed:goddesses-beta && next start",
     "lint": "eslint",
     "test:tester": "node --import tsx --test scripts/tester-console.test.ts",
     "test:tester-views": "node --experimental-test-module-mocks --import tsx --test scripts/tester-console.test.ts scripts/tester-views.test.ts",

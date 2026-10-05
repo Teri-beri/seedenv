@@ -9,6 +9,7 @@ const sections = [
     bullets: [
       { label: "Account & Authentication Information", text: "When you sign up or log in (via email magic links, GitHub, or Google OAuth), we collect your name, email address, username, and authentication identifiers." },
       { label: "Company Billing & Support", text: "Company billing records include the company name, supplied tax identifier, and billing address. Checkout receipts retain a billing snapshot. Support requests include the account identifier, role, selected category, message, application route, and browser/OS user-agent context to investigate your request." },
+      { label: "Public Launch Circle", text: "Developer updates explicitly marked public, their author usernames, and visible comments are accessible without signing in. Older members-only updates remain restricted unless made public through an explicit publishing choice. Do not include confidential builds, credentials, or personal data in public discussions." },
       { label: "Developers", text: "Organization details, project URLs, test build files/links, campaign specifications, and payout/funding preferences." },
       { label: "Testers", text: "Device specifications, operating system versions, testing hardware profiles, and feedback submissions." },
       { label: "Test Submissions & Proof Files", text: "Files uploaded to verify completed tasks, including bug reports, crash logs, system diagnostics, feedback notes, screenshots, and screen recordings." },

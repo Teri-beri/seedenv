@@ -60,6 +60,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         take: 8,
       },
       transactions: {
+        select: { id: true, amountCents: true, type: true, status: true, description: true, createdAt: true },
         orderBy: { createdAt: "desc" },
         take: 8,
       },
@@ -120,7 +121,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     : null;
 
   let sitePerformance: AnalyticsSummaryData | null = null;
-  if (canViewSitePerformance) {
+  if (canViewSitePerformance && activeTab === "site-performance") {
     sitePerformance = await getAnalyticsSummary();
   }
 

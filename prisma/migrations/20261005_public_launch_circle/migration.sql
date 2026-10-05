@@ -1,0 +1,1 @@
+ALTER TABLE "CommunityPost" ADD COLUMN "publicVisible" BOOLEAN NOT NULL DEFAULT FALSE;
