@@ -90,7 +90,7 @@ export function StripeSettingsCard({
   }
 
   return (
-    <section className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-5 backdrop-blur-md sm:p-6">
+    <section id="stripe-setup" className="scroll-mt-28 rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-5 backdrop-blur-md sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           {isDeveloper ? <CreditCard className="mt-1 size-5 text-amber-500" /> : <Banknote className="mt-1 size-5 text-amber-500" />}
@@ -100,7 +100,7 @@ export function StripeSettingsCard({
             <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
               {isDeveloper
                 ? "Save a card securely with Stripe so campaign escrow checkout can use your funding account. SeedEnv never stores card numbers."
-                : "Connect a Stripe Express account to receive approved tester payouts. Identity and bank details are entered on Stripe."}
+                : "Set up Stripe Express to receive direct payouts for verified cohort work. Identity, bank, and applicable tax information are entered securely on Stripe."}
             </p>
           </div>
         </div>
@@ -111,7 +111,7 @@ export function StripeSettingsCard({
 
       {draftId && isDeveloper ? (
         <div className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/[0.05] p-4">
-          <p className="text-sm font-semibold text-amber-100">Your no-charge draft is saved.</p>
+          <p className="text-sm font-semibold text-amber-100">Your draft is saved.</p>
           <p className="mt-1 text-xs leading-5 text-neutral-400">{paymentMethodSaved ? "Resume the draft when you’re ready to continue to escrow checkout." : "Finish saving a payment method with Stripe, then return here to continue the draft."}</p>
           {paymentMethodSaved ? <Link className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-amber-300 hover:text-amber-200" href={`/console?view=new-drop&draft=${encodeURIComponent(draftId)}`}>Resume saved draft <ArrowRight className="size-4" /></Link> : null}
         </div>
@@ -133,7 +133,7 @@ export function StripeSettingsCard({
           ) : null}
           <Button disabled={!stripeConfigured || isPending} onClick={setupPayoutAccount} type="button">
             {isPending ? <LoaderCircle className="size-4 animate-spin" /> : <ExternalLink className="size-4" />}
-            {isPending ? "Opening Stripe…" : connectAccountId ? "Continue Stripe payout setup" : "Set up payouts with Stripe"}
+            {isPending ? "Opening Stripe…" : connectAccountId ? "Continue Stripe payout setup" : "Connect with Stripe"}
           </Button>
         </div>
       ) : null}
@@ -145,6 +145,7 @@ export function StripeSettingsCard({
         </div>
       ) : null}
       {payoutMessage ? <p className="mt-3 text-sm text-neutral-300" role="status">{payoutMessage}</p> : null}
+      {isTester ? <Link href="/dashboard/validator/payouts" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm text-emerald-300">Bank schedule &amp; earned ledger <ArrowRight className="size-4" /></Link> : null}
 
       {isDeveloper ? (
         <div className="mt-4 flex flex-wrap items-center gap-3">

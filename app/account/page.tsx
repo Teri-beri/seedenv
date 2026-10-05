@@ -134,8 +134,8 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 <ArrowLeft className="size-4" /> Back
               </Link>
               <Link className="mobile-settings-brand flex items-center gap-3" href="/">
-                <span className="relative size-12 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 shadow-lg shadow-amber-500/10">
-                  <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="48px" className="scale-125 object-cover" priority />
+                <span className="relative size-12 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#0E1017]/80">
+                  <Image src="/seedenv-logo-v3.png" alt="SeedEnv" fill sizes="48px" className="object-contain" priority />
                 </span>
                 <span>
                   <span className="block text-xs font-semibold uppercase tracking-[0.32em] text-amber-500">SeedEnv</span>

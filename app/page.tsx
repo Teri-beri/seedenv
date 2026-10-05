@@ -2,7 +2,6 @@ import { CampaignStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { PublicLanding } from "@/components/public-landing";
-import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -11,14 +10,10 @@ async function getOptionalViewer() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) return null;
-    return prisma.user.findUnique({
+    return await prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
-        username: true,
         role: true,
-        walletBalanceCents: true,
-        avatarUrl: true,
-        image: true,
       },
     });
   } catch (error) {
@@ -28,15 +23,28 @@ async function getOptionalViewer() {
 }
 
 export default async function Home() {
-  await ensurePreviewData();
-  const [missions, viewer] = await Promise.all([
+  const [directory, viewer] = await Promise.all([
     prisma.appCampaign.findMany({
       where: { status: CampaignStatus.ACTIVE, expiresAt: { gt: new Date() } },
-      include: { instructions: { orderBy: { stepNumber: "asc" } } },
+      select: {
+        id: true,
+        title: true,
+        iconUrl: true,
+        platform: true,
+        targetVibe: true,
+        description: true,
+        bountyPerTaskUsd: true,
+        totalSlots: true,
+        claimedSlots: true,
+        instructions: { select: { instructionTitle: true }, orderBy: { stepNumber: "asc" } },
+      },
       orderBy: [{ bountyPerTaskUsd: "desc" }, { createdAt: "desc" }],
+    }).then((missions) => ({ missions, unavailable: false })).catch((error: unknown) => {
+      console.error("SeedEnv public cohort lookup failed:", error);
+      return { missions: [], unavailable: true };
     }),
     getOptionalViewer(),
   ]);
 
-  return <PublicLanding missions={missions} viewer={viewer} />;
+  return <PublicLanding missions={directory.missions} viewer={viewer} directoryUnavailable={directory.unavailable} />;
 }

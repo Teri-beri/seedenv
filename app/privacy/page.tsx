@@ -8,6 +8,7 @@ const sections = [
     body: ["We collect information directly from you, automatically through your use of the Platform, and from third-party services."],
     bullets: [
       { label: "Account & Authentication Information", text: "When you sign up or log in (via email magic links, GitHub, or Google OAuth), we collect your name, email address, username, and authentication identifiers." },
+      { label: "Company Billing & Support", text: "Company billing records include the company name, supplied tax identifier, and billing address. Checkout receipts retain a billing snapshot. Support requests include the account identifier, role, selected category, message, application route, and browser/OS user-agent context to investigate your request." },
       { label: "Developers", text: "Organization details, project URLs, test build files/links, campaign specifications, and payout/funding preferences." },
       { label: "Testers", text: "Device specifications, operating system versions, testing hardware profiles, and feedback submissions." },
       { label: "Test Submissions & Proof Files", text: "Files uploaded to verify completed tasks, including bug reports, crash logs, system diagnostics, feedback notes, screenshots, and screen recordings." },

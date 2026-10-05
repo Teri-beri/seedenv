@@ -1,4 +1,6 @@
 import { ImageResponse } from "next/og";
+import { createElement } from "react";
+import { brandLogoDataUrl } from "@/lib/brand-image";
 
 export const runtime = "edge";
 export const alt = "SeedEnv - High-Signal Beta Testing & App Store Readiness";
@@ -24,7 +26,10 @@ export default function OpenGraphImage() {
         }}
       >
         <div style={{ display: "flex", color: "#6EE7B7", fontSize: 22, marginBottom: 24 }}>seedenv.com</div>
-        <div style={{ display: "flex", fontSize: 112, fontWeight: 700, lineHeight: 1.1 }}>SeedEnv</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+          {createElement("img", { src: brandLogoDataUrl, alt: "SeedEnv", width: 112, height: 112, style: { objectFit: "contain" } })}
+          <div style={{ display: "flex", fontSize: 112, fontWeight: 700, lineHeight: 1.1 }}>SeedEnv</div>
+        </div>
         <div style={{ display: "flex", maxWidth: 980, fontSize: 42, lineHeight: 1.3, marginTop: 24 }}>
           High-Signal Beta Testing &amp; App Store Readiness
         </div>

@@ -1,0 +1,133 @@
+import test, { mock } from "node:test";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { PDFDocument } from "pdf-lib";
+import { billingDetailsSchema, invoiceSnapshotSchema, invoiceTotalMatches, payoutScheduleLabel, supportRequestSchema } from "../lib/enterprise-rules";
+import { generateInvoicePdf } from "../lib/invoice-pdf";
+
+const company = { companyName: "Société QA", taxId: "FR123456789", addressLine1: "10 Rue du Test", addressLine2: "", city: "Paris", region: "", postalCode: "75001", country: "FR" };
+const snapshot = { version: 1 as const, cohortId: "cohort-test", cohortTitle: "TestFlight QA", rewardPoolCents: 10000, platformFeeCents: 500, company };
+
+test("billing details, invoice totals, support metadata, and schedules remain bounded and truthful", () => {
+  assert.equal(billingDetailsSchema.parse({ ...company, country: "fr" }).country, "FR");
+  assert.equal(billingDetailsSchema.safeParse({ ...company, companyName: "" }).success, false);
+  assert.equal(invoiceSnapshotSchema.safeParse(snapshot).success, true);
+  assert.equal(invoiceTotalMatches(snapshot, 10500), true);
+  assert.equal(invoiceTotalMatches(snapshot, 10501), false);
+  assert.equal(invoiceTotalMatches(snapshot, -1), false);
+  assert.equal(supportRequestSchema.safeParse({ category: "Technical Bug", subject: "A bug", message: "A reproducible bug with enough detail.", route: "/console?token=secret" }).success, false);
+  assert.equal(payoutScheduleLabel(undefined), "Schedule unavailable");
+  assert.equal(payoutScheduleLabel({ interval: "weekly", weekly_anchor: "friday", delay_days: 2 }), "Weekly on friday / 2-day availability delay");
+  assert.equal(payoutScheduleLabel({ interval: "manual" }), "Manual bank payouts");
+});
+
+test("PDF receipts embed Unicode billing details and produce valid bounded pages", async () => {
+  const bytes = await generateInvoicePdf({ id: "receipt-test", date: new Date("2026-10-05T12:00:00Z"), amountCents: 10500, paymentReference: "pi_test", snapshot });
+  assert.equal(Buffer.from(bytes).subarray(0, 5).toString(), "%PDF-");
+  const pdf = await PDFDocument.load(bytes);
+  assert.equal(pdf.getTitle(), "SeedEnv receipt receipt-test");
+  assert.ok(pdf.getPageCount() >= 1);
+  assert.equal(pdf.getPage(0).getWidth(), 595);
+  assert.ok(bytes.length > 1000);
+});
+
+test("invoice route rejects anonymous, foreign, pending, and inconsistent payments", async () => {
+  let signedIn = false;
+  let present = true;
+  let amount = 10500;
+  const queries: Array<Record<string, unknown>> = [];
+  const modules = [
+    mock.module("../app/api/auth/[...nextauth]/route.ts", { namedExports: { authOptions: {} } }),
+    mock.module("next-auth", { namedExports: { getServerSession: async () => signedIn ? { user: { id: "owner" } } : null } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: { walletTransaction: { findFirst: async ({ where }: { where: Record<string, unknown> }) => {
+      queries.push(where);
+      return present ? { id: "receipt-test", amountCents: amount, createdAt: new Date("2026-10-05"), stripePaymentId: "pi_test", invoiceSnapshot: snapshot } : null;
+    } } } } }),
+  ];
+  try {
+    const { GET } = await import(`../app/api/billing/invoices/[id]/route.ts?enterprise=${randomUUID()}`);
+    const params = { params: Promise.resolve({ id: "receipt-test" }) };
+    assert.equal((await GET(new Request("http://localhost/api/billing/invoices/receipt-test"), params)).status, 401);
+    assert.equal(queries.length, 0);
+    signedIn = true;
+    present = false;
+    assert.equal((await GET(new Request("http://localhost/api/billing/invoices/receipt-test"), params)).status, 404);
+    assert.deepEqual(queries[0], { id: "receipt-test", userId: "owner", type: "ESCROW_DEPOSIT", status: "COMPLETED" });
+    present = true;
+    amount = 1;
+    assert.equal((await GET(new Request("http://localhost/api/billing/invoices/receipt-test"), params)).status, 409);
+    amount = 10500;
+    const receipt = await GET(new Request("http://localhost/api/billing/invoices/receipt-test"), params);
+    assert.equal(receipt.status, 200);
+    assert.equal(receipt.headers.get("cache-control"), "private, no-store");
+    assert.equal(receipt.headers.get("content-type"), "application/pdf");
+    assert.equal(Buffer.from(await receipt.arrayBuffer()).subarray(0, 5).toString(), "%PDF-");
+  } finally { for (const item of modules.reverse()) item.restore(); }
+});
+
+test("support identity is server-derived, rate-limited, durable, and admin-resolvable", async () => {
+  let role = "TESTER";
+  let signedIn = true;
+  let recent = 0;
+  let writes = 0;
+  let recorded: Record<string, unknown> = {};
+  const queue = { count: async () => recent, create: async ({ data }: { data: Record<string, unknown> }) => { recorded = data; writes++; return { id: "support-test" }; }, update: async () => { writes++; return { id: "support-test" }; } };
+  const modules = [
+    mock.module("../lib/member.ts", { namedExports: { requireMember: async (required?: string) => { if (!signedIn || required && role !== required) throw new Error("Access denied."); return { id: "real-owner", role }; } } }),
+    mock.module("next/headers", { namedExports: { headers: async () => new Headers({ "user-agent": "Server browser / macOS" }) } }),
+    mock.module("next/cache", { namedExports: { revalidatePath: () => undefined } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: { supportTicket: queue, billingProfile: { upsert: async () => { writes++; } } } } }),
+    mock.module("../lib/quest-ledger.ts", { namedExports: { serializable: async (work: (tx: { supportTicket: typeof queue }) => Promise<unknown>) => work({ supportTicket: queue }) } }),
+  ];
+  try {
+    const actions = await import(`../app/actions/enterpriseActions.ts?support=${randomUUID()}`);
+    const payload = { category: "Technical Bug", subject: "Checkout issue", message: "Steps to reproduce a checkout problem safely.", route: "/console", userId: "spoofed-owner", role: "ADMIN", userAgent: "spoofed browser" };
+    assert.equal((await actions.submitSupportRequest(payload)).ok, true);
+    assert.equal(recorded.userId, "real-owner");
+    assert.equal(recorded.role, "TESTER");
+    assert.equal(recorded.userAgent, "Server browser / macOS");
+    recent = 5;
+    assert.equal((await actions.submitSupportRequest(payload)).ok, false);
+    assert.equal(writes, 1);
+    assert.equal((await actions.resolveSupportTicket("support-test")).ok, false);
+    role = "ADMIN";
+    assert.equal((await actions.resolveSupportTicket("support-test")).ok, true);
+    signedIn = false;
+    assert.equal((await actions.submitSupportRequest(payload)).ok, false);
+    assert.equal(writes, 2);
+    signedIn = true;
+    role = "TESTER";
+    assert.equal((await actions.saveCompanyBillingDetails(company)).ok, false);
+    role = "DEVELOPER";
+    assert.equal((await actions.saveCompanyBillingDetails(company)).ok, true);
+  } finally { for (const item of modules.reverse()) item.restore(); }
+});
+
+test("real checkout action captures an immutable company and recorded fee snapshot", async () => {
+  const priorKey = process.env.STRIPE_SECRET_KEY;
+  process.env.STRIPE_SECRET_KEY = "mocked-provider-config";
+  let written: Record<string, unknown> = {};
+  const modules = [
+    mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "owner", role: "DEVELOPER", stripeCustomerId: "cus_test" }) } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: {
+      billingProfile: { findUnique: async () => ({ ...company }) },
+      appCampaign: { create: async ({ data }: { data: Record<string, unknown> }) => ({ id: "cohort-test", ...data }) },
+      walletTransaction: { create: async ({ data }: { data: Record<string, unknown> }) => { written = data; return { id: "deposit-test" }; } },
+    } } }),
+    mock.module("../lib/stripe.ts", { namedExports: { SEEDENV_PLATFORM_FEE_PERCENT: 0.05, getStripe: () => ({ customers: { retrieve: async () => ({ deleted: false, invoice_settings: { default_payment_method: "pm_test" } }) }, checkout: { sessions: { create: async () => ({ url: "https://checkout.stripe.com/mock" }) } } }) } }),
+  ];
+  try {
+    const { createCampaignWithEscrow } = await import(`../app/actions/campaignActions.ts?invoice=${randomUUID()}`);
+    const result = await createCampaignWithEscrow({ title: "TestFlight QA", platform: "TESTFLIGHT", appUrl: "https://example.invalid", targetVibe: "Developer Tools", description: "A safe test of company invoice details at checkout.", totalSlots: 25, bountyPerTaskUsd: 4, instructions: [{ instructionTitle: "Onboarding", instructionDetail: "Follow signup and record any confusing steps.", proofType: "SCREENSHOT", minimumRep: 0 }], discoveryAllowed: false, discoveryMinRep: 0 });
+    assert.equal(result.checkoutUrl, "https://checkout.stripe.com/mock");
+    assert.equal(written.campaignId, "cohort-test");
+    assert.equal(written.platformFeeCents, 500);
+    const saved = invoiceSnapshotSchema.parse(written.invoiceSnapshot);
+    assert.equal(saved.company?.companyName, "Société QA");
+    assert.equal(invoiceTotalMatches(saved, Number(written.amountCents)), true);
+  } finally {
+    for (const item of modules.reverse()) item.restore();
+    if (priorKey === undefined) delete process.env.STRIPE_SECRET_KEY;
+    else process.env.STRIPE_SECRET_KEY = priorKey;
+  }
+});

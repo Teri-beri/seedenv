@@ -47,7 +47,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
             <Link className="flex items-center gap-3" href="/">
               <span className="relative size-10 overflow-hidden rounded-xl border border-[#1F2430]">
-                <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="40px" className="scale-125 object-cover" />
+                <Image src="/seedenv-logo-v3.png" alt="SeedEnv" fill sizes="40px" className="object-contain" />
               </span>
               <span><span className="block text-xs font-semibold uppercase tracking-[0.25em] text-amber-500">SeedEnv</span><span className="block text-sm font-semibold text-neutral-200">Tester Console</span></span>
             </Link>

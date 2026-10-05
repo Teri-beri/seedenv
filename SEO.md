@@ -7,6 +7,14 @@ Next.js automatically adds image URLs, dimensions, content types, and alt text.
 
 ## App Icons
 
+The current brand source is `assets/branding/seedenv-source.jpg`. Run
+`node scripts/generate-brand-assets.mjs` to regenerate the transparent UI mark,
+dark-backed browser/PWA icons, and the embedded social-card mark. Legacy image
+URLs contain the same new artwork; UI uses the versioned v3 URL to avoid stale
+browser/email caches. `/favicon.ico` is served by `app/favicon.ico`, not a
+conflicting public file. Apple artwork is 180 x 180; the main site icon is
+576 x 576; ICO frames cover 16, 32, 48, 64, 128, and 256 pixels.
+
 Place approved square brand assets in the App Router directory:
 
 | Asset | Dimensions | Purpose |

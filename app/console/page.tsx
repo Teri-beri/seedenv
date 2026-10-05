@@ -224,6 +224,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
             <div className="flex items-center gap-2 border-b border-[#1F2430] px-5 py-4">
               <CreditCard className="size-4 text-amber-500" />
               <h3 className="text-sm font-semibold text-white">Transaction history</h3>
+              <Link href="/dashboard/developer/billing" className="ml-auto text-xs text-emerald-300 hover:underline">Company billing &amp; invoices</Link>
             </div>
             {billingTransactions.length ? (
               <div className="divide-y divide-[#1F2430]">

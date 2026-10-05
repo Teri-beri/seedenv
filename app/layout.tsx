@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/components/auth-provider";
+import { SupportModal } from "@/components/SupportModal";
 import { CursorGridTrail } from "@/components/cursor-grid-trail";
 import { siteMetadata, siteStructuredData } from "@/lib/seo";
 import "./globals.css";
@@ -26,16 +27,16 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/seedenv-favicon-2026.ico", sizes: "256x256", type: "image/x-icon" },
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/seedenv-favicon-v3.ico", sizes: "16x16 32x32 48x48 64x64 128x128 256x256", type: "image/x-icon" },
+      { url: "/icons/icon-192.png?v=seedcube-v3", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png?v=seedcube-v3", sizes: "512x512", type: "image/png" },
     ],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/apple-touch-icon.png?v=seedcube-v3", sizes: "180x180", type: "image/png" }],
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#090A0F",
+  themeColor: "#0F1117",
   colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
@@ -54,7 +55,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(siteStructuredData).replace(/</g, "\\u003c") }}
         />
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>{children}<SupportModal /></AuthProvider>
       </body>
     </html>
   );

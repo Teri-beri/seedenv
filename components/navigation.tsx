@@ -76,7 +76,7 @@ export function DeveloperHeader({ activeView }: { activeView: "overview" | "new-
       <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex shrink-0 items-center gap-3">
           <div className="relative size-11 overflow-hidden rounded-2xl border border-stroke bg-surface shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
-            <Image src="/seedenv-logo-v2.png" alt="SeedEnv" fill sizes="44px" className="scale-125 object-cover" />
+            <Image src="/seedenv-logo-v3.png" alt="SeedEnv" fill sizes="44px" className="object-contain" />
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-aurum">SeedEnv</p>

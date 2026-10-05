@@ -111,6 +111,8 @@ model User {
   campaigns              AppCampaign[]       @relation("DeveloperCampaigns")
   submissions            Submission[]        @relation("TesterSubmissions")
   transactions           WalletTransaction[]
+  billingProfile         BillingProfile?
+  supportTickets         SupportTicket[]
   accounts               Account[]
   sessions               Session[]
   createdAt              DateTime            @default(now())
@@ -183,6 +185,7 @@ model AppCampaign {
   discoveryAllowed Boolean           @default(false)
   discoveryMinRep  Int               @default(0)
   applications     MissionApplication[]
+  transactions     WalletTransaction[]
 
   @@index([developerId, status])
   @@index([status, expiresAt])
@@ -339,12 +342,48 @@ model WalletTransaction {
   type            TransactionType
   status          TransactionStatus @default(PENDING)
   stripePaymentId String?
+  campaignId      String?
+  campaign        AppCampaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  platformFeeCents Int?
+  invoiceSnapshot Json?
   description     String
   createdAt       DateTime          @default(now())
 
   @@index([userId, createdAt])
   @@index([type, status])
   @@index([stripePaymentId])
+  @@index([campaignId])
+}
+
+model BillingProfile {
+  userId         String   @id
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName    String   @db.VarChar(150)
+  taxId          String?  @db.VarChar(80)
+  addressLine1   String   @db.VarChar(200)
+  addressLine2   String?  @db.VarChar(200)
+  city           String   @db.VarChar(100)
+  region         String?  @db.VarChar(100)
+  postalCode     String   @db.VarChar(30)
+  country        String   @db.VarChar(2)
+  updatedAt      DateTime @updatedAt
+}
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        UserRole
+  category    String   @db.VarChar(40)
+  subject     String   @db.VarChar(150)
+  message     String   @db.VarChar(5000)
+  route       String   @db.VarChar(1000)
+  userAgent   String   @db.VarChar(500)
+  status      String   @default("OPEN")
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
 }
 
 model ClipProfile {

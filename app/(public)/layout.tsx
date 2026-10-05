@@ -9,7 +9,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-3 text-xl font-bold">
-            <Image src="/icon-192.png" alt="" width={36} height={36} className="rounded-lg" />
+            <Image src="/seedenv-logo-v3.png" alt="" width={36} height={36} className="object-contain" />
             SeedEnv
           </Link>
           <nav aria-label="Primary" className="flex flex-wrap items-center gap-5 text-sm text-neutral-300">

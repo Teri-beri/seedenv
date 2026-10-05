@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: { "/api/billing/invoices/*": ["./assets/fonts/NotoSans.ttf", "./public/seedenv-logo-v3.png"] },
   experimental: {
     serverActions: { bodySizeLimit: "8mb" },
   },

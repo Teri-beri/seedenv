@@ -16,6 +16,44 @@ test("campaign funding adds a fixed 5% fee on the reward pool with cent rounding
   for (const amount of [-1, NaN, Infinity]) assert.throws(() => quoteCampaignFunding(amount));
 });
 
+test("campaign saves enforce automatic REP and preserve the Discovery exception", async () => {
+  const previousOwner = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL;
+  process.env.SEEDENV_ANALYTICS_OWNER_EMAIL = "rep-policy@example.invalid";
+  const savedInstructions: Array<{ minimumRep: number; presetId?: string }> = [];
+  const modules = [
+    mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "rep-policy-developer", role: "DEVELOPER", username: "teriberi", email: "rep-policy@example.invalid" }) } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: { appCampaign: { create: async ({ data }: { data: { title: string; instructions: { create: Array<{ minimumRep: number; presetId?: string }> } } }) => {
+      savedInstructions.push(...data.instructions.create);
+      return { id: "rep-policy-draft", title: data.title, status: "DRAFT" };
+    } } } } }),
+  ];
+  try {
+    const { saveTestCampaignDraft } = await import(`../app/actions/campaignActions.ts?rep-policy=${randomUUID()}`);
+    const input = {
+      title: "Automatic reputation test",
+      platform: "WEB_STAGING",
+      appUrl: "https://example.invalid",
+      targetVibe: "Creator Tools",
+      description: "Verify automatic reputation requirements without a real database.",
+      totalSlots: 25,
+      bountyPerTaskUsd: 4,
+      instructions: [{ presetId: "offline-reconnect", instructionTitle: "Custom offline testing title", instructionDetail: "Check cached actions and state recovery after reconnecting.", proofType: "SCREENSHOT", minimumRep: 0 }],
+      discoveryAllowed: true,
+      discoveryMinRep: 900,
+    };
+    await saveTestCampaignDraft(input);
+    assert.equal(savedInstructions[0].minimumRep, 1500);
+    assert.equal(savedInstructions[0].presetId, undefined);
+    await assert.rejects(saveTestCampaignDraft({ ...input, discoveryMinRep: 1501 }), /Discovery REP floor/);
+    await assert.rejects(saveTestCampaignDraft({ ...input, instructions: [{ ...input.instructions[0], presetId: "unknown-preset" }] }), /Unknown testing mission preset/);
+    assert.equal(savedInstructions.length, 1);
+  } finally {
+    for (const item of modules.reverse()) item.restore();
+    if (previousOwner === undefined) delete process.env.SEEDENV_ANALYTICS_OWNER_EMAIL;
+    else process.env.SEEDENV_ANALYTICS_OWNER_EMAIL = previousOwner;
+  }
+});
+
 test("proof editing requires an explicit revision start and a live editing window", () => {
   const original = { expiresAt: new Date(Date.now() + 60000), feedbackText: "Original feedback", proofImageUrl: "proof:original", revisionRequestedAt: null, revisionStartedAt: null };
   assert.throws(() => assertProofEditable(original), /already awaiting review/);
@@ -26,6 +64,98 @@ test("proof editing requires an explicit revision start and a live editing windo
   const encodedScreenshot = Buffer.alloc(5 * 1024 * 1024).toString("base64");
   assert.equal(nextConfig.experimental?.serverActions?.bodySizeLimit, "8mb");
   assert.ok(Buffer.byteLength(JSON.stringify({ proofImageBase64: encodedScreenshot, feedbackText: "f".repeat(2000), crashLogs: "c".repeat(20000), networkLogs: "n".repeat(20000) })) < 8 * 1024 * 1024);
+});
+
+test("missing Stripe configuration or funding method saves a draft without creating payment records", async () => {
+  const previousStripeKey = process.env.STRIPE_SECRET_KEY;
+  const previousNodeEnv = process.env.NODE_ENV;
+  const created: Array<{ status: string; totalBudgetUsd: number; platformFeeUsd: number }> = [];
+  const updated: Array<{ status: string }> = [];
+  const transaction = {
+    taskInstruction: { deleteMany: async () => ({ count: 1 }) },
+    appCampaign: { update: async ({ data }: { data: { status: string } }) => {
+      updated.push(data);
+      return { id: "existing-payment-draft", ...data };
+    } },
+  };
+  const modules = [
+    mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "payment-test-developer", role: "DEVELOPER", stripeCustomerId: null }) } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: {
+      appCampaign: {
+        create: async ({ data }: { data: { status: string; totalBudgetUsd: number; platformFeeUsd: number } }) => {
+          created.push(data);
+          return { id: `payment-draft-${created.length}`, ...data };
+        },
+        findFirst: async () => ({ id: "existing-payment-draft" }),
+      },
+      walletTransaction: { create: async () => assert.fail("Setup fallback must not create escrow or wallet entries.") },
+      $transaction: async (work: (tx: typeof transaction) => Promise<unknown>) => work(transaction),
+    } } }),
+  ];
+  try {
+    Object.assign(process.env, { NODE_ENV: "production" });
+    delete process.env.STRIPE_SECRET_KEY;
+    const { createCampaignWithEscrow } = await import(`../app/actions/campaignActions.ts?payment-setup=${randomUUID()}`);
+    const input = {
+      title: "Missing payment setup test",
+      platform: "WEB_STAGING",
+      appUrl: "https://example.invalid",
+      targetVibe: "Creator Tools",
+      description: "Save the campaign before routing to payment setup without charging.",
+      totalSlots: 25,
+      bountyPerTaskUsd: 4,
+      instructions: [{ instructionTitle: "Complete onboarding", instructionDetail: "Walk through signup and report confusing steps.", proofType: "SCREENSHOT", minimumRep: 0 }],
+      discoveryAllowed: false,
+      discoveryMinRep: 0,
+    };
+    assert.deepEqual(await createCampaignWithEscrow(input), { campaignId: "payment-draft-1", checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true });
+    assert.equal(created[0].status, "DRAFT");
+    assert.equal(created[0].totalBudgetUsd, 105);
+    assert.equal(created[0].platformFeeUsd, 5);
+    assert.deepEqual(await createCampaignWithEscrow(input, "existing-payment-draft"), { campaignId: "existing-payment-draft", checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true });
+    assert.equal(updated[0].status, "DRAFT");
+    process.env.STRIPE_SECRET_KEY = "configured-for-mocked-test";
+    assert.deepEqual(await createCampaignWithEscrow(input), { campaignId: "payment-draft-2", checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true });
+    assert.equal(created[1].status, "DRAFT");
+    assert.equal(created.length, 2);
+  } finally {
+    for (const item of modules.reverse()) item.restore();
+    if (previousStripeKey === undefined) delete process.env.STRIPE_SECRET_KEY;
+    else process.env.STRIPE_SECRET_KEY = previousStripeKey;
+    if (previousNodeEnv === undefined) Reflect.deleteProperty(process.env, "NODE_ENV");
+    else Object.assign(process.env, { NODE_ENV: previousNodeEnv });
+  }
+});
+
+test("public landing survives unavailable cohort and optional account lookups without seeding data", async () => {
+  let signedIn = false;
+  const loggedErrors: string[] = [];
+  const log = mock.method(console, "error", (message: string) => { loggedErrors.push(message); });
+  const modules = [
+    mock.module("../app/api/auth/[...nextauth]/route.ts", { namedExports: { authOptions: {} } }),
+    mock.module("next-auth", { namedExports: { getServerSession: async () => signedIn ? { user: { id: "landing-viewer" } } : null } }),
+    mock.module("../components/public-landing.tsx", { namedExports: { PublicLanding: () => null } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: {
+      appCampaign: { findMany: async () => { throw new Error("Database unavailable in isolated test."); } },
+      user: { findUnique: async () => { throw new Error("Optional account lookup unavailable."); } },
+    } } }),
+  ];
+  try {
+    const { default: Home } = await import(`../app/page.tsx?landing=${randomUUID()}`);
+    const guest = await Home();
+    assert.deepEqual(guest.props.missions, []);
+    assert.equal(guest.props.viewer, null);
+    assert.equal(guest.props.directoryUnavailable, true);
+    signedIn = true;
+    const expiredViewer = await Home();
+    assert.equal(expiredViewer.props.viewer, null);
+    assert.equal(expiredViewer.props.directoryUnavailable, true);
+    assert.ok(loggedErrors.some((message) => message.includes("public cohort lookup")));
+    assert.ok(loggedErrors.some((message) => message.includes("optional session lookup")));
+  } finally {
+    for (const item of modules.reverse()) item.restore();
+    log.mock.restore();
+  }
 });
 
 test("launch journeys use real rollback-only database records and mocked providers", { skip: process.env.RUN_LAUNCH_DB_TESTS !== "1" }, async () => {

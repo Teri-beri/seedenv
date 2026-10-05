@@ -12,7 +12,7 @@ import { createCampaignWithEscrow, saveTestCampaignDraft, type CampaignInput } f
 import { Button } from "@/components/ui/button";
 import { DeveloperInsights, type InsightSubmission } from "@/components/developer-insights";
 import { formatCents } from "@/lib/utils";
-import { microTaskTemplates } from "@/lib/micro-task-templates";
+import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templates";
 import { quoteCampaignFunding, SEEDENV_PLATFORM_FEE_PERCENT } from "@/lib/pricing";
 
 type ReviewSubmission = {
@@ -71,7 +71,8 @@ function parseHttpUrl(value: string) {
 }
 
 const vibes = ["Social & UGC", "Fitness & Wellness", "Niche Marketplace", "Creator Tools", "Fintech Trust", "AI Workflow"];
-const defaultTask = { instructionTitle: "Complete onboarding", instructionDetail: "Install the app, create an account, and capture the final onboarding screen.", proofType: TaskProofType.SCREENSHOT, minimumRep: 0 };
+const defaultTask = { instructionTitle: SEED_TASK_PRESETS[0].title, instructionDetail: SEED_TASK_PRESETS[0].defaultDescription, proofType: TaskProofType.SCREENSHOT, minimumRep: 0 };
+const taskPresetCategories = Array.from(new Set(SEED_TASK_PRESETS.map((preset) => preset.category)));
 const selectClass = "w-full rounded-2xl border border-stroke bg-black/28 px-4 py-3 text-white outline-none focus:border-aurum [color-scheme:dark]";
 const optionStyle = { backgroundColor: "#0E1017", color: "#F8FAFC" };
 
@@ -91,7 +92,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     description: initialDraft.description,
     totalSlots: initialDraft.totalSlots,
     bountyPerTaskUsd: initialDraft.bountyPerTaskUsd,
-    instructions: initialDraft.instructions.map(({ instructionTitle, instructionDetail, proofType, minimumRep }) => ({ instructionTitle, instructionDetail, proofType, minimumRep })),
+    instructions: initialDraft.instructions.map(({ instructionTitle, instructionDetail, proofType, minimumRep }) => ({ instructionTitle, instructionDetail, proofType, minimumRep: resolveTaskMinimumRep({ instructionTitle, minimumRep }) })),
     discoveryAllowed: initialDraft.discoveryAllowed,
     discoveryMinRep: initialDraft.discoveryMinRep,
   } : {
@@ -118,6 +119,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const fundingQuote = useMemo(() => quoteCampaignFunding(payoutPool), [payoutPool]);
   const totalEscrow = fundingQuote.totalBudgetUsd;
   const platformFee = fundingQuote.platformFeeUsd;
+  const testerFundingShare = totalEscrow > 0 ? (fundingQuote.payoutPoolUsd / totalEscrow * 100).toFixed(2) : "0.00";
 
   function validateStep(stepToValidate: number) {
     const nextErrors: Record<string, string> = {};
@@ -233,7 +235,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
       try {
         const result = await createCampaignWithEscrow(form, draftId);
         if (result.requiresPaymentSetup) {
-          router.push(`/account?tab=portfolio&draft=${encodeURIComponent(result.campaignId)}`);
+          router.push(`/account?tab=portfolio&draft=${encodeURIComponent(result.campaignId)}#stripe-setup`);
           return;
         }
         if (result.checkoutUrl?.startsWith("http")) {
@@ -264,7 +266,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
         router.push(`/console?view=billing&testDraft=${encodeURIComponent(draft.campaignId)}`);
         router.refresh();
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Could not save the no-charge test draft.");
+        setMessage(error instanceof Error ? error.message : "Could not save the test draft.");
       }
     });
   }
@@ -299,12 +301,12 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
       {view === "new-drop" ? (
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="luxury-panel rounded-2xl p-6 transition-all hover:border-violet-500/30">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-aurum">New Drop / Campaign</p>
               <h2 className="mt-2 text-3xl font-black">Launch Wizard</h2>
             </div>
-            <div className="flex rounded-lg border border-[#1F2430] bg-[#090A0F]/60 p-1" role="tablist" aria-label="Launch wizard steps">
+            <div className="flex self-start rounded-lg border border-[#1F2430] bg-[#090A0F]/60 p-1 sm:self-auto" role="tablist" aria-label="Launch wizard steps">
               {([[1, "Details"], [2, "Tasks"], [3, "Budget"]] as const).map(([item, label]) => (
                 <button aria-selected={step === item} disabled={item > highestStep} key={item} className={`rounded-md px-2.5 py-2 text-xs font-bold transition-all disabled:cursor-not-allowed disabled:opacity-35 ${step === item ? "bg-amber-500 text-neutral-950" : "text-white/55 enabled:hover:text-white"}`} onClick={() => { setStep(item); setErrors({}); }} role="tab" type="button">
                   <span className="mr-1 font-mono">{item}</span>{label}
@@ -359,12 +361,22 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
 
           {step === 2 && (
             <div className="mt-6 space-y-3">
-              <label className="block text-sm font-semibold text-neutral-300">Add a micro-task template
+              <label className="block text-sm font-semibold text-neutral-300">Add testing mission
                 <select value="" disabled={form.instructions.length >= 12} className={`mt-2 ${selectClass}`} onChange={(event) => {
-                  const template = microTaskTemplates.find(([id]) => id === event.target.value);
-                  if (!template) return;
-                  setForm((current) => ({ ...current, instructions: [...current.instructions, { instructionTitle: template[1], instructionDetail: template[2], proofType: TaskProofType.SCREENSHOT, minimumRep: 0 }] }));
-                }}><option value="">Choose from 24 testing activities</option>{microTaskTemplates.map(([id, title]) => <option key={id} value={id} style={optionStyle}>{title}</option>)}</select>
+                  const preset = SEED_TASK_PRESETS.find((item) => item.id === event.target.value);
+                  if (!preset) return;
+                  setForm((current) => current.instructions.length >= 12 ? current : ({ ...current, instructions: [...current.instructions, { presetId: preset.id, instructionTitle: preset.title, instructionDetail: preset.defaultDescription, proofType: TaskProofType.SCREENSHOT, minimumRep: resolveTaskMinimumRep({ presetId: preset.id, instructionTitle: preset.title }) }] }));
+                  setErrors({});
+                }}>
+                  <option value="">Choose a testing mission</option>
+                  {taskPresetCategories.map((category) => (
+                    <optgroup key={category} label={category} style={optionStyle}>
+                      {SEED_TASK_PRESETS.filter((preset) => preset.category === category).map((preset) => (
+                        <option key={preset.id} value={preset.id} style={optionStyle}>{preset.title} ({preset.estimatedMinutes} min)</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
                 <span className="mt-2 block text-xs font-normal leading-6 text-neutral-500">Adapt the brief to your app. Rewards are issued for the whole approved mission, not once per step.</span>
               </label>
               {form.instructions.map((task, index) => (
@@ -379,7 +391,6 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     <Field error={errors[`instructionTitle-${index}`]} label="Instruction title" maxLength={90} required value={task.instructionTitle} onChange={(value) => updateTask(index, { instructionTitle: value })} />
-                    <label className="space-y-2 text-sm font-semibold text-white/72">Minimum tester REP<input type="number" min={0} max={1000000} value={task.minimumRep} onChange={(event) => updateTask(index, { minimumRep: Number(event.target.value) })} className={selectClass} /></label>
                     <label className="space-y-2 text-sm font-semibold text-white/72">
                       Proof type
                       <select style={{ colorScheme: "dark" }} value={task.proofType} onChange={(event) => updateTask(index, { proofType: event.target.value as TaskProofType })} className={selectClass}>
@@ -397,11 +408,14 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                 </motion.div>
               ))}
               {errors.instructions ? <p className="text-sm text-rose-300" role="alert">{errors.instructions}</p> : null}
-              <Button disabled={form.instructions.length >= 12} type="button" variant="ghost" onClick={() => setForm((current) => ({ ...current, instructions: [...current.instructions, defaultTask] }))}>
-                <Plus className="size-4" /> Add step
+              <Button disabled={form.instructions.length >= 12} type="button" variant="ghost" onClick={() => {
+                setForm((current) => current.instructions.length >= 12 ? current : ({ ...current, instructions: [...current.instructions, { instructionTitle: "", instructionDetail: "", proofType: TaskProofType.SCREENSHOT, minimumRep: 0 }] }));
+                setErrors({});
+              }}>
+                <Plus className="size-4" /> Add custom task
               </Button>
               <div className="rounded-xl border border-stroke p-4">
-                <p className="text-xs leading-6 text-neutral-400">Applicants must meet the highest REP requirement among the campaign steps. You review all applications before testers start.</p>
+                <p className="text-xs leading-6 text-neutral-400">Tester reputation is checked automatically before an application can be submitted. Discovery Pass applicants remain subject to your Discovery REP floor and review.</p>
                 <label className="mt-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={form.discoveryAllowed} onChange={(event) => setForm((current) => ({ ...current, discoveryAllowed: event.target.checked }))} />Allow Discovery Pass applicants</label>
                 {form.discoveryAllowed ? <label className="mt-3 block text-sm">Discovery REP floor<input type="number" min={0} max={1000000} value={form.discoveryMinRep} onChange={(event) => setForm((current) => ({ ...current, discoveryMinRep: Number(event.target.value) }))} className={`mt-2 ${selectClass}`} /></label> : null}
               </div>
@@ -413,15 +427,15 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               <Slider error={errors.totalSlots} label="Number of testers" min={5} max={500} value={form.totalSlots} onChange={(value) => updateFormField("totalSlots", value)} />
               <Slider error={errors.bountyPerTaskUsd} label="Bounty per tester ($)" min={1} max={100} value={form.bountyPerTaskUsd} step={0.5} onChange={(value) => updateFormField("bountyPerTaskUsd", value)} />
               <div className="grid gap-3 md:grid-cols-3">
-                <Metric label="Tester payout escrow (92%)" value={`$${payoutPool.toFixed(2)}`} />
+                <Metric label={`Tester payout escrow (${testerFundingShare}%)`} value={`$${payoutPool.toFixed(2)}`} />
                 <Metric label={`${SEEDENV_PLATFORM_FEE_PERCENT * 100}% platform & telemetry fee`} value={`$${platformFee.toFixed(2)}`} />
                 <Metric label="Total escrow" value={`$${totalEscrow.toFixed(2)}`} gold />
               </div>
-              <p className="text-xs leading-5 text-white/50">No hidden markups. 92% of funds go straight to rewarding verified human validators.</p>
+              <p className="text-xs leading-5 text-white/50">The {SEEDENV_PLATFORM_FEE_PERCENT * 100}% platform fee is added to tester rewards. Testers receive {testerFundingShare}% of total funding before any Stripe fees.</p>
               <Button size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending}>
                 <BadgeDollarSign className="size-5" /> Deposit Escrow & Launch
               </Button>
-              {canSaveTestDraft ? <Button className="w-full" disabled={isPending || isUploadingIcon} type="button" variant="ghost" onClick={saveNoChargeTestDraft}><CheckCircle2 className="size-4" /> Save test draft (no charge)</Button> : null}
+              {canSaveTestDraft ? <Button className="w-full" disabled={isPending || isUploadingIcon} type="button" variant="ghost" onClick={saveNoChargeTestDraft}><CheckCircle2 className="size-4" /> Save test draft</Button> : null}
             </div>
           )}
           <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4">

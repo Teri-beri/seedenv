@@ -1,26 +1,88 @@
-export const microTaskTemplates = [
-  ["onboarding", "Complete onboarding", "Follow the onboarding flow in the supplied test environment. Report each unclear step and capture the completion screen."],
-  ["create", "Create a test item", "Create an item using fictional test data. Verify the saved item appears and include the exact steps you followed."],
-  ["edit", "Edit and reopen", "Edit a test item, save it, then reopen it. Compare the saved values with your changes and capture any discrepancy."],
-  ["delete", "Delete test data", "Delete an item you created for this test. Verify the deletion and explain whether the confirmation was clear."],
-  ["search", "Search with intent", "Search for a known test item, a partial term, and a nonexistent term. Record the results and any misleading messages."],
-  ["filter", "Check result filters", "Apply the filters described in the brief. Verify every visible result matches them and report inconsistencies."],
-  ["settings", "Verify settings persist", "Change a non-sensitive setting, reopen the app, and verify it persists. Restore your original setting after testing."],
-  ["validation", "Check form validation", "Use safe invalid inputs in the test form. Record each error and explain whether it tells you how to fix the input."],
-  ["empty", "Explore an empty state", "Open the specified screen with no test data. Explain whether the next action is clear and capture the empty state."],
-  ["loading", "Inspect a loading state", "Observe the specified loading workflow. Note progress feedback and whether controls prevent duplicate actions."],
-  ["retry", "Check retry behavior", "Using the developer-approved test scenario, trigger a recoverable failure and verify the retry action works."],
-  ["mobile", "Check a phone layout", "Use your phone to complete the specified workflow. Report overlap, clipped content, or controls that are difficult to reach."],
-  ["text", "Increase text size", "Increase device text size, then inspect the specified screen. Capture clipped labels or inaccessible actions."],
-  ["keyboard", "Navigate by keyboard", "Navigate the specified workflow with keyboard controls. Record the focus order and any actions you cannot reach."],
-  ["labels", "Inspect control labels", "Check the specified form and icon controls for meaningful labels. Describe ambiguous actions with screenshots."],
-  ["contrast", "Check readability", "Review the specified screen for difficult-to-read text and contrast problems. Identify exact elements and conditions."],
-  ["reader", "Check screen-reader feedback", "With an available screen reader, perform the specified workflow. Record unclear labels or missing status announcements."],
-  ["landscape", "Rotate the screen", "Rotate your phone during the specified workflow. Confirm content remains usable and entered test data is preserved."],
-  ["browser", "Compare supported browsers", "If you have two browsers supported by the brief, repeat the same workflow and document any differences."],
-  ["device", "Record device behavior", "Repeat the specified task on your available supported device. Include device, OS, browser, and app build details."],
-  ["reproduce", "Reproduce a known issue", "Follow the provided bug report on the stated build. Explain whether it reproduces and include observed differences."],
-  ["fix", "Verify a bug fix", "Repeat the original reproduction steps on the fixed build. Confirm the expected behavior and check nearby actions."],
-  ["workaround", "Document a workaround", "For the assigned issue, test only developer-approved alternatives and document a safe, repeatable workaround."],
-  ["summary", "Write a usability summary", "Complete the requested workflow and summarize what felt clear, confusing, or slow. Include specific examples."],
-] as const;
+import { rankThresholds } from "./rank";
+
+export interface TaskPreset {
+  id: string;
+  category: "Core Flows" | "Stress & Performance" | "Commerce & Auth" | "Bug Hunting & Device";
+  title: string;
+  defaultDescription: string;
+  estimatedMinutes: number;
+}
+
+export const SEED_TASK_PRESETS: TaskPreset[] = [
+  {
+    id: "first-time-onboarding",
+    category: "Core Flows",
+    title: "First-Time Onboarding & UX Teardown",
+    defaultDescription: "Walk through initial signup, permission requests, and tutorial. Note confusing copy, friction points, or drop-offs.",
+    estimatedMinutes: 5,
+  },
+  {
+    id: "core-feature-smoke-test",
+    category: "Core Flows",
+    title: "Primary User Loop / Golden Path Test",
+    defaultDescription: "Execute the core value loop (e.g., create content, search feed, send transaction, or join a room) and verify end-to-end success.",
+    estimatedMinutes: 8,
+  },
+  {
+    id: "dark-mode-visual-hierarchy",
+    category: "Core Flows",
+    title: "UI Visual Audit (Dark Mode & Dynamic Type)",
+    defaultDescription: "Toggle Dark/Light modes and adjust system font scale to largest setting; check for truncated text and layout clipping.",
+    estimatedMinutes: 5,
+  },
+  {
+    id: "offline-reconnect",
+    category: "Stress & Performance",
+    title: "Airplane Mode & Offline Sync Resilience",
+    defaultDescription: "Trigger actions while in Airplane Mode, reconnect to network, and verify state recovery, cached feeds, or retry handling.",
+    estimatedMinutes: 7,
+  },
+  {
+    id: "background-kill-resume",
+    category: "Stress & Performance",
+    title: "Background App Kill & Session Restore",
+    defaultDescription: "Minimize app, force close from app switcher mid-action, reopen, and confirm state/session persistence.",
+    estimatedMinutes: 5,
+  },
+  {
+    id: "rapid-tap-stress",
+    category: "Stress & Performance",
+    title: "Rapid Interaction / Rage-Tap Stress Test",
+    defaultDescription: "Rapidly spam action buttons, back swipes, and concurrent requests to check for double-firing, UI lockups, or memory spikes.",
+    estimatedMinutes: 5,
+  },
+  {
+    id: "auth-providers-test",
+    category: "Commerce & Auth",
+    title: "Social Auth & 2FA / Session Invalidation",
+    defaultDescription: "Test Sign in with Apple, Google, or Magic Link; verify logout, session expiration, and credential re-entry.",
+    estimatedMinutes: 6,
+  },
+  {
+    id: "checkout-iap-sandbox",
+    category: "Commerce & Auth",
+    title: "StoreKit Sandbox / In-App Purchase Flow",
+    defaultDescription: "Complete a sandbox TestFlight digital currency or subscription transaction; verify balance update and receipt delivery.",
+    estimatedMinutes: 8,
+  },
+  {
+    id: "screen-record-repro",
+    category: "Bug Hunting & Device",
+    title: "Exploratory Bug Bounty with Screen Recording",
+    defaultDescription: "Freely explore unreleased features for 10 minutes with native screen recording; report reproducible crash logs and UI glitches.",
+    estimatedMinutes: 10,
+  },
+  {
+    id: "specific-device-screen-fit",
+    category: "Bug Hunting & Device",
+    title: "Device Notch, Island & Foldable Fit",
+    defaultDescription: "Test on targeted hardware (Dynamic Island, home bar inset, or small SE screens) to verify touch targets are not obstructed.",
+    estimatedMinutes: 5,
+  },
+];
+
+export function resolveTaskMinimumRep(task: { presetId?: string; instructionTitle: string; minimumRep?: number }) {
+  const preset = SEED_TASK_PRESETS.find((item) => task.presetId ? item.id === task.presetId : item.title === task.instructionTitle);
+  const advanced = preset && preset.category !== "Core Flows" && preset.id !== "specific-device-screen-fit";
+  return Math.max(task.minimumRep ?? 0, advanced ? rankThresholds.CORE_VALIDATOR.minXp : 0);
+}

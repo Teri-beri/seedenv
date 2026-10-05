@@ -6,13 +6,16 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SEEDENV_PLATFORM_FEE_PERCENT, getStripe } from "@/lib/stripe";
 import { quoteCampaignFunding } from "@/lib/pricing";
+import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templates";
+import { billingDetailsSchema } from "@/lib/enterprise-rules";
 
 const taskInstructionSchema = z.object({
   instructionTitle: z.string().min(3).max(90),
   instructionDetail: z.string().min(12).max(900),
   proofType: z.nativeEnum(TaskProofType),
   minimumRep: z.number().int().min(0).max(1000000).default(0),
-});
+  presetId: z.string().max(90).refine((id) => SEED_TASK_PRESETS.some((preset) => preset.id === id), "Unknown testing mission preset.").optional(),
+}).transform((instruction) => ({ ...instruction, minimumRep: resolveTaskMinimumRep(instruction) }));
 
 const httpUrlSchema = z.string().url().refine((value) => {
   const protocol = new URL(value).protocol;
@@ -62,7 +65,10 @@ function buildCampaignData(input: CampaignInput, developerId: string, status: Ca
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       instructions: {
         create: input.instructions.map((instruction, index) => ({
-          ...instruction,
+          instructionTitle: instruction.instructionTitle,
+          instructionDetail: instruction.instructionDetail,
+          proofType: instruction.proofType,
+          minimumRep: instruction.minimumRep,
           stepNumber: index + 1,
         })),
       },
@@ -99,7 +105,7 @@ export async function saveTestCampaignDraft(data: CampaignInput) {
   const developer = await requireDeveloper();
   const ownerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();
   if (!ownerEmail || developer.email.trim().toLowerCase() !== ownerEmail || developer.username.trim().toLowerCase() !== "teriberi") {
-    throw new Error("No-charge test drafts are only available to the SeedEnv owner account.");
+    throw new Error("Test drafts are only available to the SeedEnv owner account.");
   }
 
   const { data: campaignData } = buildCampaignData(input, developer.id, CampaignStatus.DRAFT);
@@ -110,8 +116,9 @@ export async function saveTestCampaignDraft(data: CampaignInput) {
 export async function createCampaignWithEscrow(data: CampaignInput, draftId?: string) {
   const input = campaignSchema.parse(data);
   const developer = await requireDeveloper();
-  if (process.env.NODE_ENV === "production" && !process.env.STRIPE_SECRET_KEY) {
-    throw new Error("Stripe is required in production. No campaign or escrow record was created.");
+  if (!process.env.STRIPE_SECRET_KEY) {
+    const draft = await saveCampaignDraft(developer.id, input, draftId);
+    return { campaignId: draft.id, checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true };
   }
 
   if (process.env.STRIPE_SECRET_KEY) {
@@ -130,6 +137,8 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
     }
   }
 
+  const profile = await prisma.billingProfile.findUnique({ where: { userId: developer.id } });
+  const company = profile ? billingDetailsSchema.parse({ ...profile, taxId: profile.taxId || "", addressLine2: profile.addressLine2 || "", region: profile.region || "" }) : null;
   const { data: campaignData, escrowTotalCents } = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING);
   let campaign;
   if (draftId) {
@@ -150,15 +159,21 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
     data: {
       userId: developer.id,
       amountCents: escrowTotalCents,
+      campaignId: campaign.id,
+      platformFeeCents: Math.round(campaignData.platformFeeUsd * 100),
+      invoiceSnapshot: {
+        version: 1,
+        cohortId: campaign.id,
+        cohortTitle: input.title,
+        rewardPoolCents: escrowTotalCents - Math.round(campaignData.platformFeeUsd * 100),
+        platformFeeCents: Math.round(campaignData.platformFeeUsd * 100),
+        company,
+      },
       type: TransactionType.ESCROW_DEPOSIT,
       status: TransactionStatus.PENDING,
       description: `Escrow deposit for ${campaign.title} (${campaign.id})`,
     },
   });
-
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return { campaignId: campaign.id, checkoutUrl: null, escrowTotalCents };
-  }
 
   const stripe = getStripe();
   let session;
