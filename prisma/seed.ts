@@ -1,4 +1,5 @@
 import { PrismaClient, CampaignStatus, PlatformType, RankTier, TaskProofType, TransactionStatus, TransactionType, UserRole } from "@prisma/client";
+import { quoteCampaignFunding } from "../lib/pricing";
 
 const prisma = new PrismaClient();
 
@@ -62,7 +63,6 @@ async function main() {
       completedSlots: 4,
       bountyPerTaskUsd: 3.5,
       totalBudgetUsd: 87.5,
-      platformFeeUsd: 17.5,
       expiresAt: daysFromNow(12),
       instructions: [
         ["Join TestFlight", "Install PulseRoom and complete onboarding with a profile photo.", TaskProofType.SCREENSHOT],
@@ -82,7 +82,6 @@ async function main() {
       completedSlots: 11,
       bountyPerTaskUsd: 5,
       totalBudgetUsd: 200,
-      platformFeeUsd: 40,
       expiresAt: daysFromNow(18),
       instructions: [
         ["Build a plan", "Create a three-day workout plan using the guided setup.", TaskProofType.SCREENSHOT],
@@ -102,7 +101,6 @@ async function main() {
       completedSlots: 6,
       bountyPerTaskUsd: 4.25,
       totalBudgetUsd: 127.5,
-      platformFeeUsd: 25.5,
       expiresAt: daysFromNow(21),
       instructions: [
         ["Create a listing", "Post one realistic item with a title, category, price, and photo.", TaskProofType.SCREENSHOT],
@@ -113,6 +111,7 @@ async function main() {
   ] as const;
 
   for (const campaignData of campaigns) {
+    const { totalBudgetUsd, platformFeeUsd } = quoteCampaignFunding(campaignData.totalSlots * campaignData.bountyPerTaskUsd);
     await prisma.appCampaign.create({
       data: {
         developerId: developer.id,
@@ -122,9 +121,9 @@ async function main() {
         iconUrl: campaignData.iconUrl,
         targetVibe: campaignData.targetVibe,
         description: campaignData.description,
-        totalBudgetUsd: campaignData.totalBudgetUsd,
+        totalBudgetUsd,
         bountyPerTaskUsd: campaignData.bountyPerTaskUsd,
-        platformFeeUsd: campaignData.platformFeeUsd,
+        platformFeeUsd,
         totalSlots: campaignData.totalSlots,
         claimedSlots: campaignData.claimedSlots,
         completedSlots: campaignData.completedSlots,

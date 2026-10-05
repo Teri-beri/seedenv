@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SEEDENV_PLATFORM_FEE_PERCENT, getStripe } from "@/lib/stripe";
-import { usdToCents } from "@/lib/utils";
+import { quoteCampaignFunding } from "@/lib/pricing";
 
 const taskInstructionSchema = z.object({
   instructionTitle: z.string().min(3).max(90),
@@ -40,9 +40,7 @@ export type CampaignInput = z.infer<typeof campaignSchema>;
 
 function buildCampaignData(input: CampaignInput, developerId: string, status: CampaignStatus) {
   const testerPayoutPoolUsd = input.totalSlots * input.bountyPerTaskUsd;
-  const totalBudgetUsd = Number((testerPayoutPoolUsd / (1 - SEEDENV_PLATFORM_FEE_PERCENT)).toFixed(2));
-  const platformFeeUsd = Number((totalBudgetUsd - testerPayoutPoolUsd).toFixed(2));
-  const escrowTotalCents = usdToCents(totalBudgetUsd);
+  const { totalBudgetUsd, platformFeeUsd, escrowTotalCents } = quoteCampaignFunding(testerPayoutPoolUsd);
 
   return {
     escrowTotalCents,
@@ -177,7 +175,7 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
             unit_amount: escrowTotalCents,
             product_data: {
               name: `SeedEnv escrow: ${campaign.title}`,
-              description: `${input.totalSlots} tester slots at $${input.bountyPerTaskUsd.toFixed(2)} plus 8% platform and telemetry fee`,
+              description: `${input.totalSlots} tester slots at $${input.bountyPerTaskUsd.toFixed(2)} plus ${SEEDENV_PLATFORM_FEE_PERCENT * 100}% platform and telemetry fee on the tester reward pool`,
             },
           },
         },

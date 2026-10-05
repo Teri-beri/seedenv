@@ -1,3 +1,7 @@
+import { publicPageMetadata } from "@/lib/seo";
+
+export const metadata = publicPageMetadata("Privacy", "Learn how SeedEnv handles account information, testing feedback, proof uploads, and payment-provider integrations.", "/privacy");
+
 const sections = [
   {
     title: "1. Information We Collect",

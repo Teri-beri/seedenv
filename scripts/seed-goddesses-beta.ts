@@ -1,4 +1,5 @@
 import { CampaignStatus, PlatformType, PrismaClient, TaskProofType } from "@prisma/client";
+import { quoteCampaignFunding } from "../lib/pricing";
 
 const prisma = new PrismaClient();
 const appUrl = "https://testflight.apple.com/join/mRBmnG8M";
@@ -14,6 +15,7 @@ async function main() {
   if (!developer) throw new Error("Create a developer account before seeding the Goddesses beta mission.");
 
   const existing = await prisma.appCampaign.findFirst({ where: { title: "Goddesses App Beta Validation" } });
+  const { totalBudgetUsd, platformFeeUsd } = quoteCampaignFunding(40 * 5);
   const campaign = existing || await prisma.appCampaign.create({
     data: {
       developerId: developer.id,
@@ -22,9 +24,9 @@ async function main() {
       appUrl,
       targetVibe: "Social & UGC",
       description: "Validate the real Goddesses TestFlight beta: onboarding, profile setup, community discovery, and trust friction.",
-      totalBudgetUsd: 216,
+      totalBudgetUsd,
       bountyPerTaskUsd: 5,
-      platformFeeUsd: 18,
+      platformFeeUsd,
       totalSlots: 40,
       status: CampaignStatus.ACTIVE,
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { quoteCampaignFunding } from "./pricing";
 
 export const clipTerms = "Creator retains ownership. On successful payment, the developer receives 90 days of non-exclusive organic repost rights to the approved video. Paid ads, boosting, whitelisting, raw footage, and ownership transfer are excluded and require a separate agreement. Developer review and release are due within 72 hours of submission; revisions within three days; publication within seven days of approval. Deadline or retention breaches require dispute review, not automatic forfeiture. No guaranteed views or sales. Required sponsorship disclosure and commercially licensed media are the creator's responsibility.";
 export const clipTermsVersion = "clippers-v1-organic-90";
@@ -34,7 +35,7 @@ export type ClipProfileInput = z.infer<typeof clipProfileSchema>;
 
 export function clipChargeCents(feeCents: number) {
   if (!Number.isSafeInteger(feeCents) || feeCents < 1000 || feeCents > 100000) throw new Error("Creator fees must be between $10 and $1,000.");
-  return Math.ceil(feeCents * 100 / 92);
+  return quoteCampaignFunding(feeCents / 100).escrowTotalCents;
 }
 
 export function publicationIdentity(value: string, platform: string) {

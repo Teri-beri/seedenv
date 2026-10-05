@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { DeveloperInsights, type InsightSubmission } from "@/components/developer-insights";
 import { formatCents } from "@/lib/utils";
 import { microTaskTemplates } from "@/lib/micro-task-templates";
+import { quoteCampaignFunding, SEEDENV_PLATFORM_FEE_PERCENT } from "@/lib/pricing";
 
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
@@ -114,8 +115,9 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const [isPending, startTransition] = useTransition();
 
   const payoutPool = useMemo(() => form.totalSlots * form.bountyPerTaskUsd, [form.totalSlots, form.bountyPerTaskUsd]);
-  const totalEscrow = useMemo(() => payoutPool / 0.92, [payoutPool]);
-  const platformFee = useMemo(() => totalEscrow * 0.08, [totalEscrow]);
+  const fundingQuote = useMemo(() => quoteCampaignFunding(payoutPool), [payoutPool]);
+  const totalEscrow = fundingQuote.totalBudgetUsd;
+  const platformFee = fundingQuote.platformFeeUsd;
 
   function validateStep(stepToValidate: number) {
     const nextErrors: Record<string, string> = {};
@@ -412,7 +414,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               <Slider error={errors.bountyPerTaskUsd} label="Bounty per tester ($)" min={1} max={100} value={form.bountyPerTaskUsd} step={0.5} onChange={(value) => updateFormField("bountyPerTaskUsd", value)} />
               <div className="grid gap-3 md:grid-cols-3">
                 <Metric label="Tester payout escrow (92%)" value={`$${payoutPool.toFixed(2)}`} />
-                <Metric label="8% platform & telemetry fee" value={`$${platformFee.toFixed(2)}`} />
+                <Metric label={`${SEEDENV_PLATFORM_FEE_PERCENT * 100}% platform & telemetry fee`} value={`$${platformFee.toFixed(2)}`} />
                 <Metric label="Total escrow" value={`$${totalEscrow.toFixed(2)}`} gold />
               </div>
               <p className="text-xs leading-5 text-white/50">No hidden markups. 92% of funds go straight to rewarding verified human validators.</p>

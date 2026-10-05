@@ -3,6 +3,7 @@ import type { Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/components/auth-provider";
 import { CursorGridTrail } from "@/components/cursor-grid-trail";
+import { siteMetadata, siteStructuredData } from "@/lib/seo";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,38 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://seedenv.com"),
-  applicationName: "SeedEnv",
-  title: {
-    default: "SeedEnv | Seed Real Beta Communities",
-    template: "%s | SeedEnv",
-  },
-  description: "Seed authentic beta communities. Get paid for real launch feedback.",
-  alternates: {
-    canonical: "/",
-  },
+  ...siteMetadata,
   manifest: "/manifest.json",
-  openGraph: {
-    type: "website",
-    url: "https://seedenv.com",
-    siteName: "SeedEnv",
-    title: "SeedEnv | Seed Real Beta Communities",
-    description: "Seed authentic beta communities. Get paid for real launch feedback.",
-    images: [
-      {
-        url: "/seedenv-logo-v2.png",
-        width: 1024,
-        height: 768,
-        alt: "SeedEnv",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "SeedEnv | Seed Real Beta Communities",
-    description: "Seed authentic beta communities. Get paid for real launch feedback.",
-    images: ["/seedenv-logo-v2.png"],
-  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -79,6 +50,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full bg-obsidian text-white selection:bg-aurum selection:text-obsidian">
         <CursorGridTrail />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteStructuredData).replace(/</g, "\\u003c") }}
+        />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

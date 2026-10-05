@@ -6,6 +6,15 @@ import type { User } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { assertProofEditable, startProofRevision } from "../lib/submission-lifecycle";
 import nextConfig from "../next.config";
+import { quoteCampaignFunding, SEEDENV_PLATFORM_FEE_PERCENT } from "../lib/pricing";
+
+test("campaign funding adds a fixed 5% fee on the reward pool with cent rounding", () => {
+  assert.equal(SEEDENV_PLATFORM_FEE_PERCENT, 0.05);
+  assert.deepEqual(quoteCampaignFunding(100), { payoutPoolUsd: 100, platformFeeUsd: 5, totalBudgetUsd: 105, escrowTotalCents: 10500 });
+  assert.equal(quoteCampaignFunding(87.5).platformFeeUsd, 4.38);
+  assert.equal(quoteCampaignFunding(127.5).platformFeeUsd, 6.38);
+  for (const amount of [-1, NaN, Infinity]) assert.throws(() => quoteCampaignFunding(amount));
+});
 
 test("proof editing requires an explicit revision start and a live editing window", () => {
   const original = { expiresAt: new Date(Date.now() + 60000), feedbackText: "Original feedback", proofImageUrl: "proof:original", revisionRequestedAt: null, revisionStartedAt: null };

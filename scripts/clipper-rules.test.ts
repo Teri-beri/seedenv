@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { assertClipTransition, clipCampaignSchema, clipChargeCents, publicationIdentity, clipTermsVersion } from "../lib/clipper-rules";
 
 test("creator fee uses integer cents, includes the platform share, and has exact limits", () => {
-  assert.equal(clipChargeCents(1000), 1087);
-  assert.equal(clipChargeCents(5000), 5435);
-  assert.equal(clipChargeCents(100000), 108696);
+  assert.equal(clipChargeCents(1000), 1050);
+  assert.equal(clipChargeCents(5000), 5250);
+  assert.equal(clipChargeCents(100000), 105000);
+  assert.equal(clipChargeCents(1001), 1051);
   for (const value of [999, 100001, 1000.5, NaN, Infinity]) assert.throws(() => clipChargeCents(value));
 });
 

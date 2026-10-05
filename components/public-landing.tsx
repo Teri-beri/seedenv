@@ -9,7 +9,9 @@ import { CSSProperties, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AnalyticsTracker, trackAnalytics } from "@/components/analytics-tracker";
 import { AnimatedGridBackground } from "@/components/animated-grid-background";
+import { PublicFooter } from "@/components/public-footer";
 import { formatCents } from "@/lib/utils";
+import { quoteCampaignFunding, SEEDENV_PLATFORM_FEE_PERCENT } from "@/lib/pricing";
 
 type Mission = {
   id: string;
@@ -172,7 +174,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
 
         <aside className="luxury-panel hidden rounded-2xl border-white/10 bg-zinc-900/80 p-4 backdrop-blur-md sm:block sm:p-5">
           <p className="text-xs uppercase tracking-[0.28em] text-amber-500">{audience === "validator" ? "Active rewards" : "Developer signal"}</p>
-          {audience === "developer" ? <div className="mt-5 space-y-3"><MetricLine label="Verified human validators" value={`${openSlots} open slots`} /><MetricLine label="Platform fee" value="8% of total budget" /><MetricLine label="Evidence layer" value="Proof + telemetry" /></div> : null}
+          {audience === "developer" ? <div className="mt-5 space-y-3"><MetricLine label="Verified human validators" value={`${openSlots} open slots`} /><MetricLine label="Platform fee" value={`${SEEDENV_PLATFORM_FEE_PERCENT * 100}% of tester reward pool`} /><MetricLine label="Evidence layer" value="Proof + telemetry" /></div> : null}
           <div className="mt-5 grid gap-3">
             {missions.slice(0, 3).map((mission) => (
               <div key={mission.id} className="rounded-2xl border border-white/10 bg-zinc-950/45 p-4 backdrop-blur-md transition-all hover:border-amber-500/50">
@@ -288,6 +290,7 @@ export function PublicLanding({ missions, viewer }: { missions: Mission[]; viewe
           <p className="font-mono text-xs">Human validation infrastructure</p>
         </div>
       </footer>
+      <div className="order-6 w-full"><PublicFooter /></div>
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#090A0F]/92 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-xl sm:hidden">
         <div className="mx-auto grid max-w-md grid-cols-2 gap-3">
           <Button className="h-12 rounded-2xl" onClick={() => goToProtectedAction("/dashboard", "Starting as a Scout")}>Start as a Scout</Button>
@@ -357,10 +360,8 @@ function ValidatorJourney() {
 function DeveloperPricing({ onDeploy }: { onDeploy: () => void }) {
   const [budget, setBudget] = useState(300);
   const testerCount = Math.max(1, Math.round(budget / 10));
-  const payoutLow = Math.round(budget * 0.9);
-  const payoutHigh = Math.round(budget * 0.95);
-  const feeLow = Math.round(budget * 0.05);
-  const feeHigh = Math.round(budget * 0.1);
+  const fundingQuote = quoteCampaignFunding(budget);
+  const feePercent = SEEDENV_PLATFORM_FEE_PERCENT * 100;
 
   return (
     <div className="luxury-panel rounded-2xl p-5 md:p-8">
@@ -368,16 +369,16 @@ function DeveloperPricing({ onDeploy }: { onDeploy: () => void }) {
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-amber-500">For Developers · Transparent pricing</p>
           <h2 className="mt-3 max-w-2xl bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-3xl font-black tracking-tight text-transparent sm:text-4xl">Launch validation without mystery fees.</h2>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-neutral-400">SeedEnv takes only a 5%–10% platform fee on your total campaign budget. 90%+ goes directly to incentivizing vetted, enthusiastic beta users.</p>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-neutral-400">SeedEnv adds a fixed {feePercent}% platform fee to your tester reward pool. The full reward pool goes to approved tester work; the fee is added separately.</p>
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             {["Proof hosting", "Automated validation", "Fraud protection"].map((item) => <div className="rounded-xl border border-white/10 bg-zinc-950/45 p-3 text-xs font-semibold text-zinc-300" key={item}><Check className="mb-2 size-4 text-emerald-400" />{item}</div>)}
           </div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-zinc-950/55 p-5">
-          <div className="flex items-center justify-between gap-3"><label className="text-sm font-bold text-white" htmlFor="campaign-budget">Campaign budget</label><div className="flex items-center gap-1 rounded-lg border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-amber-200"><span>$</span><input aria-label="Campaign budget in dollars" className="w-20 bg-transparent text-right font-mono font-black outline-none" id="campaign-budget" max="5000" min="100" onChange={(event) => setBudget(Number(event.target.value) || 100)} type="number" value={budget} /></div></div>
-          <input aria-label="Campaign budget slider" className="mt-5 w-full accent-amber-500" max="5000" min="100" onChange={(event) => setBudget(Number(event.target.value))} step="25" type="range" value={budget} />
-          <div className="mt-5 space-y-3 text-sm"><div className="flex justify-between gap-4 text-zinc-300"><span>Tester payout pool (90–95%)</span><strong className="font-mono text-emerald-300">${payoutLow}–${payoutHigh}</strong></div><div className="flex justify-between gap-4 text-zinc-300"><span>Platform & telemetry fee (5–10%)</span><strong className="font-mono text-amber-300">${feeLow}–${feeHigh}</strong></div><div className="flex justify-between gap-4 border-t border-white/10 pt-3 text-zinc-300"><span>Guaranteed deliverables</span><strong className="font-mono text-white">{testerCount} audits</strong></div></div>
+          <div className="flex items-center justify-between gap-3"><label className="text-sm font-bold text-white" htmlFor="campaign-budget">Tester reward pool</label><div className="flex items-center gap-1 rounded-lg border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-amber-200"><span>$</span><input aria-label="Tester reward pool in dollars" className="w-20 bg-transparent text-right font-mono font-black outline-none" id="campaign-budget" max="5000" min="100" onChange={(event) => setBudget(Math.min(5000, Math.max(100, Number(event.target.value) || 100)))} type="number" value={budget} /></div></div>
+          <input aria-label="Tester reward pool slider" className="mt-5 w-full accent-amber-500" max="5000" min="100" onChange={(event) => setBudget(Number(event.target.value))} step="25" type="range" value={budget} />
+          <div className="mt-5 space-y-3 text-sm"><div className="flex justify-between gap-4 text-zinc-300"><span>Tester payout pool</span><strong className="font-mono text-emerald-300">${fundingQuote.payoutPoolUsd.toFixed(2)}</strong></div><div className="flex justify-between gap-4 text-zinc-300"><span>Platform &amp; telemetry fee ({feePercent}%)</span><strong className="font-mono text-amber-300">${fundingQuote.platformFeeUsd.toFixed(2)}</strong></div><div className="flex justify-between gap-4 border-t border-white/10 pt-3 text-zinc-300"><span>Total funding</span><strong className="font-mono text-white">${fundingQuote.totalBudgetUsd.toFixed(2)}</strong></div><div className="flex justify-between gap-4 text-zinc-300"><span>Estimated tester slots</span><strong className="font-mono text-white">{testerCount}</strong></div></div>
           <p className="mt-4 text-xs leading-5 text-zinc-500">Distributed across {testerCount} testers with device logs and verified tester reviews included.</p>
           <Button className="mt-5 w-full" onClick={onDeploy}>Launch This Cohort <ArrowRight className="size-4" /></Button>
         </div>

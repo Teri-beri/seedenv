@@ -1,3 +1,7 @@
+import { publicPageMetadata } from "@/lib/seo";
+
+export const metadata = publicPageMetadata("Terms", "Read SeedEnv's terms for beta testing missions, developer campaigns, submitted feedback, and tester rewards.", "/terms");
+
 const sections = [
   {
     title: "1. The SeedEnv Platform",

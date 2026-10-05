@@ -1,5 +1,6 @@
 import { CampaignStatus, PlatformType, TaskProofType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { quoteCampaignFunding } from "@/lib/pricing";
 
 export async function ensurePreviewData() {
   if (process.env.NODE_ENV === "production") return;
@@ -24,6 +25,7 @@ export async function ensurePreviewData() {
   ] as const;
 
   for (const [title, platform, vibe, bounty, totalSlots, claimedSlots, description, appUrl, iconUrl] of campaigns) {
+    const { totalBudgetUsd, platformFeeUsd } = quoteCampaignFunding(bounty * totalSlots);
     await prisma.appCampaign.create({
       data: {
         developerId: developer.id,
@@ -31,8 +33,8 @@ export async function ensurePreviewData() {
         platform,
         targetVibe: vibe,
         bountyPerTaskUsd: bounty,
-        totalBudgetUsd: bounty * totalSlots,
-        platformFeeUsd: Number(((bounty * totalSlots) * 0.08).toFixed(2)),
+        totalBudgetUsd,
+        platformFeeUsd,
         totalSlots,
         claimedSlots,
         completedSlots: Math.floor(claimedSlots / 2),
