@@ -14,6 +14,7 @@ import { DeveloperBottomNav } from "@/components/navigation";
 import { getBillingOverview } from "@/lib/billing-data";
 import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
+import { isPublicHandle, publicProfilePath } from "@/lib/public-profile";
 import { getProofImageUrl } from "@/lib/storage";
 import { SEEDENV_PLATFORM_FEE_PERCENT } from "@/lib/pricing";
 
@@ -32,7 +33,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
 
   const security = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { passwordHash: true, role: true, username: true, email: true, avatarUrl: true, stripeCustomerId: true, _count: { select: { accounts: true } } },
+    select: { passwordHash: true, role: true, username: true, email: true, avatarUrl: true, stripeCustomerId: true, companyName: true, billingProfile: { select: { companyName: true } }, _count: { select: { accounts: true } } },
   });
   if (security && !security.passwordHash && security._count.accounts === 0) redirect("/onboarding/setup?next=/console");
   const ownerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();
@@ -132,10 +133,18 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     Promise.all(approvedAssets.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
     Promise.all(auditReports.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
   ]);
+  const accountUsername = security?.username || session.user.name || "account";
+  const consoleAccount = {
+    username: accountUsername,
+    avatarUrl: security?.avatarUrl || null,
+    organization: security?.companyName?.trim() || security?.billingProfile?.companyName?.trim() || null,
+    roleLabel: security?.role === "ADMIN" || canSaveTestDraft ? "Admin" : "Developer",
+    publicProfileHref: isPublicHandle(accountUsername) ? publicProfilePath(accountUsername) : null,
+  };
   return (
     <AuthCheck role="DEVELOPER">
     <main className="mobile-app-shell min-h-screen bg-[#0A0D12] pb-16 text-white" id="console-top">
-      <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={{ username: security?.username || session.user.name || "account", avatarUrl: security?.avatarUrl || null }} />
+      <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {overview ? <>
           <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: SEEDENV_PLATFORM_FEE_PERCENT }} />

@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: { bodySizeLimit: "8mb" },
   },
+  async rewrites() {
+    return [{ source: "/@:username", destination: "/u/:username" }];
+  },
   async headers() {
     return ["dashboard", "api", "settings", "auth", "account", "console", "admin", "onboarding", "community", "clippers", "quests", "applications"].map((path) => ({
       source: `/${path}/:path*`,

@@ -19,6 +19,7 @@ import { DeveloperBottomNav, TesterBottomNav } from "@/components/navigation";
 import { getAnalyticsSummary, parseAnalyticsRange } from "@/lib/analytics";
 import { ANALYTICS_OPT_OUT_COOKIE, clientIp, excludedIps } from "@/lib/analytics-context";
 import { prisma } from "@/lib/prisma";
+import { isPublicHandle, publicProfilePath } from "@/lib/public-profile";
 import { rankProgress } from "@/lib/rank";
 import { getStripe } from "@/lib/stripe";
 import { formatCents } from "@/lib/utils";
@@ -192,6 +193,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                     <Metric icon={<BriefcaseBusiness className="size-5" />} label="Studio" value={user.companyName || "Add studio name"} />
                   </div>
                   <p className="mt-4 text-xs leading-5 text-neutral-500">Social and product links are displayed as provided. Only email and connected GitHub sign-in are marked verified.</p>
+                  {(user.role !== UserRole.TESTER || user.developerWorkspaceEnabled) && isPublicHandle(user.username) ? (
+                    <Link className="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-emerald-300 hover:underline" href={publicProfilePath(user.username)}>View public profile ↗</Link>
+                  ) : null}
                 </section>
               </div>
             ) : null}
