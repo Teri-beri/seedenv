@@ -205,6 +205,7 @@ export function AccountSettingsForm({ initial }: AccountSettingsFormProps) {
             {twitterHandle ? <Link className="inline-flex items-center gap-1 rounded-full border border-[#2A2F3D] px-2.5 py-1 text-xs text-neutral-300 hover:border-amber-500/40" href={`https://x.com/${twitterHandle.replace(/^@/, "")}`} target="_blank" rel="noreferrer">X / Twitter</Link> : null}
             {productUrl ? <Link className="inline-flex items-center gap-1 rounded-full border border-[#2A2F3D] px-2.5 py-1 text-xs text-neutral-300 hover:border-amber-500/40" href={productUrl} target="_blank" rel="noreferrer"><Link2 className="size-3.5" /> Product link</Link> : null}
           </div>
+          <p className="mt-3 text-xs leading-5 text-neutral-500">Social and product links are shown as entered. Only email and connected GitHub sign-in are marked verified.</p>
         </section>
       ) : null}
 

@@ -1,5 +1,5 @@
 import { SubmissionStatus, TransactionStatus, TransactionType, UserRole } from "@prisma/client";
-import { ArrowLeft, ArrowRight, BadgeCheck, BriefcaseBusiness, CheckCircle2, ShieldCheck, Sprout, Trophy, WalletCards } from "lucide-react";
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, CheckCircle2, ShieldCheck, Sprout, Trophy, WalletCards } from "lucide-react";
 import { getServerSession } from "next-auth";
 import Image from "next/image";
 import Link from "next/link";
@@ -181,23 +181,18 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             ) : null}
 
             {activeTab === "profile" ? (
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
-                <div className="space-y-6">
-                  <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, bio: user.bio, portfolioUrl: user.portfolioUrl, companyName: user.companyName, productUrl: user.productUrl, githubUsername: user.githubUsername, discordUrl: user.discordUrl, twitterHandle: user.twitterHandle, emailVerified: Boolean(user.emailVerified), githubConnected: user.accounts.some((account) => account.provider === "github"), role: user.role }} />
-                </div>
-                <section className="mobile-profile-summary luxury-panel h-fit rounded-2xl p-6">
-                  <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Developer profile</p>
-                  <h1 className="mt-3 text-3xl font-black text-white">Build trust before launch.</h1>
-                  <p className="mt-3 max-w-xl text-sm leading-6 text-neutral-400">A clear studio identity, concise product brief, and connected social accounts help testers understand who is behind each build.</p>
-                  <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                    <Metric icon={<BadgeCheck className="size-5" />} label="Email verification" value={user.emailVerified ? "Verified" : "Not verified"} />
-                    <Metric icon={<BriefcaseBusiness className="size-5" />} label="Studio" value={user.companyName || "Add studio name"} />
+              <div className="max-w-3xl space-y-4">
+                {(user.role !== UserRole.TESTER || user.developerWorkspaceEnabled) && isPublicHandle(user.username) ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs">
+                      <span className="uppercase tracking-wider text-zinc-500">Public profile</span>
+                      <span className="truncate text-zinc-200">{publicProfilePath(user.username)}</span>
+                      <span className={user.emailVerified ? "text-emerald-400" : "text-zinc-500"}>{user.emailVerified ? "● Email verified" : "○ Email unverified"}</span>
+                    </div>
+                    <Link className="shrink-0 rounded-md border border-zinc-800 px-2.5 py-1 font-mono text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white" href={publicProfilePath(user.username)}>View ↗</Link>
                   </div>
-                  <p className="mt-4 text-xs leading-5 text-neutral-500">Social and product links are displayed as provided. Only email and connected GitHub sign-in are marked verified.</p>
-                  {(user.role !== UserRole.TESTER || user.developerWorkspaceEnabled) && isPublicHandle(user.username) ? (
-                    <Link className="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-emerald-300 hover:underline" href={publicProfilePath(user.username)}>View public profile ↗</Link>
-                  ) : null}
-                </section>
+                ) : null}
+                <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, bio: user.bio, portfolioUrl: user.portfolioUrl, companyName: user.companyName, productUrl: user.productUrl, githubUsername: user.githubUsername, discordUrl: user.discordUrl, twitterHandle: user.twitterHandle, emailVerified: Boolean(user.emailVerified), githubConnected: user.accounts.some((account) => account.provider === "github"), role: user.role }} />
               </div>
             ) : null}
 
