@@ -5,7 +5,7 @@ import { PDFDocument } from "pdf-lib";
 import { billingDetailsSchema, invoiceSnapshotSchema, invoiceTotalMatches, payoutScheduleLabel, supportRequestSchema } from "../lib/enterprise-rules";
 import { generateInvoicePdf } from "../lib/invoice-pdf";
 
-const company = { companyName: "Société QA", taxId: "FR123456789", addressLine1: "10 Rue du Test", addressLine2: "", city: "Paris", region: "", postalCode: "75001", country: "FR" };
+const company = { companyName: "Société QA", taxId: "FR123456789", billingEmail: "billing@example.fr", addressLine1: "10 Rue du Test", addressLine2: "", city: "Paris", region: "", postalCode: "75001", country: "FR" };
 const snapshot = { version: 1 as const, cohortId: "cohort-test", cohortTitle: "TestFlight QA", rewardPoolCents: 10000, platformFeeCents: 500, company };
 
 test("billing details, invoice totals, support metadata, and schedules remain bounded and truthful", () => {

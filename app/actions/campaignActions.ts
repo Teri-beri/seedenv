@@ -138,7 +138,7 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
   }
 
   const profile = await prisma.billingProfile.findUnique({ where: { userId: developer.id } });
-  const company = profile ? billingDetailsSchema.parse({ ...profile, taxId: profile.taxId || "", addressLine2: profile.addressLine2 || "", region: profile.region || "" }) : null;
+  const company = profile ? billingDetailsSchema.parse({ ...profile, taxId: profile.taxId || "", billingEmail: profile.billingEmail || "", addressLine2: profile.addressLine2 || "", region: profile.region || "" }) : null;
   const { data: campaignData, escrowTotalCents } = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING);
   let campaign;
   if (draftId) {

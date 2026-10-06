@@ -83,7 +83,7 @@ export async function createStripeConnectOnboardingLink(country: string): Promis
   }
 }
 
-export async function createStripePaymentMethodSetupLink(draftId?: string): Promise<StripeRedirectResult> {
+export async function createStripePaymentMethodSetupLink(draftId?: string, returnTo?: "billing"): Promise<StripeRedirectResult> {
   const user = await getCurrentUser("DEVELOPER");
   if (user.role !== UserRole.DEVELOPER) return { ok: false, message: "Switch to your Developer workspace to set up campaign funding." };
   if (!process.env.STRIPE_SECRET_KEY) return { ok: false, message: "Stripe setup is unavailable. Contact SeedEnv support." };
@@ -121,8 +121,8 @@ export async function createStripePaymentMethodSetupLink(draftId?: string): Prom
       customer: customerId,
       payment_method_types: ["card"],
       setup_intent_data: { metadata: { seedenvUserId: user.id } },
-      success_url: stripeAppUrl(`/account?tab=portfolio&stripePayment=success${draftQuery}`),
-      cancel_url: stripeAppUrl(`/account?tab=portfolio&stripePayment=cancelled${draftQuery}`),
+      success_url: stripeAppUrl(returnTo === "billing" ? "/console?view=billing&stripePayment=success" : `/account?tab=portfolio&stripePayment=success${draftQuery}`),
+      cancel_url: stripeAppUrl(returnTo === "billing" ? "/console?view=billing&stripePayment=cancelled" : `/account?tab=portfolio&stripePayment=cancelled${draftQuery}`),
       metadata: { type: "SEEDENV_PAYMENT_METHOD_SETUP", seedenvUserId: user.id },
     });
     if (!session.url) return { ok: false, message: "Stripe did not return a setup link. Please try again." };

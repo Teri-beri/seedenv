@@ -37,6 +37,7 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS "Submission_proofImageHash_idx" ON "Submission"("proofImageHash")`,
   `ALTER TABLE "Account" ADD COLUMN IF NOT EXISTS "refresh_token_expires_in" INTEGER`,
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "passwordHash" TEXT`,
+  `ALTER TABLE "BillingProfile" ADD COLUMN IF NOT EXISTS "billingEmail" VARCHAR(254)`,
   `ALTER TABLE "User"
     ALTER COLUMN "bio" TYPE VARCHAR(200) USING left("bio", 200),
     ADD COLUMN IF NOT EXISTS "github_username" TEXT,

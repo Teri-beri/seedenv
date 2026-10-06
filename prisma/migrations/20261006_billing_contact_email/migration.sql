@@ -1,0 +1,1 @@
+ALTER TABLE "BillingProfile" ADD COLUMN IF NOT EXISTS "billingEmail" VARCHAR(254);

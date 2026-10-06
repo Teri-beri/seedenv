@@ -1,19 +1,21 @@
 import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
-import { ArrowRight, CreditCard } from "lucide-react";
+import { Plus } from "lucide-react";
 import { getServerSession } from "next-auth";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import AuthCheck from "@/components/AuthCheck";
+import { BillingMetrics } from "@/components/billing/billing-metrics";
+import { BillingInfoForm, PaymentMethodCard } from "@/components/billing/billing-profile";
+import { InvoiceTable } from "@/components/billing/invoice-table";
 import { DeveloperStudio } from "@/components/developer-studio";
 import { ConsoleHeader } from "@/components/console-header";
 import { ActiveCohorts, ConsoleMetricStrip } from "@/components/console-overview";
 import { DeveloperBottomNav } from "@/components/navigation";
+import { getBillingOverview } from "@/lib/billing-data";
 import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
 import { getProofImageUrl } from "@/lib/storage";
 import { SEEDENV_PLATFORM_FEE_PERCENT } from "@/lib/pricing";
-import { formatCents } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,7 @@ const consoleViews = ["overview", "new-drop", "review-deck", "asset-vault", "bil
 type ConsoleView = (typeof consoleViews)[number];
 const reviewPageSize = 20;
 
-export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string }> }) {
+export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string; stripePayment?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "DEVELOPER") redirect("/");
@@ -30,7 +32,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
 
   const security = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { passwordHash: true, role: true, username: true, email: true, avatarUrl: true, _count: { select: { accounts: true } } },
+    select: { passwordHash: true, role: true, username: true, email: true, avatarUrl: true, stripeCustomerId: true, _count: { select: { accounts: true } } },
   });
   if (security && !security.passwordHash && security._count.accounts === 0) redirect("/onboarding/setup?next=/console");
   const ownerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();
@@ -59,7 +61,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   const reviewTotalPages = Math.max(1, Math.ceil(pendingReviewCount / reviewPageSize));
   const requestedReviewPage = Number.parseInt(params.reviewPage || "1", 10);
   const reviewPage = Number.isFinite(requestedReviewPage) ? Math.min(Math.max(requestedReviewPage, 1), reviewTotalPages) : 1;
-  const [pendingSubmissions, approvedAssets, campaigns, billingTransactions, completedEscrow, pendingEscrow, auditReports] = await Promise.all([
+  const [pendingSubmissions, approvedAssets, campaigns, completedEscrow, auditReports, billing] = await Promise.all([
     prisma.submission.findMany({
       where: pendingReviewWhere,
       include: { tester: true, campaign: { include: { instructions: { orderBy: { stepNumber: "asc" } } } } },
@@ -79,18 +81,8 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       take: overview ? 10 : 0,
       select: { id: true, title: true, platform: true, totalBudgetUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true },
     }),
-    prisma.walletTransaction.findMany({
-      where: { userId: session.user.id },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      select: { id: true, amountCents: true, type: true, status: true, description: true, createdAt: true },
-    }),
     prisma.walletTransaction.aggregate({
       where: { userId: session.user.id, type: TransactionType.ESCROW_DEPOSIT, status: TransactionStatus.COMPLETED },
-      _sum: { amountCents: true },
-    }),
-    prisma.walletTransaction.aggregate({
-      where: { userId: session.user.id, type: TransactionType.ESCROW_DEPOSIT, status: TransactionStatus.PENDING },
       _sum: { amountCents: true },
     }),
     prisma.submission.findMany({
@@ -120,9 +112,9 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
         campaign: { select: { id: true, title: true } },
       },
     }),
+    activeView === "billing" ? getBillingOverview(session.user.id, security?.stripeCustomerId || null) : null,
   ]);
   const completedEscrowCents = completedEscrow._sum.amountCents || 0;
-  const pendingEscrowCents = pendingEscrow._sum.amountCents || 0;
   const checkoutCampaign = activeView === "billing" && params.campaign
     ? await prisma.appCampaign.findFirst({ where: { id: params.campaign, developerId: session.user.id }, select: { title: true, status: true } })
     : null;
@@ -157,15 +149,15 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
         ) : null}
         {activeView !== "billing" ? <DeveloperStudio key={launchDraft?.id || "new-drop"} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} view={activeView} /> : null}
 
-        {activeView === "billing" ? <section className="space-y-5">
+        {billing ? <section className="space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="font-mono text-xs uppercase tracking-wider text-zinc-500">Billing</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-zinc-100">Escrow &amp; payment history</h2>
-              <p className="mt-2 text-sm text-neutral-400">Review Stripe-funded tester escrow and recent billing activity.</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-zinc-100">Escrow, payments &amp; invoices</h2>
+              <p className="mt-1 text-sm text-zinc-400">Tester escrow funded through Stripe, platform fees, and downloadable cohort receipts.</p>
             </div>
-            <a className="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200" href="/console?view=new-drop">
-              Create a funded drop <ArrowRight className="size-4" />
+            <a className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200" href="/console?view=new-drop">
+              <Plus className="size-3.5" /> Fund New Cohort
             </a>
           </div>
 
@@ -173,50 +165,18 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
           {params.escrow === "cancelled" ? <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-200" role="status">Checkout was cancelled{checkoutCampaign ? ` for ${checkoutCampaign.title}` : ""}. No payment was confirmed.</p> : null}
           {testDraftCampaign ? <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-100" role="status">Test draft saved for {testDraftCampaign.title}. No payment was taken, and it is not available to testers.</p> : null}
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <BillingMetric label="Completed escrow" value={formatCents(completedEscrowCents)} />
-            <BillingMetric label="Awaiting payment" value={formatCents(pendingEscrowCents)} />
-            <BillingMetric label="Recent transactions" value={billingTransactions.length.toLocaleString()} />
+          <BillingMetrics metrics={billing.metrics} />
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <PaymentMethodCard method={billing.paymentMethod} unavailable={billing.paymentMethodUnavailable} setupResult={params.stripePayment} />
+            <BillingInfoForm initial={billing.billingDetails} />
           </div>
 
-          <section className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40">
-            <div className="flex items-center gap-2 border-b border-zinc-800 px-5 py-4">
-              <CreditCard className="size-4 text-zinc-500" />
-              <h3 className="text-sm font-semibold text-white">Transaction history</h3>
-              <Link href="/dashboard/developer/billing" className="ml-auto text-xs text-emerald-300 hover:underline">Company billing &amp; invoices</Link>
-            </div>
-            {billingTransactions.length ? (
-              <div className="divide-y divide-zinc-800">
-                {billingTransactions.map((transaction) => (
-                  <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4" key={transaction.id}>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-white">{transaction.description}</p>
-                      <p className="mt-1 text-xs text-neutral-500">{transaction.createdAt.toLocaleDateString()} · {transaction.type.replaceAll("_", " ")}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${transaction.status === TransactionStatus.COMPLETED ? "bg-emerald-950/50 text-emerald-300" : transaction.status === TransactionStatus.FAILED ? "bg-red-950/50 text-red-300" : "bg-amber-950/50 text-amber-300"}`}>{transaction.status.toLowerCase()}</span>
-                      <span className="font-mono text-sm font-bold text-white">{formatCents(transaction.amountCents)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="p-6 text-sm text-neutral-400">No billing activity yet. Create a drop to configure tester slots and fund its escrow through Stripe Checkout.</p>
-            )}
-          </section>
+          <InvoiceTable invoices={billing.invoices} />
         </section> : null}
       </div>
       <DeveloperBottomNav />
     </main>
     </AuthCheck>
-  );
-}
-
-function BillingMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4">
-      <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">{label}</p>
-      <p className="mt-2 font-mono text-xl font-bold text-white">{value}</p>
-    </div>
   );
 }

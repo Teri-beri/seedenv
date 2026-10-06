@@ -10,11 +10,12 @@ import { sendNotificationEmail } from "@/lib/notifications";
 
 export async function saveCompanyBillingDetails(data: BillingDetails) {
   const parsed = billingDetailsSchema.safeParse(data);
-  if (!parsed.success) return { ok: false as const, message: "Enter complete billing details and a two-letter country code." };
+  if (!parsed.success) return { ok: false as const, message: parsed.error.issues.some((issue) => issue.path[0] === "billingEmail") ? "Enter a valid billing contact email." : "Enter complete billing details and a two-letter country code." };
   try {
     const user = await requireMember("DEVELOPER");
-    await prisma.billingProfile.upsert({ where: { userId: user.id }, create: { userId: user.id, ...parsed.data }, update: parsed.data });
-    revalidatePath("/dashboard/developer/billing");
+    const data = { ...parsed.data, billingEmail: parsed.data.billingEmail || null };
+    await prisma.billingProfile.upsert({ where: { userId: user.id }, create: { userId: user.id, ...data }, update: data });
+    revalidatePath("/console");
     return { ok: true as const };
   } catch {
     return { ok: false as const, message: "Billing details could not be saved. Check your workspace access and try again." };

@@ -3,6 +3,7 @@ import { z } from "zod";
 export const billingDetailsSchema = z.object({
   companyName: z.string().trim().min(1).max(150),
   taxId: z.string().trim().max(80).default(""),
+  billingEmail: z.string().trim().max(254).default("").refine((value) => value === "" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), "Enter a valid billing contact email."),
   addressLine1: z.string().trim().min(1).max(200),
   addressLine2: z.string().trim().max(200).default(""),
   city: z.string().trim().min(1).max(100),

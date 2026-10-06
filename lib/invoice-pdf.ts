@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb } from "pdf-lib";
+import { invoiceNumber } from "./billing";
 import type { InvoiceSnapshot } from "./enterprise-rules";
 
 export async function generateInvoicePdf(input: { id: string; date: Date; amountCents: number; paymentReference: string; snapshot: InvoiceSnapshot }) {
@@ -36,6 +37,7 @@ export async function generateInvoicePdf(input: { id: string; date: Date; amount
   line("SeedEnv", 24);
   line("Payment receipt / invoice", 16);
   line("TERIMUS LLC");
+  line(`Invoice: ${invoiceNumber(input.id, input.date)}`);
   line(`Receipt: ${input.id}`);
   line(`Date: ${input.date.toISOString().slice(0, 10)}`);
   line(`Payment reference: ${input.paymentReference}`);
@@ -45,6 +47,7 @@ export async function generateInvoicePdf(input: { id: string; date: Date; amount
   if (company) {
     line(company.companyName);
     if (company.taxId) line(`Tax ID / VAT: ${company.taxId}`);
+    if (company.billingEmail) line(`Billing contact: ${company.billingEmail}`);
     line(company.addressLine1);
     if (company.addressLine2) line(company.addressLine2);
     line(`${company.city}, ${company.region} ${company.postalCode}, ${company.country}`);
@@ -57,7 +60,7 @@ export async function generateInvoicePdf(input: { id: string; date: Date; amount
   line(`Total paid: ${money(input.amountCents)}`, 14);
   cursor -= 20;
   line("Stripe processing and payout fees, if applicable, are separate. This receipt does not certify VAT registration or replace a jurisdiction-specific tax invoice.", 9);
-  document.setTitle(`SeedEnv receipt ${input.id}`);
+  document.setTitle(`SeedEnv receipt ${invoiceNumber(input.id, input.date)}`);
   document.setAuthor("TERIMUS LLC");
   return document.save();
 }

@@ -361,6 +361,7 @@ model BillingProfile {
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   companyName    String   @db.VarChar(150)
   taxId          String?  @db.VarChar(80)
+  billingEmail   String?  @db.VarChar(254)
   addressLine1   String   @db.VarChar(200)
   addressLine2   String?  @db.VarChar(200)
   city           String   @db.VarChar(100)
