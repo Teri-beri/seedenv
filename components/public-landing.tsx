@@ -147,10 +147,15 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
       <main className="terminal-grid">
         <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg,rgba(255,255,255,0.025) 1px, transparent 1px)", backgroundSize: "44px 44px" }}>
           <div className="min-w-0">
-            <div className="inline-flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 font-mono text-xs text-emerald-300">
-              <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
-              {missions.length ? "Cohorts Live" : "Pre-launch validation"}
-            </div>
+            <a href="#cohorts" onClick={() => setActiveAnchor("cohorts")} className="group inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 font-mono text-xs text-emerald-400 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
+              <span className="relative flex size-2" aria-hidden="true">
+                {missions.length ? <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:animate-none" /> : null}
+                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+              </span>
+              <span className="font-semibold text-emerald-300">{missions.length ? "Live Cohorts Active" : "Pre-launch validation"}</span>
+              <span className="text-zinc-600" aria-hidden="true">|</span>
+              <span className="text-zinc-400 transition-colors group-hover:text-zinc-200">{missions.length ? "Inspect Open Slots" : "View Cohorts"} <span aria-hidden="true">→</span></span>
+            </a>
             <h1 className="mt-4 max-w-5xl text-4xl font-semibold leading-tight text-white md:text-5xl">Human validation infrastructure for pre-launch mobile &amp; web apps.</h1>
             <p className="mt-5 max-w-3xl text-base leading-7 text-zinc-400">Production-grade human testing cohorts before public App Store distribution. Define scenarios and review real-device evidence.</p>
             <div className="mt-7 flex flex-wrap gap-3">
