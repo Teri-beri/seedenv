@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { TesterBottomNav } from "@/components/navigation";
 import Link from "next/link";
 import { MemberShell } from "@/components/member-shell";
 import { MemberAction } from "@/components/member-action";
@@ -53,6 +54,7 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
     {user?.role === "ADMIN" ? <section className="mb-6 space-y-3 rounded-lg border border-rose-400/20 p-5"><h2 className="text-xl font-semibold">Moderation queue</h2>{reports.length ? reports.map((report) => <div key={report.id} className="rounded-lg border border-white/10 p-4"><p className="break-words text-sm text-zinc-400">Content: {report.post?.body || report.comment?.body}</p><p className="mt-2 text-sm">Report: {report.reason}</p><div className="mt-3 flex flex-wrap gap-3"><MemberAction action={() => hideCommunityContent(report.postId || report.commentId || "", report.postId ? "post" : "comment")}>Remove content</MemberAction><MemberAction action={() => dismissCommunityReport(report.id)}>Dismiss report</MemberAction></div></div>) : <p className="text-zinc-400">No open reports.</p>}</section> : null}
     {!directory.unavailable ? <FeedFilters sort={sort} scope={scope} member={Boolean(user)} /> : null}
     {user && !directory.unavailable ? <CommunityFeed posts={feed} userId={user.id} developer={user.role === "DEVELOPER" || user.role === "ADMIN"} admin={user.role === "ADMIN"} activeRole={user.role} dualWorkspace={dualWorkspace} /> : <PublicLaunchCircle posts={feed} signedIn={Boolean(user)} unavailable={directory.unavailable} />}
+    {user?.role === "TESTER" ? <TesterBottomNav /> : null}
     <nav aria-label="Feed pages" className="mt-6 flex gap-4">{page > 1 ? <Link href={feedHref(sort, scope, page - 1)} className="min-h-11 rounded-lg border border-white/10 px-4 py-3">Previous</Link> : null}{posts.length > 20 ? <Link href={feedHref(sort, scope, page + 1)} className="min-h-11 rounded-lg border border-white/10 px-4 py-3">Next</Link> : null}</nav>
   </MemberShell>;
 }

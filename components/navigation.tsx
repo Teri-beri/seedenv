@@ -1,7 +1,7 @@
 "use client";
 
 import { UserRole } from "@prisma/client";
-import { Boxes, BriefcaseBusiness, CreditCard, Flame, Gamepad2, LayoutDashboard, LoaderCircle, Medal, PlusCircle, Settings, ShieldCheck, Sprout, Trophy, UserRound } from "lucide-react";
+import { Boxes, BriefcaseBusiness, CreditCard, Flame, Gamepad2, LayoutDashboard, LoaderCircle, Medal, MessagesSquare, PlusCircle, Settings, ShieldCheck, Sprout, Trophy, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -14,6 +14,7 @@ const testerItems = [
   { label: "My missions", icon: Flame, href: "/dashboard?view=missions", view: "missions" },
   { label: "Reputation", icon: Medal, href: "/dashboard?view=reputation", view: "reputation" },
   { label: "Leaderboard", icon: Trophy, href: "/dashboard?view=leaderboard", view: "leaderboard" },
+  { label: "Circle", icon: MessagesSquare, href: "/community", view: null },
   { label: "Settings", icon: UserRound, href: "/account", view: null },
 ];
 
@@ -81,9 +82,9 @@ export function TesterBottomNav() {
   }, [pathname, searchParams, router]);
   return (
     <nav aria-label="Tester app navigation" className="mobile-app-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-stroke bg-obsidian/94 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
-      <div className="mx-auto grid max-w-lg grid-cols-5 gap-0.5">
+      <div className="mx-auto grid max-w-lg grid-cols-6 gap-0.5">
         {testerItems.map(({ label, icon: Icon, href, view: itemView }) => {
-          const active = pathname === "/account" ? href === "/account" : pathname === "/dashboard" && itemView === view;
+          const active = pathname === "/account" || pathname === "/community" ? href === pathname : pathname === "/dashboard" && itemView === view;
           return (
           <Link key={label} aria-current={active ? "page" : undefined} className={`flex min-h-12 min-w-0 flex-col items-center justify-center rounded-2xl px-1 py-2 text-center text-[10px] font-semibold transition hover:bg-violet-500/10 hover:text-white ${active ? "bg-violet-500/15 text-violet-200" : "text-muted"}`} href={href}>
             <Icon className="mx-auto mb-1 size-4" />
