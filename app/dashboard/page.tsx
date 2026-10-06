@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { sweepOverdueSubmissionsLazily } from "@/lib/submission-approval";
 import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
@@ -9,6 +11,7 @@ import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
 import { awardDailyCheckIn } from "@/lib/quest-ledger";
 import { resolveTesterView } from "@/lib/tester-console";
+import { ensureValidatorHandle } from "@/lib/validator-handle";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +22,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const params = await searchParams;
   const activeView = resolveTesterView(params.view, params.claim);
 
-  const security = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { passwordHash: true, _count: { select: { accounts: true } } },
-  });
-  if (security && !security.passwordHash && security._count.accounts === 0) redirect("/onboarding/setup?next=/dashboard");
+  await ensureValidatorHandle(session.user.id);
 
   await ensurePreviewData();
+  after(sweepOverdueSubmissionsLazily);
   await awardDailyCheckIn(session.user.id);
   const now = new Date();
   const [tester, missions, leaderboard, summary, recent, pending, approvedCampaigns, payouts, applications] = await Promise.all([

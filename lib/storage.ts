@@ -63,6 +63,28 @@ export async function uploadProofImage(input: {
   return `${proofPrefix}${input.path}`;
 }
 
+export function proofStorageConfigured() {
+  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+export async function uploadProofRecording(input: { buffer: Buffer; contentType: string; path: string }) {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error("Recording storage is not configured.");
+  const { error } = await supabase.storage.from(process.env.SUPABASE_PROOF_BUCKET || "proof-screenshots").upload(input.path, input.buffer, {
+    contentType: input.contentType,
+    upsert: false,
+  });
+  if (error) throw new Error(error.message);
+  return `${proofPrefix}${input.path}`;
+}
+
+export async function deleteProofObject(value: string) {
+  const path = value.startsWith(proofPrefix) ? value.slice(proofPrefix.length) : null;
+  const supabase = getSupabase();
+  if (!path || !supabase) return;
+  await supabase.storage.from(process.env.SUPABASE_PROOF_BUCKET || "proof-screenshots").remove([path]);
+}
+
 export async function uploadAvatarImage(input: {
   buffer: Buffer;
   contentType: "image/png" | "image/jpeg";

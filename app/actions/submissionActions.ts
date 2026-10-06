@@ -10,14 +10,14 @@ import { getCurrentUser } from "@/lib/auth";
 import { sendDiscordWebhookMessage } from "@/lib/discord";
 import { notificationEnabled, sendNotificationEmail } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { rankForXp, xpForBounty } from "@/lib/rank";
 import { uploadProofImage } from "@/lib/storage";
-import { getStripe } from "@/lib/stripe";
-import { formatCents, usdToCents } from "@/lib/utils";
+import { usdToCents } from "@/lib/utils";
+import { isStoredRecording } from "@/lib/recording";
+import { approvePendingSubmission, settleApprovedPayout, transferTesterPayout } from "@/lib/submission-approval";
 import { requireMember } from "@/lib/member";
-import { awardQuestXp, qualifyReferral, serializable } from "@/lib/quest-ledger";
+import { serializable } from "@/lib/quest-ledger";
 import { startAcceptedApplication } from "@/lib/mission-applications";
-import { assertProofEditable, needsRevision, rejectProof, requestProofRevision, startProofRevision } from "@/lib/submission-lifecycle";
+import { assertProofEditable, rejectProof, requestProofRevision, startProofRevision } from "@/lib/submission-lifecycle";
 
 const proofSchema = z.object({
   proofImageBase64: z.string().max(7 * 1024 * 1024).optional(),
@@ -169,7 +169,7 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
       proofImageUrl,
       proofImageHash: hash,
       feedbackText: input.feedbackText,
-      recordingUrl: input.recordingUrl || null,
+      recordingUrl: input.recordingUrl || (isStoredRecording(current.recordingUrl) ? current.recordingUrl : null),
       osBuild: input.osBuild || null,
       deviceModel: input.deviceModel || null,
       screenResolution: input.screenResolution || null,
@@ -183,6 +183,7 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
       isTouchCapable: input.hardware?.isTouchCapable ?? null,
       batteryLevel: input.hardware?.batteryLevel ?? null,
       isLowPowerMode: input.hardware?.isLowPowerMode ?? null,
+      submittedAt: new Date(),
       revisionRequestedAt: null,
       revisionStartedAt: null,
       rejectionReason: null,
@@ -223,111 +224,12 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
 
 export async function approveSubmission(submissionId: string) {
   const reviewer = await requireMember("DEVELOPER");
-
-  const result = await serializable(async (tx) => {
-    const submission = await tx.submission.findUnique({
-      where: { id: submissionId },
-      include: { campaign: true, tester: true },
-    });
-    if (!submission || submission.status !== SubmissionStatus.PENDING) throw new Error("Pending submission not found.");
-    if (submission.campaign.developerId !== reviewer.id && reviewer.role !== "ADMIN") throw new Error("You cannot review this submission.");
-    if (!submission.feedbackText && !submission.proofImageUrl) throw new Error("Proof must be submitted before approval.");
-    if (needsRevision(submission)) throw new Error("Wait for the tester to submit the requested revision before approving.");
-
-    const xpGain = xpForBounty(submission.payoutCents);
-    const nextXp = submission.tester.xpPoints + xpGain;
-
-    const approval = await tx.submission.updateMany({
-      where: { id: submissionId, status: SubmissionStatus.PENDING },
-      data: { status: SubmissionStatus.APPROVED, reviewedAt: new Date() },
-    });
-    if (approval.count !== 1) throw new Error("This submission has already been reviewed.");
-    await tx.appCampaign.update({
-      where: { id: submission.campaignId },
-      data: { completedSlots: { increment: 1 } },
-    });
-    await tx.user.update({
-      where: { id: submission.testerId },
-      data: {
-        xpPoints: { increment: xpGain },
-        rankTier: rankForXp(nextXp),
-        lastActiveDate: new Date(),
-      },
-    });
-    await awardQuestXp(tx, submission.testerId, `approved:${submission.id}`, 25, "Developer-approved contribution");
-    await qualifyReferral(tx, submission.testerId);
-    const payout = await tx.walletTransaction.create({
-      data: {
-        userId: submission.testerId,
-        amountCents: submission.payoutCents,
-        type: TransactionType.BOUNTY_PAYOUT,
-        status: TransactionStatus.PENDING,
-        description: `Payout pending Stripe transfer for ${submission.campaign.title}`,
-      },
-      select: { id: true },
-    });
-
-    return { payoutCents: submission.payoutCents, xpGain, testerId: submission.testerId, payoutTransactionId: payout.id };
-  });
-
-  const tester = await prisma.user.findUnique({
-    where: { id: result.testerId },
-    select: { email: true, notificationPreferences: true },
-  });
-  const payoutSent = await transferTesterPayout(result.testerId, result.payoutTransactionId);
-  if (tester && notificationEnabled(tester.notificationPreferences, "email_ledger_updates", true)) {
-    await sendNotificationEmail(
-      tester.email,
-      payoutSent ? "Your SeedEnv payout was sent" : "Your SeedEnv payout is pending setup",
-      payoutSent
-        ? `Your ${formatCents(result.payoutCents)} tester payout was transferred to your Stripe account.`
-        : `Your ${formatCents(result.payoutCents)} tester payout was approved and is pending Stripe payout setup. Open Account > Portfolio / Billing to connect Stripe and release it.`,
-    );
-  }
+  const result = await serializable((tx) => approvePendingSubmission(tx, submissionId, { kind: "reviewer", id: reviewer.id, admin: reviewer.role === "ADMIN" }));
+  const payoutSent = await settleApprovedPayout(result, false);
 
   revalidatePath("/dashboard");
   revalidatePath("/console");
   return { payoutCents: result.payoutCents, xpGain: result.xpGain, payoutStatus: payoutSent ? "TRANSFERRED" as const : "PENDING" as const };
-}
-
-async function transferTesterPayout(testerId: string, transactionId: string) {
-  const [tester, transaction] = await Promise.all([
-    prisma.user.findUnique({ where: { id: testerId }, select: { stripeConnectAccountId: true } }),
-    prisma.walletTransaction.findUnique({ where: { id: transactionId }, select: { amountCents: true, status: true } }),
-  ]);
-  if (!tester || !transaction) return false;
-  if (transaction.status === TransactionStatus.COMPLETED) return true;
-  if (!tester.stripeConnectAccountId || !process.env.STRIPE_SECRET_KEY) return false;
-
-  try {
-    const stripe = getStripe();
-    const account = await stripe.accounts.retrieve(tester.stripeConnectAccountId);
-    if (!account.payouts_enabled) return false;
-
-    const transfer = await stripe.transfers.create({
-      amount: transaction.amountCents,
-      currency: "usd",
-      destination: tester.stripeConnectAccountId,
-      metadata: { seedenvUserId: testerId, seedenvLedgerTransactionId: transactionId },
-    }, { idempotencyKey: `seedenv-payout-${transactionId}` });
-
-    const settled = await prisma.$transaction(async (database) => {
-      const updated = await database.walletTransaction.updateMany({
-        where: { id: transactionId, status: TransactionStatus.PENDING },
-        data: { status: TransactionStatus.COMPLETED, stripePaymentId: transfer.id, description: "Tester payout transferred to Stripe" },
-      });
-      if (updated.count) {
-        await database.user.update({ where: { id: testerId }, data: { walletBalanceCents: { increment: transaction.amountCents } } });
-      }
-      return updated.count > 0;
-    });
-    if (settled) return true;
-    const current = await prisma.walletTransaction.findUnique({ where: { id: transactionId }, select: { status: true } });
-    return current?.status === TransactionStatus.COMPLETED;
-  } catch (error) {
-    console.warn("Stripe tester payout transfer failed:", error instanceof Error ? error.message : "Unknown transfer error.");
-    return false;
-  }
 }
 
 export async function releasePendingTesterPayouts() {

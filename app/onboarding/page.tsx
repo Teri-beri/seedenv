@@ -5,8 +5,9 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 import { saveMemberReferral } from "@/lib/quest-ledger";
 import { requireMember } from "@/lib/member";
+import { ensureValidatorHandle } from "@/lib/validator-handle";
 
-const allowedNextPaths = ["/dashboard", "/console", "/admin"];
+const allowedNextPaths = ["/dashboard", "/console", "/admin", "/validators/join"];
 
 function cleanNextPath(value: string | undefined) {
   if (!value?.startsWith("/")) return "/dashboard";
@@ -83,6 +84,11 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         nextPath = "/account?referralError=1";
       }
     }
+  }
+  const finalRole = requestedRole ?? user?.role;
+  if (finalRole === UserRole.TESTER) {
+    await ensureValidatorHandle(session.user.id);
+    redirect(nextPath);
   }
   if (user && !user.passwordHash && user._count.accounts === 0) {
     redirect(`/onboarding/setup?next=${encodeURIComponent(nextPath)}`);

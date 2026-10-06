@@ -190,7 +190,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
         <section id="validators" className={`${sectionShell} ${surfaceTint}`}><div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" /><div className={sectionClass}>
           <div className="flex flex-wrap items-end justify-between gap-5">
             <div><p className={labelClass}>For validators</p><h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">Progression &amp; Verification Protocol</h2></div>
-            <button type="button" className={secondaryAction} onClick={() => requestAccess({ role: "TESTER", callbackUrl: "/dashboard", title: "Become a Validator" })}>Become a Validator <ArrowRight className="size-4" /></button>
+            <Link href="/validators/join" className={secondaryAction} onClick={() => trackAnalytics("signup_start", { role: "TESTER", callbackUrl: "/validators/join" })}>Become a Validator <ArrowRight className="size-4" /></Link>
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             <WorkflowStep number="01" icon={<ShieldCheck className="size-5" />} title="Hardware & Technical Onboarding" text="Record your device, OS, and testing background. Include reproducible, original evidence from the hardware required by the cohort; hardware details are reviewed rather than assumed verified." />

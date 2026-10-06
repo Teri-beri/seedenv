@@ -1,3 +1,5 @@
+import { isStoredRecording } from "@/lib/recording";
+
 export const GITHUB_REPO_PATTERN = /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/;
 
 export type IssueSubmission = {
@@ -57,7 +59,9 @@ function safeHttpUrl(value: string | null) {
 export function buildGitHubIssue(submission: IssueSubmission, origin: string) {
   const firstLine = (submission.feedbackText || "Tester report").split(/\r?\n/)[0].trim().slice(0, 80);
   const title = `[SeedEnv] ${submission.campaign.title}: ${firstLine}`.slice(0, 240);
-  const recording = safeHttpUrl(submission.recordingUrl);
+  const recording = isStoredRecording(submission.recordingUrl)
+    ? `${origin.replace(/\/$/, "")}/api/submissions/${encodeURIComponent(submission.id)}/recording (SeedEnv sign-in required)`
+    : safeHttpUrl(submission.recordingUrl);
   const lines = [
     `Exported from SeedEnv cohort **${cell(submission.campaign.title)}** · tester \`${submission.tester.username}\` · ${submission.createdAt.toISOString().slice(0, 10)}`,
     "",

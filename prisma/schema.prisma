@@ -201,6 +201,8 @@ model AppCampaign {
   guaranteedDays   Int?
   syncGitHubRepo   String?
   hardwareStrict   Boolean              @default(true)
+  estimatedMinutes Int?             @map("estimated_minutes")
+  testerPerk       String?          @map("tester_perk") @db.VarChar(80)
   applications     MissionApplication[]
   transactions     WalletTransaction[]
 
@@ -346,6 +348,7 @@ model Submission {
   rejectionReason     String?
   revisionRequestedAt DateTime?
   revisionStartedAt   DateTime?
+  submittedAt         DateTime?         @map("submitted_at")
   payoutCents         Int
   claimedAt           DateTime          @default(now())
   expiresAt           DateTime
@@ -357,6 +360,7 @@ model Submission {
   @@index([testerId, status])
   @@index([proofImageHash])
   @@index([expiresAt, status])
+  @@index([status, submittedAt])
 }
 
 model WalletTransaction {

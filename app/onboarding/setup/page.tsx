@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-const allowedNextPaths = ["/dashboard", "/console", "/admin", "/account"];
+const allowedNextPaths = ["/dashboard", "/console", "/admin", "/account", "/validators/join"];
 
 function cleanNextPath(value: string | undefined, fallback: string) {
   if (!value?.startsWith("/")) return fallback;

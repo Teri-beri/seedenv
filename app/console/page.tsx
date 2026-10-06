@@ -1,3 +1,6 @@
+import { after } from "next/server";
+import { autoApproveDeadline, sweepOverdueSubmissionsLazily } from "@/lib/submission-approval";
+import { recordingHref } from "@/lib/recording";
 import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
 import { Plus } from "lucide-react";
 import { getServerSession } from "next-auth";
@@ -45,6 +48,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   );
 
   await ensurePreviewData();
+  after(sweepOverdueSubmissionsLazily);
   const campaignScope = { developerId: session.user.id };
   const pendingReviewWhere = {
     status: SubmissionStatus.PENDING,
@@ -128,10 +132,19 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
         include: { instructions: { orderBy: { stepNumber: "asc" } } },
       })
     : null;
+  const renderedAt = new Date().getTime();
   const [pendingPreviews, approvedPreviews, auditPreviews] = await Promise.all([
-    Promise.all(pendingSubmissions.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
-    Promise.all(approvedAssets.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
-    Promise.all(auditReports.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl) }))),
+    Promise.all(pendingSubmissions.map(async (submission) => {
+      const deadline = autoApproveDeadline(submission.submittedAt);
+      return {
+        ...submission,
+        proofImageUrl: await getProofImageUrl(submission.proofImageUrl),
+        recordingUrl: recordingHref(submission.id, submission.recordingUrl),
+        autoApproveHoursLeft: deadline && !submission.revisionRequestedAt ? Math.max(0, Math.ceil((deadline.getTime() - renderedAt) / 3_600_000)) : null,
+      };
+    })),
+    Promise.all(approvedAssets.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl), recordingUrl: recordingHref(submission.id, submission.recordingUrl) }))),
+    Promise.all(auditReports.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl), recordingUrl: recordingHref(submission.id, submission.recordingUrl) }))),
   ]);
   const accountUsername = security?.username || session.user.name || "account";
   const consoleAccount = {

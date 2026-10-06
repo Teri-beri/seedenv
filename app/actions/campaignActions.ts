@@ -37,6 +37,8 @@ const campaignSchema = z.object({
   cohortType: z.nativeEnum(CohortType).default(CohortType.STANDARD_QA),
   syncGitHubRepo: z.string().trim().regex(/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/, "Use the owner/repo format.").optional().or(z.literal("")),
   hardwareStrict: z.boolean().default(true),
+  estimatedMinutes: z.number().int().min(1, "Estimate at least 1 minute.").max(240, "Keep estimates under 4 hours.").nullable().optional(),
+  testerPerk: z.string().trim().max(80, "Keep the perk under 80 characters.").optional().or(z.literal("")),
 }).refine((input) => !input.discoveryAllowed || input.discoveryMinRep <= Math.max(...input.instructions.map((item) => item.minimumRep)), {
   message: "The Discovery REP floor cannot exceed the highest task requirement.",
   path: ["discoveryMinRep"],
@@ -88,6 +90,8 @@ function buildCampaignData(input: CampaignInput, developerId: string, status: Ca
       guaranteedDays: terms.guaranteedDays,
       syncGitHubRepo: input.syncGitHubRepo || null,
       hardwareStrict: input.hardwareStrict,
+      estimatedMinutes: input.estimatedMinutes ?? null,
+      testerPerk: input.testerPerk || null,
       discoveryAllowed: input.discoveryAllowed,
       discoveryMinRep: input.discoveryMinRep,
       status,

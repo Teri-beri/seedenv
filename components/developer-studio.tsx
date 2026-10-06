@@ -17,6 +17,7 @@ import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE
 
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
+  autoApproveHoursLeft?: number | null;
   rejectionReason?: string | null;
   id: string;
   proofImageUrl: string | null;
@@ -66,6 +67,8 @@ type CampaignDraft = {
   cohortType: CohortTypeKey;
   syncGitHubRepo: string | null;
   hardwareStrict: boolean;
+  estimatedMinutes: number | null;
+  testerPerk: string | null;
   instructions: Array<{ stepNumber: number; instructionTitle: string; instructionDetail: string; proofType: TaskProofType; minimumRep: number }>;
 };
 
@@ -106,6 +109,8 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     cohortType: initialDraft.cohortType,
     syncGitHubRepo: initialDraft.syncGitHubRepo || "",
     hardwareStrict: initialDraft.hardwareStrict,
+    estimatedMinutes: initialDraft.estimatedMinutes,
+    testerPerk: initialDraft.testerPerk || "",
   } : {
     title: "",
     platform: PlatformType.TESTFLIGHT,
@@ -127,6 +132,8 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     } : {}),
     syncGitHubRepo: "",
     hardwareStrict: true,
+    estimatedMinutes: null,
+    testerPerk: "",
   });
   const [message, setMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -463,6 +470,18 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                 {form.discoveryAllowed ? <label className="mt-3 block text-sm">Discovery REP floor<input type="number" min={0} max={1000000} value={form.discoveryMinRep} onChange={(event) => setForm((current) => ({ ...current, discoveryMinRep: Number(event.target.value) }))} className={`mt-2 ${selectClass}`} /></label> : null}
               </div>
               <div className="grid gap-4 rounded-xl border border-stroke p-4 md:grid-cols-2">
+                <label className="block text-sm">Estimated tester time <span className="text-neutral-500">(minutes, optional)</span>
+                  <input className={`mt-2 ${selectClass} font-mono text-sm`} inputMode="numeric" max={240} min={1} placeholder="10" type="number" value={form.estimatedMinutes ?? ""} onChange={(event) => updateFormField("estimatedMinutes", event.target.value ? Math.round(Number(event.target.value)) : null)} />
+                  <span className="mt-1 block text-xs text-neutral-500">Shown to testers with an hourly equivalent of the reward.</span>
+                  {errors.estimatedMinutes ? <span className="block text-xs text-rose-300">{errors.estimatedMinutes}</span> : null}
+                </label>
+                <label className="block text-sm">Tester perk <span className="text-neutral-500">(optional)</span>
+                  <input className={`mt-2 ${selectClass} text-sm`} maxLength={80} placeholder="Lifetime Pro unlock in the app" value={form.testerPerk || ""} onChange={(event) => updateFormField("testerPerk", event.target.value)} />
+                  <span className="mt-1 block text-xs text-neutral-500">Only list perks you will actually grant to approved testers.</span>
+                  {errors.testerPerk ? <span className="block text-xs text-rose-300">{errors.testerPerk}</span> : null}
+                </label>
+              </div>
+              <div className="grid gap-4 rounded-xl border border-stroke p-4 md:grid-cols-2">
                 <label className="block text-sm">GitHub issue repo <span className="text-neutral-500">(optional)</span>
                   <input aria-invalid={Boolean(errors.syncGitHubRepo)} className={`mt-2 ${selectClass} font-mono text-sm`} maxLength={140} placeholder="owner/repo" value={form.syncGitHubRepo || ""} onChange={(event) => updateFormField("syncGitHubRepo", event.target.value.trim())} />
                   <span className="mt-1 block text-xs text-neutral-500">Submissions can be exported to this repo as issues. Add a token under Settings.</span>
@@ -651,7 +670,7 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                   <span className="block truncate text-sm font-semibold text-white">{submission.campaign.title}</span>
                   <span className="mt-1 block truncate text-xs text-neutral-500">{submission.tester.username} · {submission.id.slice(-8)}</span>
                   <span className="mt-2 block font-mono text-xs text-emerald-400">{formatCents(submission.payoutCents)}</span>
-                  {submission.revisionRequestedAt ? <span className="mt-2 block text-xs text-violet-300">Awaiting tester revision</span> : null}
+                  {submission.revisionRequestedAt ? <span className="mt-2 block text-xs text-violet-300">Awaiting tester revision</span> : typeof submission.autoApproveHoursLeft === "number" ? <span className="mt-2 block font-mono text-[11px] text-amber-300/90">Auto-approves in {submission.autoApproveHoursLeft <= 1 ? "<1h" : `${submission.autoApproveHoursLeft}h`}</span> : null}
                 </button>
               ))}
             </div>
@@ -722,6 +741,7 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                     <Button disabled={isPending} type="button" variant="danger" onClick={() => { setDecision("reject"); setError(""); }}><XCircle className="size-4" /> Reject</Button>
                   </div>
                 )}
+                {typeof active.autoApproveHoursLeft === "number" && !active.revisionRequestedAt ? <p className="text-xs leading-5 text-zinc-500">Unreviewed proofs auto-approve 48 hours after submission. This one auto-approves in about {active.autoApproveHoursLeft <= 1 ? "an hour" : `${active.autoApproveHoursLeft} hours`} unless you approve, reject, or request a revision.</p> : null}
               </div>
             </div>
           </article>
