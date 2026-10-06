@@ -9,7 +9,8 @@ const headers = { "Cache-Control": "private, no-store" };
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const origin = request.headers.get("origin");
-  if (!origin || new URL(origin).host !== new URL(request.url).host) return NextResponse.json({ message: "Cross-site export requests are not allowed." }, { status: 403, headers });
+  const requestHost = request.headers.get("x-forwarded-host") || request.headers.get("host") || new URL(request.url).host;
+  if (!origin || new URL(origin).host !== requestHost) return NextResponse.json({ message: "Cross-site export requests are not allowed." }, { status: 403, headers });
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ message: "Sign in to export submissions." }, { status: 401, headers });
 
