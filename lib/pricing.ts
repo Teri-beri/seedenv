@@ -115,3 +115,40 @@ export function calculateCohortEscrow(validatorCount: number, stipendPerValidato
     totalAuthorized: quote.totalBudgetUsd,
   };
 }
+
+// Card processing passed through on pay-per-tester charges, grossed up so the fee itself is covered.
+export function cardProcessingFeeCents(baseCents: number) {
+  if (!Number.isSafeInteger(baseCents) || baseCents <= 0) return 0;
+  const totalCents = Math.ceil((baseCents + STRIPE_CARD_FIXED_CENTS) / (1 - STRIPE_CARD_RATE));
+  return totalCents - baseCents;
+}
+
+export type SlotChargeQuote = { stipendCents: number; platformFeeCents: number; processingFeeCents: number; totalCents: number };
+
+// The platform fee is cumulative: 20% of all funded stipends with a $15 cohort floor, minus fees already collected.
+export function quoteSlotCharge(stipendCents: number, retainedStipendCents: number, retainedPlatformFeeCents: number): SlotChargeQuote {
+  if (!Number.isSafeInteger(stipendCents) || stipendCents <= 0) throw new Error("The tester stipend must be a positive amount.");
+  const owed = standardPlatformFeeCents(Math.max(0, retainedStipendCents) + stipendCents);
+  const platformFeeCents = Math.max(0, owed - Math.max(0, retainedPlatformFeeCents));
+  const baseCents = stipendCents + platformFeeCents;
+  const processingFeeCents = cardProcessingFeeCents(baseCents);
+  return { stipendCents, platformFeeCents, processingFeeCents, totalCents: baseCents + processingFeeCents };
+}
+
+export type PerTesterProjection = { firstCharge: SlotChargeQuote | null; typicalCharge: SlotChargeQuote | null; stipendCents: number; platformFeeCents: number; processingFeeCents: number; maxTotalCents: number };
+
+// Maximum spend if every slot is filled, charged one accepted tester at a time.
+export function projectPerTesterCharges(slots: number, stipendCents: number): PerTesterProjection {
+  const projection: PerTesterProjection = { firstCharge: null, typicalCharge: null, stipendCents: 0, platformFeeCents: 0, processingFeeCents: 0, maxTotalCents: 0 };
+  if (!Number.isSafeInteger(slots) || slots <= 0 || !Number.isSafeInteger(stipendCents) || stipendCents <= 0) return projection;
+  for (let index = 0; index < slots; index += 1) {
+    const charge = quoteSlotCharge(stipendCents, projection.stipendCents, projection.platformFeeCents);
+    if (index === 0) projection.firstCharge = charge;
+    projection.typicalCharge = charge;
+    projection.stipendCents += charge.stipendCents;
+    projection.platformFeeCents += charge.platformFeeCents;
+    projection.processingFeeCents += charge.processingFeeCents;
+    projection.maxTotalCents += charge.totalCents;
+  }
+  return projection;
+}

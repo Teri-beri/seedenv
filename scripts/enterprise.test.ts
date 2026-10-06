@@ -112,35 +112,46 @@ test("support identity is server-derived, rate-limited, durable, and admin-resol
   } finally { for (const item of modules.reverse()) item.restore(); }
 });
 
-test("real checkout action captures an immutable company and recorded fee snapshot", async () => {
+test("custom drops launch pay-per-tester with no checkout and no upfront deposit", async () => {
   const priorKey = process.env.STRIPE_SECRET_KEY;
   process.env.STRIPE_SECRET_KEY = "mocked-provider-config";
-  let written: Record<string, unknown> = {};
+  let created: Record<string, unknown> = {};
+  let deposits = 0;
+  let checkouts = 0;
   const modules = [
+    mock.module("next/cache", { namedExports: { revalidatePath: () => undefined } }),
     mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "owner", role: "DEVELOPER", stripeCustomerId: "cus_test" }) } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: {
       billingProfile: { findUnique: async () => ({ ...company }) },
-      appCampaign: { create: async ({ data }: { data: Record<string, unknown> }) => ({ id: "cohort-test", ...data }) },
-      walletTransaction: { create: async ({ data }: { data: Record<string, unknown> }) => { written = data; return { id: "deposit-test" }; } },
+      appCampaign: { create: async ({ data }: { data: Record<string, unknown> }) => { created = data; return { id: "cohort-test", ...data }; } },
+      walletTransaction: { create: async () => { deposits += 1; return { id: "deposit-test" }; } },
     } } }),
-    mock.module("../lib/stripe.ts", { namedExports: { getStripe: () => ({ customers: { retrieve: async () => ({ deleted: false, invoice_settings: { default_payment_method: "pm_test" } }) }, checkout: { sessions: { create: async () => ({ url: "https://checkout.stripe.com/mock" }) } } }) } }),
+    mock.module("../lib/stripe.ts", { namedExports: { getStripe: () => ({ customers: { retrieve: async () => ({ deleted: false, invoice_settings: { default_payment_method: "pm_test" } }) }, checkout: { sessions: { create: async () => { checkouts += 1; return { url: "https://checkout.stripe.com/mock" }; } } } }) } }),
   ];
   try {
     const { createCampaignWithEscrow } = await import(`../app/actions/campaignActions.ts?invoice=${randomUUID()}`);
     const result = await createCampaignWithEscrow({ title: "TestFlight QA", platform: "TESTFLIGHT", appUrl: "https://example.invalid", targetVibe: "Developer Tools", description: "A safe test of company invoice details at checkout.", totalSlots: 25, bountyPerTaskUsd: 4, instructions: [{ instructionTitle: "Onboarding", instructionDetail: "Follow signup and record any confusing steps.", proofType: "SCREENSHOT", minimumRep: 0 }], discoveryAllowed: false, discoveryMinRep: 0 });
-    assert.equal(result.checkoutUrl, "https://checkout.stripe.com/mock");
-    assert.equal(written.campaignId, "cohort-test");
-    assert.equal(written.platformFeeCents, 2000);
-    assert.equal(written.amountCents, 12000);
-    const saved = invoiceSnapshotSchema.parse(written.invoiceSnapshot);
-    assert.equal(saved.company?.companyName, "Société QA");
-    assert.equal(invoiceTotalMatches(saved, Number(written.amountCents)), true);
+    assert.equal(result.launched, true);
+    assert.equal(result.checkoutUrl, null);
+    assert.equal(result.escrowTotalCents, 0);
+    assert.equal(created.status, "ACTIVE");
+    assert.equal(created.fundingModel, "PAY_PER_TESTER");
+    assert.equal(deposits, 0);
+    assert.equal(checkouts, 0);
   } finally {
     for (const item of modules.reverse()) item.restore();
     if (priorKey === undefined) delete process.env.STRIPE_SECRET_KEY;
     else process.env.STRIPE_SECRET_KEY = priorKey;
   }
 });
+
+test("per-slot receipts include the passed-through processing line in their total", () => {
+  const slot = { ...snapshot, rewardPoolCents: 400, platformFeeCents: 1500, processingFeeCents: 88 };
+  assert.equal(invoiceSnapshotSchema.safeParse(slot).success, true);
+  assert.equal(invoiceTotalMatches(invoiceSnapshotSchema.parse(slot), 1988), true);
+  assert.equal(invoiceTotalMatches(invoiceSnapshotSchema.parse(slot), 1900), false);
+});
+
 test("flat bundles override client slots, rewards, and platform at checkout", async () => {
   const priorKey = process.env.STRIPE_SECRET_KEY;
   process.env.STRIPE_SECRET_KEY = "mocked-provider-config";

@@ -27,7 +27,7 @@ const consoleViews = ["overview", "new-drop", "review-deck", "asset-vault", "bil
 type ConsoleView = (typeof consoleViews)[number];
 const reviewPageSize = 20;
 
-export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string; stripePayment?: string; cohort?: string }> }) {
+export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string; stripePayment?: string; cohort?: string; launched?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "DEVELOPER") redirect("/");
@@ -84,10 +84,11 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       where: activeCampaignScope,
       orderBy: { createdAt: "desc" },
       take: overview ? 10 : 0,
-      select: { id: true, title: true, platform: true, totalBudgetUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true },
+      select: { id: true, title: true, platform: true, totalBudgetUsd: true, platformFeeUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true, fundingModel: true, slotCharges: { where: { status: "SUCCEEDED" }, select: { stipendCents: true } } },
     }),
-    prisma.walletTransaction.aggregate({
-      where: { userId: session.user.id, type: TransactionType.ESCROW_DEPOSIT, status: TransactionStatus.COMPLETED },
+    prisma.walletTransaction.groupBy({
+      by: ["type"],
+      where: { userId: session.user.id, type: { in: [TransactionType.ESCROW_DEPOSIT, TransactionType.ESCROW_REFUND] }, status: TransactionStatus.COMPLETED },
       _sum: { amountCents: true },
     }),
     prisma.submission.findMany({
@@ -119,7 +120,9 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     }),
     activeView === "billing" ? getBillingOverview(session.user.id, security?.stripeCustomerId || null) : null,
   ]);
-  const completedEscrowCents = completedEscrow._sum.amountCents || 0;
+  const escrowSum = (type: TransactionType) => completedEscrow.find((row) => row.type === type)?._sum.amountCents || 0;
+  const completedEscrowCents = Math.max(0, escrowSum(TransactionType.ESCROW_DEPOSIT) - escrowSum(TransactionType.ESCROW_REFUND));
+  const cohortRows = campaigns.map(({ slotCharges, ...campaign }) => ({ ...campaign, paidStipendCents: campaign.fundingModel === "PAY_PER_TESTER" ? slotCharges.reduce((sum, charge) => sum + charge.stipendCents, 0) : null }));
   const checkoutCampaign = activeView === "billing" && params.campaign
     ? await prisma.appCampaign.findFirst({ where: { id: params.campaign, developerId: session.user.id }, select: { title: true, status: true } })
     : null;
@@ -160,8 +163,9 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {overview ? <>
+          {params.launched ? <p className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">Cohort launched with no charge. Your saved card is charged only when you accept a tester from Applications.</p> : null}
           <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: COHORT_PLATFORM_FEE_RATE }} />
-          <ActiveCohorts cohorts={campaigns} total={activeCohortCount} />
+          <ActiveCohorts cohorts={cohortRows} total={activeCohortCount} />
         </> : null}
         {activeView !== "billing" ? <DeveloperStudio key={launchDraft?.id || "new-drop"} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} /> : null}
 
@@ -170,7 +174,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
             <div>
               <p className="font-mono text-xs uppercase tracking-wider text-zinc-500">Billing</p>
               <h2 className="mt-1 text-xl font-semibold tracking-tight text-zinc-100">Escrow, payments &amp; invoices</h2>
-              <p className="mt-1 text-sm text-zinc-400">Tester escrow funded through Stripe, platform fees, and downloadable cohort receipts.</p>
+              <p className="mt-1 text-sm text-zinc-400">Per-tester charges, bundle payments, refunds, and downloadable receipts.</p>
             </div>
             <a className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200" href="/console?view=new-drop">
               <Plus className="size-3.5" /> Fund New Cohort

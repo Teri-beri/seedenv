@@ -5,6 +5,8 @@ import { z } from "zod";
 import { requireMember } from "@/lib/member";
 import { serializable } from "@/lib/quest-ledger";
 import { createMissionApplication, reviewMissionApplication, closeMissionApplication } from "@/lib/mission-applications";
+import { prisma } from "@/lib/prisma";
+import { acceptApplicationWithFunding } from "@/lib/slot-funding";
 
 export async function requestMission(campaignId: string, note: string) {
   const member = await requireMember("TESTER");
@@ -18,6 +20,19 @@ export async function requestMission(campaignId: string, note: string) {
 export async function decideApplication(id: string, decision: "accept" | "decline") {
   if (decision !== "accept" && decision !== "decline") throw new Error("Choose a valid decision.");
   const member = await requireMember("DEVELOPER");
+  const application = decision === "accept" ? await prisma.missionApplication.findUnique({ where: { id }, select: { campaign: { select: { fundingModel: true } } } }) : null;
+  if (application?.campaign.fundingModel === "PAY_PER_TESTER") {
+    // Return charge failures as text: production server actions hide thrown error messages.
+    try {
+      const result = await acceptApplicationWithFunding(member.id, id);
+      revalidatePath("/applications");
+      revalidatePath("/dashboard");
+      revalidatePath("/console");
+      return result.message;
+    } catch (error) {
+      return error instanceof Error ? error.message : "The tester could not be accepted. Please try again.";
+    }
+  }
   await serializable((tx) => reviewMissionApplication(tx, member.id, id, decision));
   revalidatePath("/applications");
   revalidatePath("/dashboard");

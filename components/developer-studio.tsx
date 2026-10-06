@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { DeveloperInsights, type InsightSubmission } from "@/components/developer-insights";
 import { formatCents } from "@/lib/utils";
 import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templates";
-import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, quoteCampaignFunding, type CohortTypeKey } from "@/lib/pricing";
+import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, projectPerTesterCharges, quoteCampaignFunding, type CohortTypeKey } from "@/lib/pricing";
 
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
@@ -147,6 +147,8 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const activeBundle = isBundleType(form.cohortType) ? COHORT_BUNDLES[form.cohortType] : null;
   const totalEscrow = fundingQuote.totalBudgetUsd;
   const platformFee = fundingQuote.platformFeeUsd;
+  const perTester = useMemo(() => projectPerTesterCharges(form.totalSlots, Math.round(form.bountyPerTaskUsd * 100)), [form.totalSlots, form.bountyPerTaskUsd]);
+  const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
   const testerFundingShare = totalEscrow > 0 ? (fundingQuote.payoutPoolUsd / totalEscrow * 100).toFixed(2) : "0.00";
 
   function validateStep(stepToValidate: number) {
@@ -274,6 +276,11 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
         const result = await createCampaignWithEscrow(form, draftId);
         if (result.requiresPaymentSetup) {
           router.push(`/account?tab=portfolio&draft=${encodeURIComponent(result.campaignId)}#stripe-setup`);
+          return;
+        }
+        if (result.launched) {
+          router.push(`/console?view=overview&launched=${encodeURIComponent(result.campaignId)}`);
+          router.refresh();
           return;
         }
         if (result.checkoutUrl?.startsWith("http")) {
@@ -505,15 +512,43 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                   <Slider error={errors.bountyPerTaskUsd} label="Bounty per tester ($)" min={1} max={100} value={form.bountyPerTaskUsd} step={0.5} onChange={(value) => updateFormField("bountyPerTaskUsd", value)} />
                 </>
               )}
-              <div className="grid gap-3 md:grid-cols-3">
-                <Metric label={`Tester payout escrow (${testerFundingShare}%)`} value={`$${payoutPool.toFixed(2)}`} />
-                <Metric label={activeBundle ? "Flat platform fee" : platformFee === COHORT_MIN_PLATFORM_FEE_CENTS / 100 ? `Platform fee ($${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum)` : `${COHORT_PLATFORM_FEE_RATE * 100}% platform fee`} value={`$${platformFee.toFixed(2)}`} />
-                <Metric label="Total escrow" value={`$${totalEscrow.toFixed(2)}`} gold />
-              </div>
-              <p className="text-xs leading-5 text-white/50">{activeBundle ? "Bundle pricing is fixed and verified again at checkout." : `The ${COHORT_PLATFORM_FEE_RATE * 100}% platform fee (minimum $${COHORT_MIN_PLATFORM_FEE_CENTS / 100}) is added to tester rewards.`} Testers receive {testerFundingShare}% of total funding before any Stripe fees.</p>
-              <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending}>
-                <BadgeDollarSign className="size-5" /> Deposit Escrow & Launch
-              </Button>
+              {activeBundle ? (
+                <>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <Metric label={`Tester payout escrow (${testerFundingShare}%)`} value={`$${payoutPool.toFixed(2)}`} />
+                    <Metric label="Flat platform fee" value={`$${platformFee.toFixed(2)}`} />
+                    <Metric label="Total escrow" value={`$${totalEscrow.toFixed(2)}`} gold />
+                  </div>
+                  <p className="text-xs leading-5 text-white/50">Bundle pricing is fixed, paid up front, and verified again at checkout. Unused tester stipends are refunded automatically if the cohort ends early.</p>
+                  <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending}>
+                    <BadgeDollarSign className="size-5" /> Pay ${totalEscrow.toFixed(0)} & Launch
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <Metric label="Charged now" value="$0.00" />
+                    <Metric label="Per accepted tester" value={perTester.typicalCharge ? usd(perTester.typicalCharge.totalCents) : "$0.00"} />
+                    <Metric label={`Maximum if all ${form.totalSlots} fill`} value={usd(perTester.maxTotalCents)} gold />
+                  </div>
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 font-mono text-xs text-zinc-400">
+                    <p className="mb-2 text-[11px] uppercase tracking-wider text-zinc-500">Full cohort breakdown</p>
+                    <dl className="space-y-1.5">
+                      <div className="flex justify-between"><dt>Tester stipends ({form.totalSlots} × ${form.bountyPerTaskUsd.toFixed(2)})</dt><dd className="text-zinc-200">{usd(perTester.stipendCents)}</dd></div>
+                      <div className="flex justify-between"><dt>Platform fee ({COHORT_PLATFORM_FEE_RATE * 100}%, ${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum)</dt><dd className="text-zinc-200">{usd(perTester.platformFeeCents)}</dd></div>
+                      <div className="flex justify-between"><dt>Card processing (Stripe 2.9% + 30¢ per charge)</dt><dd className="text-zinc-200">{usd(perTester.processingFeeCents)}</dd></div>
+                      <div className="flex justify-between border-t border-zinc-800 pt-1.5"><dt className="text-zinc-300">Maximum total</dt><dd className="text-emerald-400">{usd(perTester.maxTotalCents)}</dd></div>
+                    </dl>
+                    {perTester.firstCharge && perTester.typicalCharge && perTester.firstCharge.totalCents !== perTester.typicalCharge.totalCents ? (
+                      <p className="mt-3 text-[11px] leading-5 text-zinc-500">The first accepted tester is charged {usd(perTester.firstCharge.totalCents)} because it carries the ${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum fee; each tester after is about {usd(perTester.typicalCharge.totalCents)}.</p>
+                    ) : null}
+                  </div>
+                  <p className="text-xs leading-5 text-white/50">Nothing is charged at launch. Your saved card is charged each time you accept a tester, so you only pay for testers who actually join. Slots freed by withdrawn or rejected testers are reused before any new charge. Ending the cohort, or 30 days passing, refunds paid slots nobody used (stipend + platform fee; card processing is non-refundable).</p>
+                  <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending}>
+                    <BadgeDollarSign className="size-5" /> Launch Cohort · no charge now
+                  </Button>
+                </>
+              )}
               {canSaveTestDraft ? <Button className="w-full" disabled={isPending || isUploadingIcon} type="button" variant="outline" onClick={saveNoChargeTestDraft}><CheckCircle2 className="size-4" /> Save test draft</Button> : null}
             </div>
           )}

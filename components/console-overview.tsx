@@ -1,6 +1,7 @@
 import { PlatformType } from "@prisma/client";
 import { Boxes } from "lucide-react";
 import Link from "next/link";
+import { EndCohortButton } from "@/components/end-cohort-button";
 import { formatCents } from "@/lib/utils";
 
 export type ConsoleMetrics = {
@@ -21,6 +22,9 @@ export type ConsoleCohort = {
   claimedSlots: number;
   completedSlots: number;
   bountyPerTaskUsd: number;
+  platformFeeUsd: number;
+  fundingModel: "PREPAID" | "PAY_PER_TESTER";
+  paidStipendCents: number | null;
 };
 
 const platformLabels: Record<PlatformType, string> = {
@@ -38,7 +42,7 @@ export function ConsoleMetricStrip({ metrics }: { metrics: ConsoleMetrics }) {
     { label: "Active cohorts", value: metrics.activeCohorts.toLocaleString(), detail: `${plural(metrics.runsInProgress, "run")} in progress` },
     { label: "Pending audits", value: metrics.pendingAudits.toLocaleString(), detail: metrics.pendingAudits ? `${plural(metrics.pendingAudits, "submission")} awaiting review` : "All submissions cleared" },
     { label: "Verified validators", value: metrics.verifiedValidators.toLocaleString(), detail: "Testers with approved reports" },
-    { label: "Escrow committed", value: formatCents(metrics.escrowCommittedCents), detail: `${Math.round(metrics.platformFeePercent * 100)}% fee · $15 min on custom drops` },
+    { label: "Total charged", value: formatCents(metrics.escrowCommittedCents), detail: `Net of refunds · ${Math.round(metrics.platformFeePercent * 100)}% fee, $15 min per custom drop` },
   ];
   return (
     <section aria-label="Console metrics" className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -66,25 +70,28 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
       </div>
       {cohorts.length ? (
         <div className="overflow-x-auto rounded-xl border border-zinc-800">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-zinc-800 bg-zinc-900/40 font-mono text-[11px] uppercase tracking-wider text-zinc-500">
               <tr>
                 <th scope="col" className="px-4 py-2.5 font-normal">Cohort</th>
                 <th scope="col" className="px-4 py-2.5 font-normal">Platform</th>
                 <th scope="col" className="px-4 py-2.5 font-normal">Slots filled</th>
-                <th scope="col" className="px-4 py-2.5 text-right font-normal">Escrow locked</th>
+                <th scope="col" className="px-4 py-2.5 text-right font-normal">Held for testers</th>
                 <th scope="col" className="px-4 py-2.5 text-right font-normal">Released</th>
+                <th scope="col" className="px-4 py-2.5 text-right font-normal"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-800">
               {cohorts.map((cohort) => {
                 const filledPercent = cohort.totalSlots ? Math.min(100, Math.round((cohort.claimedSlots / cohort.totalSlots) * 100)) : 0;
-                const releasedUsd = Math.min(cohort.totalBudgetUsd, cohort.completedSlots * cohort.bountyPerTaskUsd);
-                const lockedUsd = Math.max(0, cohort.totalBudgetUsd - releasedUsd);
+                const poolUsd = cohort.paidStipendCents === null ? Math.max(0, cohort.totalBudgetUsd - cohort.platformFeeUsd) : cohort.paidStipendCents / 100;
+                const releasedUsd = Math.min(poolUsd, cohort.completedSlots * cohort.bountyPerTaskUsd);
+                const lockedUsd = Math.max(0, poolUsd - releasedUsd);
                 return (
                   <tr key={cohort.id} className="transition-colors hover:bg-zinc-900/40">
                     <td className="max-w-xs px-4 py-3">
                       <Link href="/console?view=review-deck" className="block truncate font-medium text-zinc-100 hover:underline">{cohort.title}</Link>
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">{cohort.fundingModel === "PAY_PER_TESTER" ? "Charged per accepted tester" : "Prepaid escrow"}</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-zinc-400">{platformLabels[cohort.platform]}</td>
                     <td className="px-4 py-3">
@@ -95,6 +102,7 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-zinc-200">${lockedUsd.toFixed(2)}</td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-emerald-400">${releasedUsd.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right"><EndCohortButton campaignId={cohort.id} title={cohort.title} payPerTester={cohort.fundingModel === "PAY_PER_TESTER"} /></td>
                   </tr>
                 );
               })}

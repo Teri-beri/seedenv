@@ -43,11 +43,11 @@ export async function getBillingOverview(userId: string, stripeCustomerId: strin
         campaign: { select: { id: true, title: true, platform: true, status: true } },
       },
     }),
-    prisma.walletTransaction.aggregate({ where: { ...depositScope, status: TransactionStatus.COMPLETED }, _sum: { platformFeeCents: true } }),
+    prisma.walletTransaction.aggregate({ where: { userId, type: { in: [TransactionType.ESCROW_DEPOSIT, TransactionType.ESCROW_REFUND] }, status: TransactionStatus.COMPLETED }, _sum: { platformFeeCents: true } }),
     prisma.walletTransaction.aggregate({ where: { ...depositScope, status: TransactionStatus.PENDING }, _sum: { amountCents: true }, _count: true }),
     prisma.appCampaign.findMany({
       where: { developerId: userId, status: { in: [CampaignStatus.ACTIVE, CampaignStatus.PAUSED] } },
-      select: { id: true, totalBudgetUsd: true, platformFeeUsd: true },
+      select: { id: true, totalBudgetUsd: true, platformFeeUsd: true, fundingModel: true },
     }),
     prisma.submission.aggregate({ where: { status: SubmissionStatus.APPROVED, campaign: { developerId: userId } }, _sum: { payoutCents: true }, _count: true }),
     prisma.billingProfile.findUnique({ where: { userId } }),
@@ -58,10 +58,15 @@ export async function getBillingOverview(userId: string, stripeCustomerId: strin
     ? await prisma.submission.groupBy({ by: ["campaignId"], where: { status: SubmissionStatus.APPROVED, campaignId: { in: fundedCampaigns.map((campaign) => campaign.id) } }, _sum: { payoutCents: true } })
     : [];
   const approvedMap = new Map(approvedByCampaign.map((row) => [row.campaignId, row._sum.payoutCents || 0]));
+  const perTesterIds = fundedCampaigns.filter((campaign) => campaign.fundingModel === "PAY_PER_TESTER").map((campaign) => campaign.id);
+  const chargedByCampaign = perTesterIds.length
+    ? await prisma.slotCharge.groupBy({ by: ["campaignId"], where: { campaignId: { in: perTesterIds }, status: "SUCCEEDED" }, _sum: { stipendCents: true } })
+    : [];
+  const chargedMap = new Map(chargedByCampaign.map((row) => [row.campaignId, row._sum.stipendCents || 0]));
 
   return {
     metrics: {
-      activeEscrowCents: lockedEscrowCents(fundedCampaigns.map((campaign) => ({ ...campaign, approvedPayoutCents: approvedMap.get(campaign.id) || 0 }))),
+      activeEscrowCents: lockedEscrowCents(fundedCampaigns.map((campaign) => ({ ...campaign, approvedPayoutCents: approvedMap.get(campaign.id) || 0, fundedPoolCents: campaign.fundingModel === "PAY_PER_TESTER" ? chargedMap.get(campaign.id) || 0 : undefined }))),
       activeCohorts: fundedCampaigns.length,
       settledPayoutsCents: settled._sum.payoutCents || 0,
       validatorsPaid: settled._count,

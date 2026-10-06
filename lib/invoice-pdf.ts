@@ -55,11 +55,12 @@ export async function generateInvoicePdf(input: { id: string; date: Date; amount
   cursor -= 20;
   line(`Cohort: ${input.snapshot.cohortTitle}`, 14);
   line(`Cohort ID: ${input.snapshot.cohortId}`);
-  line(`Tester reward pool: ${money(input.snapshot.rewardPoolCents)}`);
+  line(`${input.snapshot.processingFeeCents === undefined ? "Tester reward pool" : "Tester stipend (one slot)"}: ${money(input.snapshot.rewardPoolCents)}`);
   line(`Platform fee (recorded at checkout): ${money(input.snapshot.platformFeeCents)}`);
+  if (input.snapshot.processingFeeCents !== undefined) line(`Card processing (passed through): ${money(input.snapshot.processingFeeCents)}`);
   line(`Total paid: ${money(input.amountCents)}`, 14);
   cursor -= 20;
-  line("Stripe processing and payout fees, if applicable, are separate. This receipt does not certify VAT registration or replace a jurisdiction-specific tax invoice.", 9);
+  line("Unless itemized above, Stripe processing and payout fees are separate. This receipt does not certify VAT registration or replace a jurisdiction-specific tax invoice.", 9);
   document.setTitle(`SeedEnv receipt ${invoiceNumber(input.id, input.date)}`);
   document.setAuthor("TERIMUS LLC");
   return document.save();

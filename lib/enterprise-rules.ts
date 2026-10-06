@@ -19,12 +19,13 @@ export const invoiceSnapshotSchema = z.object({
   cohortTitle: z.string().min(1).max(150),
   rewardPoolCents: z.number().int().nonnegative(),
   platformFeeCents: z.number().int().nonnegative(),
+  processingFeeCents: z.number().int().nonnegative().optional(),
   company: billingDetailsSchema.nullable(),
 });
 export type InvoiceSnapshot = z.infer<typeof invoiceSnapshotSchema>;
 
 export function invoiceTotalMatches(snapshot: InvoiceSnapshot, amountCents: number) {
-  return Number.isSafeInteger(amountCents) && amountCents > 0 && snapshot.rewardPoolCents + snapshot.platformFeeCents === amountCents;
+  return Number.isSafeInteger(amountCents) && amountCents > 0 && snapshot.rewardPoolCents + snapshot.platformFeeCents + (snapshot.processingFeeCents ?? 0) === amountCents;
 }
 
 export const supportCategories = ["Cohort Dispute", "Billing & Escrow", "Technical Bug", "General Support"] as const;

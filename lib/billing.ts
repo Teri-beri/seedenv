@@ -12,6 +12,7 @@ export type InvoiceLedgerRow = {
   date: string;
   testerPoolCents: number;
   feeCents: number;
+  processingFeeCents: number;
   totalCents: number;
   escrowStatus: EscrowStatus;
   downloadable: boolean;
@@ -46,6 +47,7 @@ export function buildInvoiceLedgerRow(transaction: {
 }): InvoiceLedgerRow {
   const snapshot = invoiceSnapshotSchema.safeParse(transaction.invoiceSnapshot);
   const feeCents = snapshot.success ? snapshot.data.platformFeeCents : transaction.platformFeeCents || 0;
+  const processingFeeCents = snapshot.success ? snapshot.data.processingFeeCents ?? 0 : 0;
   const testerPoolCents = snapshot.success ? snapshot.data.rewardPoolCents : Math.max(0, transaction.amountCents - feeCents);
   return {
     id: transaction.id,
@@ -56,6 +58,7 @@ export function buildInvoiceLedgerRow(transaction: {
     date: transaction.createdAt.toISOString(),
     testerPoolCents,
     feeCents,
+    processingFeeCents,
     totalCents: transaction.amountCents,
     escrowStatus: escrowStatusFor(transaction.status, transaction.campaign?.status),
     downloadable: transaction.status === "COMPLETED" && snapshot.success && invoiceTotalMatches(snapshot.data, transaction.amountCents),
@@ -72,10 +75,11 @@ export type BillingMetricsData = {
   awaitingPaymentCount: number;
 };
 
-// Locked escrow = funded tester pool (total minus platform fee) minus approved payouts already released.
-export function lockedEscrowCents(campaigns: Array<{ totalBudgetUsd: number; platformFeeUsd: number; approvedPayoutCents: number }>) {
+// Locked escrow = funded tester pool minus approved payouts already released.
+// Pay-per-tester cohorts pass fundedPoolCents (stipends actually charged); prepaid cohorts use the budget minus the fee.
+export function lockedEscrowCents(campaigns: Array<{ totalBudgetUsd: number; platformFeeUsd: number; approvedPayoutCents: number; fundedPoolCents?: number }>) {
   return campaigns.reduce((sum, campaign) => {
-    const poolCents = Math.round((campaign.totalBudgetUsd - campaign.platformFeeUsd) * 100);
+    const poolCents = campaign.fundedPoolCents ?? Math.round((campaign.totalBudgetUsd - campaign.platformFeeUsd) * 100);
     return sum + Math.max(0, poolCents - campaign.approvedPayoutCents);
   }, 0);
 }

@@ -9,7 +9,7 @@ export function BillingMetrics({ metrics }: { metrics: BillingMetricsData }) {
   const cards = [
     { label: "Active Escrow Committed", value: formatCents(metrics.activeEscrowCents), detail: `Locked in ${plural(metrics.activeCohorts, "active cohort")}` },
     { label: "Settled Payouts", value: formatCents(metrics.settledPayoutsCents), detail: `${plural(metrics.validatorsPaid, "approved validator task")}` },
-    { label: "Platform Fees", value: formatCents(metrics.platformFeesCents), detail: "On confirmed escrow deposits" },
+    { label: "Platform Fees", value: formatCents(metrics.platformFeesCents), detail: "Net of refunds on unused places" },
     { label: "Awaiting Payment", value: formatCents(metrics.awaitingPaymentCents), detail: metrics.awaitingPaymentCount ? `${plural(metrics.awaitingPaymentCount, "checkout")} not yet confirmed` : "No unconfirmed checkouts" },
   ];
   return (

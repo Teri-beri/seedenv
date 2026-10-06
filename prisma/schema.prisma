@@ -63,9 +63,22 @@ enum TransactionType {
   CLIPPER_PAYOUT
   CLIPPER_REFUND
   ESCROW_DEPOSIT
+  ESCROW_REFUND
   BOUNTY_PAYOUT
   PLATFORM_FEE
   WITHDRAWAL
+}
+
+enum CohortFundingModel {
+  PREPAID
+  PAY_PER_TESTER
+}
+
+enum SlotChargeStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
 }
 
 enum TransactionStatus {
@@ -201,14 +214,42 @@ model AppCampaign {
   guaranteedDays   Int?
   syncGitHubRepo   String?
   hardwareStrict   Boolean              @default(true)
-  estimatedMinutes Int?             @map("estimated_minutes")
-  testerPerk       String?          @map("tester_perk") @db.VarChar(80)
+  estimatedMinutes Int?                 @map("estimated_minutes")
+  testerPerk       String?              @map("tester_perk") @db.VarChar(80)
+  fundingModel     CohortFundingModel   @default(PREPAID) @map("funding_model")
+  cancelledAt      DateTime?            @map("cancelled_at")
+  refundedCents    Int                  @default(0) @map("refunded_cents")
   applications     MissionApplication[]
   transactions     WalletTransaction[]
+  slotCharges      SlotCharge[]
 
   @@index([developerId, status])
   @@index([status, expiresAt])
   @@index([platform])
+}
+
+// One off-session card charge that funds a single tester slot on a pay-per-tester cohort.
+model SlotCharge {
+  id                    String           @id @default(cuid())
+  campaignId            String           @map("campaign_id")
+  campaign              AppCampaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  applicationId         String?          @map("application_id")
+  stipendCents          Int              @map("stipend_cents")
+  platformFeeCents      Int              @map("platform_fee_cents")
+  processingFeeCents    Int              @map("processing_fee_cents")
+  totalCents            Int              @map("total_cents")
+  status                SlotChargeStatus @default(PENDING)
+  stripePaymentIntentId String?          @unique @map("stripe_payment_intent_id")
+  stripeRefundId        String?          @map("stripe_refund_id")
+  transactionId         String?          @map("transaction_id")
+  failureReason         String?          @map("failure_reason")
+  refundedAt            DateTime?        @map("refunded_at")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  @@index([campaignId, status])
+  @@index([status, createdAt])
+  @@map("slot_charges")
 }
 
 model TaskInstruction {

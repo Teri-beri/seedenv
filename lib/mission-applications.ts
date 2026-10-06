@@ -26,6 +26,7 @@ export async function reviewMissionApplication(tx: Prisma.TransactionClient, dev
   if (decision === "accept") {
     const campaign = application.campaign;
     if (campaign.status !== "ACTIVE" || campaign.expiresAt <= new Date()) throw new Error("Activate the campaign before accepting testers.");
+    if (campaign.fundingModel === "PAY_PER_TESTER") throw new Error("Pay-per-tester cohorts must charge the slot before accepting.");
     const held = await tx.missionApplication.count({ where: { campaignId: campaign.id, status: "ACCEPTED", startBy: { gt: new Date() } } });
     if (campaign.claimedSlots + held >= campaign.totalSlots) throw new Error("All mission places are already reserved.");
     return tx.missionApplication.update({ where: { id }, data: { status: "ACCEPTED", startBy: new Date(Math.min(campaign.expiresAt.getTime(), Date.now() + startWindowHours * 3600000)) } });

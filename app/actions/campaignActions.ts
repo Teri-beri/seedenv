@@ -1,6 +1,7 @@
 "use server";
 
-import { CampaignStatus, CohortType, PlatformType, TaskProofType, TransactionStatus, TransactionType } from "@prisma/client";
+import { CampaignStatus, CohortFundingModel, CohortType, PlatformType, TaskProofType, TransactionStatus, TransactionType } from "@prisma/client";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -8,6 +9,8 @@ import { getStripe } from "@/lib/stripe";
 import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, quoteCampaignFunding } from "@/lib/pricing";
 import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templates";
 import { billingDetailsSchema } from "@/lib/enterprise-rules";
+import { cancelCohort } from "@/lib/slot-funding";
+import { formatCents } from "@/lib/utils";
 
 const taskInstructionSchema = z.object({
   instructionTitle: z.string().min(3).max(90),
@@ -170,6 +173,25 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
     }
   }
 
+  if (!isBundleType(input.cohortType)) {
+    const { data: liveData } = buildCampaignData(input, developer.id, CampaignStatus.ACTIVE);
+    const payPerTester = { ...liveData, fundingModel: CohortFundingModel.PAY_PER_TESTER };
+    let live;
+    if (draftId) {
+      const ownedDraft = await prisma.appCampaign.findFirst({ where: { id: draftId, developerId: developer.id, status: CampaignStatus.DRAFT }, select: { id: true } });
+      if (!ownedDraft) throw new Error("This saved draft is unavailable or already launched.");
+      live = await prisma.$transaction(async (transaction) => {
+        await transaction.taskInstruction.deleteMany({ where: { campaignId: draftId } });
+        return transaction.appCampaign.update({ where: { id: draftId }, data: payPerTester });
+      });
+    } else {
+      live = await prisma.appCampaign.create({ data: payPerTester });
+    }
+    revalidatePath("/console");
+    revalidatePath("/explore");
+    return { campaignId: live.id, checkoutUrl: null, escrowTotalCents: 0, launched: true };
+  }
+
   const profile = await prisma.billingProfile.findUnique({ where: { userId: developer.id } });
   const company = profile ? billingDetailsSchema.parse({ ...profile, taxId: profile.taxId || "", billingEmail: profile.billingEmail || "", addressLine2: profile.addressLine2 || "", region: profile.region || "" }) : null;
   const { data: campaignData, escrowTotalCents, terms } = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING);
@@ -246,4 +268,20 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
   }
 
   return { campaignId: campaign.id, checkoutUrl: session.url, escrowTotalCents };
+}
+
+export async function endCohort(campaignId: string) {
+  const developer = await requireDeveloper();
+  const id = z.string().min(1).max(200).parse(campaignId);
+  try {
+    const result = await cancelCohort(developer.id, id, developer.role === "ADMIN");
+    revalidatePath("/console");
+    revalidatePath("/explore");
+    revalidatePath("/applications");
+    const parts = [result.refundedCents ? `${formatCents(result.refundedCents)} refunded to your card` : "No unused paid slots to refund"];
+    if (result.inProgress) parts.push(`${result.inProgress} tester${result.inProgress === 1 ? " is" : "s are"} already working and will still be reviewed and paid; anything they don't use is refunded automatically`);
+    return { ok: true as const, message: `Cohort ended. ${parts.join(". ")}.` };
+  } catch (error) {
+    return { ok: false as const, message: error instanceof Error ? error.message : "The cohort could not be ended." };
+  }
 }

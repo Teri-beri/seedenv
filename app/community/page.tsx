@@ -8,13 +8,11 @@ import { PublicLaunchCircle } from "@/components/public-launch-circle";
 import { dismissCommunityReport, hideCommunityContent } from "@/app/actions/communityActions";
 import { optionalCircleMember, circleAuthorSelect } from "@/lib/public-launch-circle";
 import { prisma } from "@/lib/prisma";
+import { publicPageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "Launch Circle",
-  description: "Developer launch updates, build notes, and discussion from the SeedEnv community.",
-};
+export const metadata: Metadata = publicPageMetadata("Launch Circle", "Developer launch updates, build notes, and discussion from the SeedEnv community.", "/community");
 
 type FeedSort = "latest" | "discussed";
 type FeedScope = "all" | "public" | "members";

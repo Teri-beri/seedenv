@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { useState } from "react";
-import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, quoteCampaignFunding, type CohortTypeKey } from "@/lib/pricing";
+import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, projectPerTesterCharges, quoteCampaignFunding, type CohortTypeKey } from "@/lib/pricing";
 import { formatCents } from "@/lib/utils";
 
 const tabs: Array<{ type: CohortTypeKey; label: string; price: string }> = [
-  { type: "STANDARD_QA", label: "Custom Mission Drop", price: `${COHORT_PLATFORM_FEE_RATE * 100}% fee` },
+  { type: "STANDARD_QA", label: "Custom Mission Drop", price: "Pay per tester" },
   { type: "GOOGLE_PLAY_14_DAY", label: "Google Play 14-Day", price: "$199 flat" },
   { type: "LIVE_STRESS_DROP", label: "Flash Concurrency", price: "$349 flat" },
 ];
@@ -32,6 +32,7 @@ export function PricingCalculator({ href }: { href: string }) {
   const quote = quoteCampaignFunding(validators * stipend, type);
   const feeCents = Math.round(quote.platformFeeUsd * 100);
   const floorApplied = !bundle && feeCents === COHORT_MIN_PLATFORM_FEE_CENTS;
+  const perTester = projectPerTesterCharges(validators, Math.round(stipend * 100));
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/40">
@@ -63,20 +64,37 @@ export function PricingCalculator({ href }: { href: string }) {
           </div>
         )}
 
-        <dl className="mt-6 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 border-t border-zinc-800 pt-5 text-sm">
-          <dt className="text-zinc-400">Tester reward pool{bundle ? ` (${bundle.slots} × ${formatCents(bundle.bountyCents)})` : ""}</dt>
-          <dd className="font-mono text-emerald-400">{formatCents(Math.round(quote.payoutPoolUsd * 100))}</dd>
-          <dt className="text-zinc-400">{bundle ? "Platform fee (flat)" : floorApplied ? `Platform fee ($${minFeeUsd} minimum)` : `Platform fee (${feePercent}%)`}</dt>
-          <dd className="font-mono text-zinc-200">{formatCents(feeCents)}</dd>
-          <dt className="border-t border-zinc-800 pt-3 font-medium text-zinc-100">Total due at checkout</dt>
-          <dd className="border-t border-zinc-800 pt-3 font-mono font-medium text-zinc-100">{formatCents(quote.escrowTotalCents)}</dd>
-        </dl>
+        {bundle ? (
+          <dl className="mt-6 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 border-t border-zinc-800 pt-5 text-sm">
+            <dt className="text-zinc-400">Tester reward pool ({bundle.slots} × {formatCents(bundle.bountyCents)})</dt>
+            <dd className="text-right font-mono text-emerald-400">{formatCents(Math.round(quote.payoutPoolUsd * 100))}</dd>
+            <dt className="text-zinc-400">Platform fee (flat)</dt>
+            <dd className="text-right font-mono text-zinc-200">{formatCents(feeCents)}</dd>
+            <dt className="border-t border-zinc-800 pt-3 font-medium text-zinc-100">Total due at checkout</dt>
+            <dd className="border-t border-zinc-800 pt-3 text-right font-mono font-medium text-zinc-100">{formatCents(quote.escrowTotalCents)}</dd>
+          </dl>
+        ) : (
+          <dl className="mt-6 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 border-t border-zinc-800 pt-5 text-sm">
+            <dt className="text-zinc-400">Due at launch</dt>
+            <dd className="text-right font-mono text-emerald-400">$0.00</dd>
+            <dt className="text-zinc-400">Each accepted tester</dt>
+            <dd className="text-right font-mono text-zinc-200">{formatCents(perTester.typicalCharge?.totalCents || 0)}</dd>
+            <dt className="text-zinc-500">· Rewards if all fill ({validators} × {formatCents(Math.round(stipend * 100))})</dt>
+            <dd className="text-right font-mono text-zinc-400">{formatCents(perTester.stipendCents)}</dd>
+            <dt className="text-zinc-500">· {floorApplied ? `Platform fee ($${minFeeUsd} minimum)` : `Platform fee (${feePercent}%)`}</dt>
+            <dd className="text-right font-mono text-zinc-400">{formatCents(perTester.platformFeeCents)}</dd>
+            <dt className="text-zinc-500">· Card processing (2.9% + 30¢ per charge)</dt>
+            <dd className="text-right font-mono text-zinc-400">{formatCents(perTester.processingFeeCents)}</dd>
+            <dt className="border-t border-zinc-800 pt-3 font-medium text-zinc-100">Maximum if every place fills</dt>
+            <dd className="border-t border-zinc-800 pt-3 text-right font-mono font-medium text-zinc-100">{formatCents(perTester.maxTotalCents)}</dd>
+          </dl>
+        )}
         <div className="mt-3 text-xs leading-5 text-zinc-500">
           {bundle?.type === "GOOGLE_PLAY_14_DAY"
             ? "SeedEnv cannot guarantee Google's production-access decision; the refund covers tester retention only."
             : bundle
               ? "The live session time is agreed in your cohort brief. Testers join from their own devices and networks."
-              : `${feePercent}% of the reward pool with a $${minFeeUsd} minimum per cohort. Card processing is included.`}
+              : `Launch free with a saved card. You're charged only when you accept a tester; the $${minFeeUsd} minimum fee is collected on the first one. Unused paid places are refunded when the cohort ends (card processing excepted).`}
         </div>
         <Link className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 text-sm font-semibold text-zinc-950 transition-colors hover:bg-white" href={cohortLaunchHref(href, type)}>
           {bundle ? `Start ${bundle.shortName}` : "Deploy a Cohort"} <ArrowRight className="size-4" />

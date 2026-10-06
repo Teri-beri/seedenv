@@ -95,7 +95,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 font-mono text-xs text-zinc-400">{formatDate(invoice.date)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-xs text-zinc-300">{formatCents(invoice.testerPoolCents)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-xs text-zinc-500">{formatCents(invoice.feeCents)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-xs text-zinc-500">{formatCents(invoice.feeCents)}{invoice.processingFeeCents ? <span className="block text-[10px] text-zinc-600">+{formatCents(invoice.processingFeeCents)} card</span> : null}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-sm font-semibold text-zinc-100">{formatCents(invoice.totalCents)}</td>
                     <td className="whitespace-nowrap px-3 py-3"><span className={`inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${chip.className}`}>{chip.label}</span></td>
                     <td className="whitespace-nowrap px-5 py-3 text-right">

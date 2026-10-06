@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { serializable } from "@/lib/quest-ledger";
+import { reconcileCampaignFunding } from "@/lib/slot-funding";
 import { getStripe } from "@/lib/stripe";
 import { usdToCents } from "@/lib/utils";
 
@@ -29,7 +30,7 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
   if (session.mode !== "payment" || session.status !== "complete" || session.payment_status !== "paid") return { awaitingPayment: true };
   const paymentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
   if (!metadata.campaignId || !metadata.developerId || !paymentId) throw new Error("Campaign funding identifiers are missing.");
-  return serializable(async (tx) => {
+  const result = await serializable(async (tx) => {
     const campaign = await tx.appCampaign.findUnique({ where: { id: metadata.campaignId } });
     if (!campaign || campaign.developerId !== metadata.developerId) throw new Error("Campaign funding ownership does not match.");
     const amount = usdToCents(campaign.totalBudgetUsd);
@@ -40,7 +41,11 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     if (campaign.status !== "ESCROW_PENDING") throw new Error("This campaign is not awaiting funding. Reconcile the payment before changing its state.");
     if (deposits.length !== 1 || deposits[0].status !== "PENDING" || deposits[0].amountCents !== amount) throw new Error("The campaign funding ledger needs reconciliation.");
     await tx.walletTransaction.update({ where: { id: deposits[0].id }, data: { status: "COMPLETED", stripePaymentId: paymentId } });
+    if (campaign.cancelledAt) return { cancelledBeforePayment: true, campaignId: campaign.id };
     await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: "ACTIVE" } });
     return { activated: true, campaignId: campaign.id };
   });
+  // A cohort cancelled while checkout was open is refunded instead of activated.
+  if ("cancelledBeforePayment" in result) await reconcileCampaignFunding(result.campaignId);
+  return result;
 }
