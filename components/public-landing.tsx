@@ -2,7 +2,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { ArrowRight, CheckCircle2, ChevronRight, CircleHelp, Code2, FileText, Fingerprint, Globe, Layers, LockKeyhole, Menu, Search, ShieldCheck, Smartphone, Terminal, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleHelp, Code2, FileText, Fingerprint, Globe, Layers, LockKeyhole, Menu, Search, ShieldCheck, Smartphone, Terminal, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -14,6 +14,7 @@ import { quoteCampaignFunding, SEEDENV_PLATFORM_FEE_PERCENT } from "@/lib/pricin
 import { availableSlots, discoverMissions, type MissionFilter } from "@/lib/tester-console";
 import { formatCents } from "@/lib/utils";
 import { landingViews, landingViewHref } from "@/lib/landing-views";
+import TelemetryGridCanvas from "@/components/TelemetryGridCanvas";
 
 type Mission = {
   id: string;
@@ -36,9 +37,11 @@ type AuthRequest = { role: "DEVELOPER" | "TESTER"; callbackUrl: string; title: s
 
 const primaryAction = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
 const secondaryAction = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-[#171923] px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:border-zinc-600 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
-const headerTextLink = "inline-flex min-h-11 items-center gap-1 font-mono text-xs text-zinc-400 transition-colors hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded";
+const headerTextLink = "inline-flex min-h-11 items-center gap-1 font-mono text-xs text-zinc-400 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded";
 const headerPrimaryAction = "items-center gap-1.5 rounded-lg bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold tracking-tight text-zinc-950 shadow-sm transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
-const sectionClass = "mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8";
+const sectionClass = "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8";
+const sectionShell = "relative scroll-mt-14 border-t border-zinc-800/60 py-16 sm:py-24";
+const surfaceTint = "bg-[#12161F]/20";
 const labelClass = "font-mono text-xs uppercase text-zinc-400";
 const platformLabels = { TESTFLIGHT: "iOS / TestFlight", PLAY_STORE: "Android / Play Console", WEB_STAGING: "Web / PWA" };
 
@@ -115,29 +118,31 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
   }
 
   return (
-    <div id="top" className="min-h-screen text-white [color-scheme:dark]">
+    <div className="relative isolate min-h-screen bg-[#0A0D12]">
+    <TelemetryGridCanvas />
+    <div id="top" className="relative z-10 min-h-screen text-white [color-scheme:dark]">
       <AnalyticsTracker />
-      <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-[#0A0D12]/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+      <header className="sticky top-0 z-50 w-full border-b border-zinc-800/80 bg-zinc-950/75 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-6">
           <Link href="/" className="flex min-h-11 shrink-0 items-center gap-2 sm:gap-3" aria-label="SeedEnv home">
             <Image src="/seedenv-logo-v3.png" alt="" width={36} height={36} className="size-8 shrink-0 object-contain sm:size-9" priority />
             <span className="text-base font-semibold sm:text-lg">SeedEnv</span>
             <span className="font-mono text-[10px] text-zinc-500 sm:text-xs lg:hidden xl:inline">v1.2</span>
           </Link>
-          <nav aria-label="Landing sections" className="hidden min-w-0 items-center justify-center gap-0.5 lg:flex">
-            {landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => setActiveAnchor(item.anchor)} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-sm transition-colors xl:px-2.5 ${activeAnchor === item.anchor ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}>{item.label}</Link>)}
+          <nav aria-label="Landing sections" className="hidden min-w-0 items-center justify-center gap-5 lg:flex xl:gap-6">
+            {landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => setActiveAnchor(item.anchor)} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 shrink-0 items-center rounded font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${activeAnchor === item.anchor ? "text-zinc-100" : "text-zinc-400 hover:text-zinc-100"}`}>{item.label}</Link>)}
           </nav>
-          <nav className="ml-auto flex shrink-0 items-center gap-2 md:gap-4 lg:ml-0 xl:gap-6" aria-label="Landing actions">
-            <div className="hidden items-center gap-4 md:flex xl:gap-6">
+          <nav className="ml-auto flex shrink-0 items-center gap-2 md:gap-4 lg:ml-0" aria-label="Landing actions">
+            <div className="hidden items-center gap-4 md:flex">
               <Link href="/community" className={headerTextLink}>Launch Circle</Link>
               {signedIn ? (
-                <Link href={workspaceHref} className={headerTextLink}><span>Console</span><span aria-hidden="true" className="text-zinc-600">→</span></Link>
+                <Link href={workspaceHref} className={headerTextLink}>Console</Link>
               ) : (
-                <button type="button" className={headerTextLink} onClick={() => setAuthRequest({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Access SeedEnv" })}><span>Sign In</span><span aria-hidden="true" className="text-zinc-600">→</span></button>
+                <button type="button" className={headerTextLink} onClick={() => setAuthRequest({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Access SeedEnv" })}>Sign In</button>
               )}
               <div aria-hidden="true" className="h-4 w-px bg-zinc-800" />
             </div>
-            <Link href={developerHref} className={`${headerPrimaryAction} hidden sm:inline-flex`}><span>Deploy a Cohort</span><span aria-hidden="true" className="font-bold text-zinc-600">→</span></Link>
+            <Link href={developerHref} className={`${headerPrimaryAction} hidden sm:inline-flex`}>Deploy a Cohort</Link>
             <button type="button" aria-label={mobileNavigationOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileNavigationOpen} aria-controls="landing-mobile-navigation" className="grid size-11 place-items-center rounded-lg border border-white/10 text-zinc-300 lg:hidden" onClick={() => setMobileNavigationOpen((open) => !open)}>{mobileNavigationOpen ? <X className="size-5" /> : <Menu className="size-5" />}</button>
           </nav>
         </div>
@@ -160,7 +165,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
             <p className="mt-5 max-w-3xl text-base leading-7 text-zinc-400">Production-grade human testing cohorts before public App Store distribution. Define scenarios and review real-device evidence.</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={developerHref} className={primaryAction} onClick={() => trackAnalytics("signup_start", { role: "DEVELOPER", callbackUrl: "/console?view=new-drop" })}>Deploy a Cohort <ArrowRight className="size-4" /></Link>
-              <Link href={landingViewHref("cohorts")} className={secondaryAction}>Explore Live Board <ChevronRight className="size-4" /></Link>
+              <Link href={landingViewHref("cohorts")} className={secondaryAction}>Explore Live Board</Link>
             </div>
             <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 font-mono text-xs text-zinc-400">
               <span className="flex items-center gap-2"><Smartphone className="size-4 text-emerald-400" /> TestFlight / Play Console</span>
@@ -170,23 +175,24 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
         </section>
 
         <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8" aria-label="Live validation showcase"><LiveShowcase /></section>
-        <section id="engine" className="scroll-mt-4 border-t border-zinc-800/80 bg-[#12161F]/40">
+        <section id="engine" className={`${sectionShell} ${surfaceTint}`}>
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />
           <div className={sectionClass}>
             <p className={labelClass}>For developers</p>
             <h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">A validation pipeline, not a comment box.</h2>
-            <div className="mt-8 grid gap-8 md:grid-cols-3">
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
               <WorkflowStep number="01" icon={<Code2 className="size-5" />} title="Define Test Scenarios" text="Provide a TestFlight, Play Console, or web build. Specify target devices and acceptance criteria in your brief, then choose focused testing scenarios." />
               <WorkflowStep number="02" icon={<LockKeyhole className="size-5" />} title="Escrow & Automated Distribution" text="Fund tester rewards with a transparent 5% add-on platform fee. Reviewed, approved submissions enter the Stripe transfer workflow; payment status stays visible." />
               <WorkflowStep number="03" icon={<FileText className="size-5" />} title="Structured Reports & Export" text="Review reproduction videos, device context, and crash or network logs when provided. Export approved proof and attach reproducible evidence to your GitHub issues or release tracker." />
             </div>
           </div>
         </section>
-        <section id="validators" className="scroll-mt-4 border-t border-zinc-800/80"><div className={sectionClass}>
+        <section id="validators" className={`${sectionShell} ${surfaceTint}`}><div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" /><div className={sectionClass}>
           <div className="flex flex-wrap items-end justify-between gap-5">
             <div><p className={labelClass}>For validators</p><h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">Progression &amp; Verification Protocol</h2></div>
             <button type="button" className={secondaryAction} onClick={() => requestAccess({ role: "TESTER", callbackUrl: "/dashboard", title: "Become a Validator" })}>Become a Validator <ArrowRight className="size-4" /></button>
           </div>
-          <div className="mt-8 grid gap-8 md:grid-cols-3">
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
             <WorkflowStep number="01" icon={<ShieldCheck className="size-5" />} title="Hardware & Technical Onboarding" text="Record your device, OS, and testing background. Include reproducible, original evidence from the hardware required by the cohort; hardware details are reviewed rather than assumed verified." />
             <WorkflowStep number="02" icon={<Layers className="size-5" />} title="Verified Milestones" text="Build reputation through reviewed submissions and useful technical evidence. Scenario eligibility is checked automatically; Discovery Pass rules remain explicit." />
             <WorkflowStep number="03" icon={<CheckCircle2 className="size-5" />} title="Escrow-backed Stipends" text="See the reward and acceptance criteria before applying. Approved work enters the payout ledger; a successful Stripe transfer completes payment. Payout setup is required." />
@@ -200,8 +206,9 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
           </div>
         </div></section>
 
-        <section id="cohorts" className="scroll-mt-4 border-t border-zinc-800/80 bg-[#12161F]/40">
-          <div className={sectionClass}>
+        <section id="cohorts" className={sectionShell}>
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />
+          <div className={sectionClass}><div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 sm:p-8">
             <div className="flex flex-wrap items-end justify-between gap-5">
               <div><p className={labelClass}>Validation Board</p><h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">Active Cohorts</h2></div>
               <span className="font-mono text-xs text-zinc-400">{directoryUnavailable ? "Directory counts unavailable" : `${missions.length} cohorts / ${missions.reduce((count, mission) => count + availableSlots(mission), 0)} open slots`}</span>
@@ -221,11 +228,12 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
                 {missions.length > 0 ? <button type="button" className={`${secondaryAction} mt-4`} onClick={() => { setQuery(""); setFilter("all"); }}>Clear filters</button> : null}
               </div>
             )}
-          </div>
+          </div></div>
         </section>
         <DeveloperPricing href={developerHref} />
 
-        <section id="pwa" className="scroll-mt-4 border-t border-zinc-800/80 bg-[#12161F]/40">
+        <section id="pwa" className={`${sectionShell} ${surfaceTint}`}>
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />
           <div className={`${sectionClass} flex flex-wrap items-center justify-between gap-6`}>
             <div><p className={labelClass}>Mobile & web</p><h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">SeedEnv Mobile Console (PWA)</h2><p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">A browser-based workspace for reviewing scenarios, submitting evidence, and tracking verification.</p></div>
             <button type="button" className={secondaryAction} onClick={() => requestAccess({ role: "TESTER", callbackUrl: "/dashboard", title: "Open validator console" })}>Open Console <ArrowRight className="size-4" /></button>
@@ -254,6 +262,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+    </div>
     </div>
   );
 }
@@ -287,7 +296,7 @@ function LiveShowcase() {
 }
 
 function WorkflowStep({ number, icon, title, text }: { number: string; icon: ReactNode; title: string; text: string }) {
-  return <div className="min-w-0"><div className="flex items-center justify-between border-b border-white/10 pb-4"><span className="font-mono text-xs text-zinc-500">{number}</span><span className="text-emerald-400">{icon}</span></div><h3 className="mt-5 text-base font-semibold text-white">{title}</h3><p className="mt-3 text-sm leading-7 text-zinc-400">{text}</p></div>;
+  return <div className="min-w-0 rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-6 transition-colors hover:border-zinc-700"><div className="flex items-start justify-between"><span className="mb-3 block font-mono text-xs font-semibold text-emerald-400">{number}</span><span className="text-emerald-400" aria-hidden="true">{icon}</span></div><h3 className="text-base font-semibold text-white">{title}</h3><p className="mt-3 text-sm leading-7 text-zinc-400">{text}</p></div>;
 }
 
 function CohortRow({ mission, signedIn, onJoin }: { mission: Mission; signedIn: boolean; onJoin: () => void }) {
@@ -313,7 +322,7 @@ function DeveloperPricing({ href }: { href: string }) {
   const [pool, setPool] = useState(300);
   const funding = quoteCampaignFunding(pool);
   return (
-    <section id="pricing" className="scroll-mt-4 border-t border-zinc-800/80"><div className={sectionClass}>
+    <section id="pricing" className={sectionShell}><div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" /><div className={`${sectionClass} max-w-6xl`}>
       <div className="grid gap-10 lg:grid-cols-2">
         <div>
           <p className={labelClass}>Transparent pricing</p><h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">Fund the work. Keep the math visible.</h2>
