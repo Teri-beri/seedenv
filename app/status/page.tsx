@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BackButton } from "@/components/back-button";
 import { PublicFooter } from "@/components/public-footer";
 import { getSystemStatus, type ServiceState } from "@/lib/system-status";
 
@@ -30,6 +31,7 @@ export default async function StatusPage() {
   return (
     <div className="min-h-screen bg-[#0A0D12] text-white [color-scheme:dark]">
       <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+        <BackButton fallbackHref="/" className="-ml-1 mb-2" />
         <nav aria-label="Breadcrumb" className="font-mono text-xs text-zinc-500">
           <ol className="flex items-center gap-2">
             <li><Link href="/" className="inline-flex min-h-11 items-center hover:text-zinc-200">SeedEnv</Link></li>

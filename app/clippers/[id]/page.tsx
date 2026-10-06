@@ -37,7 +37,7 @@ export default async function ClipRoomPage({ params, searchParams }: { params: P
     prisma.clipEngagement.findMany({ where: { campaignId: id, status: { in: [...roomStatuses] } }, take: 100, select: { creator: { select: { username: true } } } }),
   ]) : [[], [], []];
   const shownMessages = messages.slice(0, 50);
-  return <MemberShell title="Clippers / campaign studio" home={member.role === "ADMIN" ? "/admin" : member.role === "DEVELOPER" ? "/console" : "/dashboard"}><ClipperRoom campaign={campaign} viewerId={member.id} developer={developer} admin={admin} roomAccess={roomAccess} storageEnabled={clipStorageConfigured()} tikTokEnabled={tikTokConfigured()} agreements={agreements.map((item) => ({
+  return <MemberShell title="Clippers / campaign studio" back="/clippers" home={member.role === "ADMIN" ? "/admin" : member.role === "DEVELOPER" ? "/console" : "/dashboard"}><ClipperRoom campaign={campaign} viewerId={member.id} developer={developer} admin={admin} roomAccess={roomAccess} storageEnabled={clipStorageConfigured()} tikTokEnabled={tikTokConfigured()} agreements={agreements.map((item) => ({
     id: item.id, creatorId: item.creatorId, status: item.status, note: item.note, feeCents: item.feeCents, chargeCents: item.chargeCents, revisionCount: item.revisionCount, reviewNote: item.reviewNote,
     dueAt: item.dueAt?.toISOString() || null, reviewDueAt: item.reviewDueAt?.toISOString() || null, publishDueAt: item.publishDueAt?.toISOString() || null,
     fundedAt: item.fundedAt?.toISOString() || null, paidAt: item.paidAt?.toISOString() || null, licenseEndsAt: item.licenseEndsAt?.toISOString() || null,

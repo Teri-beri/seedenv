@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BackButton } from "@/components/back-button";
 import { PublicFooter } from "@/components/public-footer";
 
 export default function PublicLayout({ children }: { children: ReactNode }) {
@@ -21,6 +22,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main className="mx-auto min-h-[60vh] max-w-5xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8 [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:leading-tight sm:[&_h1]:text-4xl [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_p]:mt-4 [&_p]:max-w-3xl [&_p]:leading-7 [&_p]:text-neutral-300">
+        <BackButton fallbackHref="/" className="-ml-1 mb-6" />
         {children}
       </main>
       <PublicFooter />

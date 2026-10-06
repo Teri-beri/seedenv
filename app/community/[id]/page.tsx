@@ -17,7 +17,7 @@ export default async function DiscussionPage({ params, searchParams }: { params:
   if (!post) notFound();
   const feed = [{ ...post, createdAt: post.createdAt.toISOString() }];
   const dualWorkspace = Boolean(user && user.role !== "ADMIN" && (user.testerWorkspaceEnabled || user.role === "TESTER") && (user.developerWorkspaceEnabled || user.role === "DEVELOPER"));
-  return <MemberShell title="Launch Circle Discussion" home="/community">
+  return <MemberShell title="Launch Circle Discussion" home="/community" back="/community">
     {user ? <CommunityFeed posts={feed} userId={user.id} developer={false} admin={user.role === "ADMIN"} activeRole={user.role} dualWorkspace={dualWorkspace} allowNewPosts={false} /> : <PublicLaunchCircle posts={feed} signedIn={false} />}
     <nav aria-label="Comment pages" className="mt-6 flex gap-4">{page > 1 ? <Link href={`/community/${encodeURIComponent(id)}?page=${page - 1}`} className="min-h-11 p-3">Previous comments</Link> : null}{post._count.comments > page * 25 ? <Link href={`/community/${encodeURIComponent(id)}?page=${page + 1}`} className="min-h-11 p-3">Next comments</Link> : null}</nav>
   </MemberShell>;
