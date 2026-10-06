@@ -27,9 +27,9 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/seedenv-favicon-v3.ico", sizes: "16x16 32x32 48x48 64x64 128x128 256x256", type: "image/x-icon" },
-      { url: "/icons/icon-192.png?v=seedcube-v3", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512.png?v=seedcube-v3", sizes: "512x512", type: "image/png" },
+      { url: "/seedenv-favicon-v4.ico", sizes: "16x16 32x32 48x48 64x64 128x128 256x256", type: "image/x-icon" },
+      { url: "/icons/favicon-192.png?v=seedcube-v4", sizes: "192x192", type: "image/png" },
+      { url: "/icons/favicon-512.png?v=seedcube-v4", sizes: "512x512", type: "image/png" },
     ],
     apple: [{ url: "/icons/apple-touch-icon.png?v=seedcube-v3", sizes: "180x180", type: "image/png" }],
   },

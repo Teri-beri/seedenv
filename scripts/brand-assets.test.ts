@@ -37,10 +37,30 @@ test("app and home-screen icons have opaque dark backgrounds and correct dimensi
       }
     }
   }
+});
+
+test("browser-tab icons are transparent and fill the frame", async () => {
   const ico = await readFile("app/favicon.ico");
   assert.equal(ico.readUInt16LE(2), 1);
   assert.equal(ico.readUInt16LE(4), 6);
-  assert.deepEqual(ico, await readFile("public/seedenv-favicon-v3.ico"));
+  for (const alias of ["seedenv-favicon-v4.ico", "seedenv-favicon-v3.ico"]) assert.deepEqual(ico, await readFile(`public/${alias}`));
+  const frames = Array.from({ length: 6 }, (_, index) => {
+    const entry = 6 + index * 16;
+    return ico.subarray(ico.readUInt32LE(entry + 12), ico.readUInt32LE(entry + 12) + ico.readUInt32LE(entry + 8));
+  });
+  for (const input of [...frames, await readFile("public/icons/favicon-192.png"), await readFile("public/icons/favicon-512.png")]) {
+    const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    assert.equal(data[3], 0, "Tab icon corners must be transparent.");
+    let top = info.height;
+    let bottom = -1;
+    for (let row = 0; row < info.height; row++) for (let column = 0; column < info.width; column++) {
+      if (data[(row * info.width + column) * 4 + 3] > 0) {
+        top = Math.min(top, row);
+        bottom = Math.max(bottom, row);
+      }
+    }
+    assert.ok(bottom - top + 1 >= info.height * 0.94, `Tab icon artwork only spans ${bottom - top + 1}/${info.height}px.`);
+  }
 });
 
 test("UI and email logo references use v3 without crop or oversized zoom", async () => {

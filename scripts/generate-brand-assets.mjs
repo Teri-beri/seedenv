@@ -55,8 +55,15 @@ await writeFile(resolve(root, "public/icons/apple-touch-icon.png"), apple);
 await writeFile(resolve(root, "app/apple-icon.png"), apple);
 await writeFile(resolve(root, "app/icon.png"), await logoCanvas(576, dark, 58));
 
+// Browser-tab icons stay transparent and edge-to-edge: Safari draws a light plate
+// behind dark opaque favicons, which shows up as white edges around the tile.
+const tabIcon = (size) => logoCanvas(size, "#00000000", size <= 32 ? 0 : Math.round(size * 0.02));
+for (const size of [192, 512]) {
+  await writeFile(resolve(root, `public/icons/favicon-${size}.png`), await tabIcon(size));
+}
+
 const sizes = [16, 32, 48, 64, 128, 256];
-const frames = await Promise.all(sizes.map((size) => logoCanvas(size, dark, Math.max(1, Math.round(size * 0.06)))));
+const frames = await Promise.all(sizes.map(tabIcon));
 const header = Buffer.alloc(6 + frames.length * 16);
 header.writeUInt16LE(1, 2);
 header.writeUInt16LE(frames.length, 4);
@@ -72,11 +79,11 @@ frames.forEach((frame, index) => {
   frameOffset += frame.length;
 });
 const favicon = Buffer.concat([header, ...frames]);
-for (const path of ["public/seedenv-favicon-2026.ico", "public/seedenv-favicon-v3.ico", "app/favicon.ico"]) {
+for (const path of ["public/seedenv-favicon-2026.ico", "public/seedenv-favicon-v3.ico", "public/seedenv-favicon-v4.ico", "app/favicon.ico"]) {
   await writeFile(resolve(root, path), favicon);
 }
 await rm(resolve(root, "public/favicon.ico"), { force: true });
 
 const shareMark = await logoCanvas(256, "#00000000", 12);
 await writeFile(resolve(root, "lib/brand-image.ts"), `export const brandLogoDataUrl = "data:image/png;base64,${shareMark.toString("base64")}";\n`);
-console.log("Generated transparent SeedEnv artwork, dark icons, maskable icon, Apple icons, ICO frames, and embedded social mark.");
+console.log("Generated transparent SeedEnv artwork, transparent tab icons, dark icons, maskable icon, Apple icons, ICO frames, and embedded social mark.");
