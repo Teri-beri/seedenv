@@ -14,7 +14,7 @@ export type DropdownAccount = {
 
 const itemClass = "flex items-center px-3 py-1.5 rounded-lg transition-colors";
 const workspaceLinks = [
-  { label: "Launch Circle", href: "/community" },
+  { label: "Launch Circle", href: "/community", mobileOnly: true },
   { label: "Tester Applications", href: "/applications" },
   { label: "Clippers", href: "/clippers" },
 ] as const;
@@ -76,7 +76,7 @@ export function UserDropdown({ account }: { account: DropdownAccount }) {
 
           <div className="py-1">
             {workspaceLinks.map((item) => (
-              <Link key={item.href} role="menuitem" href={item.href} onClick={dismiss} className={`${itemClass} text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-200`}>{item.label}</Link>
+              <Link key={item.href} role="menuitem" href={item.href} onClick={dismiss} className={`${itemClass} text-zinc-400 hover:bg-zinc-800/70 hover:text-zinc-200 ${"mobileOnly" in item ? "md:hidden" : ""}`}>{item.label}</Link>
             ))}
           </div>
 

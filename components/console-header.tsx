@@ -11,6 +11,7 @@ const tabs = [
   { label: "Review Deck", href: "/console?view=review-deck", view: "review-deck" },
   { label: "Asset Vault", href: "/console?view=asset-vault", view: "asset-vault" },
   { label: "Billing", href: "/console?view=billing", view: "billing" },
+  { label: "Launch Circle", href: "/community", view: null },
 ] as const;
 
 export function ConsoleHeader({ activeView, paymentsMode, account }: { activeView: ConsoleView; paymentsMode: "live" | "test"; account: DropdownAccount }) {
@@ -28,7 +29,7 @@ export function ConsoleHeader({ activeView, paymentsMode, account }: { activeVie
             ? <span title="Stripe payments are in live mode" className="ml-3 shrink-0 whitespace-nowrap rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-400">LIVE</span>
             : <span title="Stripe payments are in test mode" className="ml-3 shrink-0 whitespace-nowrap rounded border border-zinc-700 bg-zinc-800/60 px-2 py-0.5 font-mono text-[11px] text-zinc-400">TEST MODE</span>}
         </div>
-        <nav aria-label="Developer console sections" className="hidden items-center gap-1 md:flex">
+        <nav aria-label="Developer console sections" className="hidden items-center gap-0.5 md:flex lg:gap-1">
           {tabs.map((tab) => {
             const active = tab.view === activeView;
             return (
@@ -36,7 +37,7 @@ export function ConsoleHeader({ activeView, paymentsMode, account }: { activeVie
                 key={tab.label}
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={`rounded-md px-3 py-1.5 text-xs transition-colors ${active ? "bg-zinc-800/80 font-medium text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+                className={`whitespace-nowrap rounded-md px-2 py-1.5 text-xs lg:px-3 transition-colors ${active ? "bg-zinc-800/80 font-medium text-white" : "text-zinc-400 hover:text-zinc-200"}`}
               >
                 {tab.label}
               </Link>
