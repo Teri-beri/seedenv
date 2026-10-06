@@ -67,7 +67,12 @@ directly. Set a retention policy, verify mailbox delivery, and staff the queue.
 
 The additive `20261005_public_launch_circle` migration marks existing posts
 private by default. New developer updates include an explicit public-visibility
-choice; public updates and their visible comments appear at `/?view=circle`.
+choice; public updates and their visible comments appear in `/community`.
+The landing is one continuous page with `#engine`, `#validators`, `#cohorts`,
+`#pricing`, and `#pwa` sections. Older `?view=` links redirect to their section
+anchors. Header navigation uses reduced-motion-aware smooth scrolling.
+Launch Circle is a separate far-right header action, not an embedded landing
+section. Older `?view=circle` links redirect to `/community`.
 Public `/community` and discussion reads exclude private/hidden content when no
 member session is available. Publishing, commenting, reports, and moderation
 still require authenticated server actions and existing rate limits.
@@ -85,12 +90,13 @@ build-time values are:
 
 ```text
 NEXT_PUBLIC_SEEDENV_STATUS=operational|degraded|maintenance
-NEXT_PUBLIC_SEEDENV_UPTIME_PERCENT=<measured 0..100 percentage>
 ```
 
-Without values, the badge says Status Unverified / uptime unverified. Do not
-publish 99.98% or System Operational merely as decorative trust copy. Build-time
-values must be updated with each status change; a live provider widget/API is
+When operational status is configured, the clean monospace badge reads
+"All Systems Operational" without an uptime percentage. Without a verified
+status, it remains a neutral "System Status" link. Do not publish operational
+health merely as decorative trust copy. Build-time values must be updated with
+each status change; a live provider widget/API is
 preferable once a monitoring vendor is configured.
 
 ## Verification

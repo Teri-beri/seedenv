@@ -132,6 +132,7 @@ test("public landing survives unavailable cohort and optional account lookups wi
   const loggedErrors: string[] = [];
   const log = mock.method(console, "error", (message: string) => { loggedErrors.push(message); });
   const modules = [
+    mock.module("next/navigation", { namedExports: { redirect: (path: string) => { throw new Error(`Redirect:${path}`); } } }),
     mock.module("../app/api/auth/[...nextauth]/route.ts", { namedExports: { authOptions: {} } }),
     mock.module("next-auth", { namedExports: { getServerSession: async () => signedIn ? { user: { id: "landing-viewer" } } : null } }),
     mock.module("../components/public-landing.tsx", { namedExports: { PublicLanding: () => null } }),
@@ -142,6 +143,8 @@ test("public landing survives unavailable cohort and optional account lookups wi
   ];
   try {
     const { default: Home } = await import(`../app/page.tsx?landing=${randomUUID()}`);
+    await assert.rejects(Home({ searchParams: Promise.resolve({ view: "developers" }) }), /Redirect:\/#engine/);
+    await assert.rejects(Home({ searchParams: Promise.resolve({ view: "circle" }) }), /Redirect:\/community/);
     const guest = await Home();
     assert.deepEqual(guest.props.missions, []);
     assert.equal(guest.props.viewer, null);

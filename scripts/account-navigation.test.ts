@@ -12,13 +12,17 @@ test("production npm startup applies pending database migrations before serving 
   assert.match(await readFile("prisma/migrations/migration_lock.toml", "utf8"), /provider = "postgresql"/);
 });
 
-test("landing sections have independent bookmarkable URLs and safe default routing", () => {
+test("landing destinations map to continuous-page anchors and keep safe legacy routing", () => {
   assert.equal(resolveLandingView(undefined), "overview");
   assert.equal(resolveLandingView("not-a-section"), "overview");
-  assert.equal(landingViewHref("overview"), "/");
+  assert.equal(landingViewHref("overview"), "#top");
+  assert.equal(resolveLandingView("circle"), "circle");
+  assert.equal(landingViewHref("circle"), "/community");
+  assert.equal(landingViews.some((view) => String(view.id) === "circle"), false);
+  assert.deepEqual(["developers", "validators", "cohorts", "pricing", "mobile"].map((view) => landingViewHref(resolveLandingView(view))), ["#engine", "#validators", "#cohorts", "#pricing", "#pwa"]);
   for (const view of landingViews) {
     assert.equal(resolveLandingView(view.id), view.id);
-    if (view.id !== "overview") assert.equal(landingViewHref(view.id), `/?view=${view.id}`);
+    assert.equal(landingViewHref(view.id), `#${view.anchor}`);
   }
 });
 
