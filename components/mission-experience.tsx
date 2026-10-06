@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { claimTaskSlot, startSubmissionRevision, submitTaskProof } from "@/app/actions/submissionActions";
+import { collectHardwareSignals } from "@/lib/hardware-integrity";
 import { Button } from "@/components/ui/button";
 import { xpForBounty } from "@/lib/rank";
 import { availableSlots, discoverMissions, type MissionFilter, type MissionSort } from "@/lib/tester-console";
@@ -261,7 +262,9 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
     }
     startTransition(async () => {
       try {
+        const hardware = await collectHardwareSignals().catch(() => null);
         await submitTaskProof(submissionId, {
+          hardware,
           ...(selectedFile && preview && proofHash ? { proofImageBase64: preview, proofImageMimeType: selectedFile.type, proofImageHash: proofHash } : {}),
           feedbackText: feedback,
           ...telemetry,

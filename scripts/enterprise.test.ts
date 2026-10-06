@@ -123,17 +123,51 @@ test("real checkout action captures an immutable company and recorded fee snapsh
       appCampaign: { create: async ({ data }: { data: Record<string, unknown> }) => ({ id: "cohort-test", ...data }) },
       walletTransaction: { create: async ({ data }: { data: Record<string, unknown> }) => { written = data; return { id: "deposit-test" }; } },
     } } }),
-    mock.module("../lib/stripe.ts", { namedExports: { SEEDENV_PLATFORM_FEE_PERCENT: 0.05, getStripe: () => ({ customers: { retrieve: async () => ({ deleted: false, invoice_settings: { default_payment_method: "pm_test" } }) }, checkout: { sessions: { create: async () => ({ url: "https://checkout.stripe.com/mock" }) } } }) } }),
+    mock.module("../lib/stripe.ts", { namedExports: { getStripe: () => ({ customers: { retrieve: async () => ({ deleted: false, invoice_settings: { default_payment_method: "pm_test" } }) }, checkout: { sessions: { create: async () => ({ url: "https://checkout.stripe.com/mock" }) } } }) } }),
   ];
   try {
     const { createCampaignWithEscrow } = await import(`../app/actions/campaignActions.ts?invoice=${randomUUID()}`);
     const result = await createCampaignWithEscrow({ title: "TestFlight QA", platform: "TESTFLIGHT", appUrl: "https://example.invalid", targetVibe: "Developer Tools", description: "A safe test of company invoice details at checkout.", totalSlots: 25, bountyPerTaskUsd: 4, instructions: [{ instructionTitle: "Onboarding", instructionDetail: "Follow signup and record any confusing steps.", proofType: "SCREENSHOT", minimumRep: 0 }], discoveryAllowed: false, discoveryMinRep: 0 });
     assert.equal(result.checkoutUrl, "https://checkout.stripe.com/mock");
     assert.equal(written.campaignId, "cohort-test");
-    assert.equal(written.platformFeeCents, 500);
+    assert.equal(written.platformFeeCents, 2000);
+    assert.equal(written.amountCents, 12000);
     const saved = invoiceSnapshotSchema.parse(written.invoiceSnapshot);
     assert.equal(saved.company?.companyName, "Société QA");
     assert.equal(invoiceTotalMatches(saved, Number(written.amountCents)), true);
+  } finally {
+    for (const item of modules.reverse()) item.restore();
+    if (priorKey === undefined) delete process.env.STRIPE_SECRET_KEY;
+    else process.env.STRIPE_SECRET_KEY = priorKey;
+  }
+});
+test("flat bundles override client slots, rewards, and platform at checkout", async () => {
+  const priorKey = process.env.STRIPE_SECRET_KEY;
+  process.env.STRIPE_SECRET_KEY = "mocked-provider-config";
+  let campaign: Record<string, unknown> = {};
+  let written: Record<string, unknown> = {};
+  let line = "";
+  const modules = [
+    mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "owner", role: "DEVELOPER", stripeCustomerId: "cus_test" }) } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: {
+      billingProfile: { findUnique: async () => null },
+      appCampaign: { create: async ({ data }: { data: Record<string, unknown> }) => { campaign = data; return { id: "bundle-test", ...data }; } },
+      walletTransaction: { create: async ({ data }: { data: Record<string, unknown> }) => { written = data; return { id: "deposit-bundle" }; } },
+    } } }),
+    mock.module("../lib/stripe.ts", { namedExports: { getStripe: () => ({ customers: { retrieve: async () => ({ deleted: false, invoice_settings: { default_payment_method: "pm_test" } }) }, checkout: { sessions: { create: async (args: { line_items: Array<{ price_data: { product_data: { description: string } } }> }) => { line = args.line_items[0].price_data.product_data.description; return { url: "https://checkout.stripe.com/mock" }; } } } }) } }),
+  ];
+  try {
+    const { createCampaignWithEscrow } = await import(`../app/actions/campaignActions.ts?bundle=${randomUUID()}`);
+    await createCampaignWithEscrow({ title: "Play closed test", platform: "WEB_STAGING", appUrl: "https://example.invalid", targetVibe: "Android", description: "Bundle checkout must ignore tampered client values.", totalSlots: 5, bountyPerTaskUsd: 1, instructions: [{ instructionTitle: "Opt in", instructionDetail: "Join the closed test and keep the app installed.", proofType: "SCREENSHOT", minimumRep: 0 }], discoveryAllowed: false, discoveryMinRep: 0, cohortType: "GOOGLE_PLAY_14_DAY" });
+    assert.equal(campaign.totalSlots, 20);
+    assert.equal(campaign.bountyPerTaskUsd, 4);
+    assert.equal(campaign.platform, "PLAY_STORE");
+    assert.equal(campaign.guaranteedDays, 14);
+    assert.equal(campaign.totalBudgetUsd, 199);
+    assert.equal(written.amountCents, 19900);
+    assert.equal(written.platformFeeCents, 11900);
+    assert.equal(invoiceTotalMatches(invoiceSnapshotSchema.parse(written.invoiceSnapshot), 19900), true);
+    assert.match(line, /flat \$119\.00 platform fee/);
   } finally {
     for (const item of modules.reverse()) item.restore();
     if (priorKey === undefined) delete process.env.STRIPE_SECRET_KEY;

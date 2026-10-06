@@ -19,6 +19,18 @@ enum RankTier {
   APEX_ARCHITECT
 }
 
+enum CohortType {
+  STANDARD_QA
+  GOOGLE_PLAY_14_DAY
+  LIVE_STRESS_DROP
+}
+
+enum HardwareIntegrity {
+  VERIFIED_PHYSICAL_NODE
+  EMULATOR_FLAGGED
+  UNVERIFIED
+}
+
 enum PlatformType {
   TESTFLIGHT
   WEB_STAGING
@@ -63,80 +75,81 @@ enum TransactionStatus {
 }
 
 model User {
-  id                     String              @id @default(cuid())
-  email                  String              @unique
-  emailVerified          DateTime?
-  name                   String?
-  image                  String?
-  passwordHash           String?
-  role                   UserRole            @default(TESTER)
-  testerWorkspaceEnabled Boolean             @default(false) @map("tester_workspace_enabled")
-  developerWorkspaceEnabled Boolean          @default(false) @map("developer_workspace_enabled")
-  username               String              @default("SeedEnv Member")
-  avatarUrl              String?
-  bio                    String?             @db.VarChar(200)
-  portfolioUrl           String?
-  companyName            String?
-  productUrl             String?
-  githubUsername         String?             @map("github_username")
-  discordUrl             String?             @map("discord_url")
-  twitterHandle          String?             @map("twitter_handle")
-  notificationPreferences Json                @default("{\"email_tester_feedback\":true,\"email_ledger_updates\":true,\"email_announcements\":false}") @map("notification_preferences")
-  discordWebhookUrl      String?             @map("discord_webhook_url")
-  walletBalanceCents     Int                 @default(0)
-  xpPoints               Int                 @default(0)
-  rankTier               RankTier            @default(ALPHA_SEEDER)
-  streakDays             Int                 @default(1)
-  lastActiveDate         DateTime            @default(now())
-  stripeCustomerId       String?
-  stripeConnectAccountId String?
-  questXp                Int                 @default(0)
-  discoveryPasses        Int                 @default(0)
-  referralCode           String?             @unique
-  questTheme             String              @default("classic")
-  clipProfile            ClipProfile?
-  clipCampaigns          ClipCampaign[]
-  clipEngagements        ClipEngagement[]
-  clipMessages           ClipMessage[]
-  clipAssets             ClipAsset[]
-  clipSocialAccounts     ClipSocialAccount[]
-  clipOAuthStates        ClipOAuthState[]
-  questRewards           QuestReward[]
-  applications           MissionApplication[]
-  referralsSent          Referral[]          @relation("ReferralInviter")
-  referralReceived       Referral?           @relation("ReferralFriend")
-  posts                  CommunityPost[]
-  comments               CommunityComment[]
-  reports                CommunityReport[]
-  campaigns              AppCampaign[]       @relation("DeveloperCampaigns")
-  submissions            Submission[]        @relation("TesterSubmissions")
-  transactions           WalletTransaction[]
-  billingProfile         BillingProfile?
-  supportTickets         SupportTicket[]
-  accounts               Account[]
-  sessions               Session[]
-  createdAt              DateTime            @default(now())
-  updatedAt              DateTime            @updatedAt
+  id                        String               @id @default(cuid())
+  email                     String               @unique
+  emailVerified             DateTime?
+  name                      String?
+  image                     String?
+  passwordHash              String?
+  role                      UserRole             @default(TESTER)
+  testerWorkspaceEnabled    Boolean              @default(false) @map("tester_workspace_enabled")
+  developerWorkspaceEnabled Boolean              @default(false) @map("developer_workspace_enabled")
+  username                  String               @default("SeedEnv Member")
+  avatarUrl                 String?
+  bio                       String?              @db.VarChar(200)
+  portfolioUrl              String?
+  companyName               String?
+  productUrl                String?
+  githubUsername            String?              @map("github_username")
+  discordUrl                String?              @map("discord_url")
+  twitterHandle             String?              @map("twitter_handle")
+  notificationPreferences   Json                 @default("{\"email_tester_feedback\":true,\"email_ledger_updates\":true,\"email_announcements\":false}") @map("notification_preferences")
+  discordWebhookUrl         String?              @map("discord_webhook_url")
+  githubTokenEncrypted      String?              @map("github_token_encrypted")
+  walletBalanceCents        Int                  @default(0)
+  xpPoints                  Int                  @default(0)
+  rankTier                  RankTier             @default(ALPHA_SEEDER)
+  streakDays                Int                  @default(1)
+  lastActiveDate            DateTime             @default(now())
+  stripeCustomerId          String?
+  stripeConnectAccountId    String?
+  questXp                   Int                  @default(0)
+  discoveryPasses           Int                  @default(0)
+  referralCode              String?              @unique
+  questTheme                String               @default("classic")
+  clipProfile               ClipProfile?
+  clipCampaigns             ClipCampaign[]
+  clipEngagements           ClipEngagement[]
+  clipMessages              ClipMessage[]
+  clipAssets                ClipAsset[]
+  clipSocialAccounts        ClipSocialAccount[]
+  clipOAuthStates           ClipOAuthState[]
+  questRewards              QuestReward[]
+  applications              MissionApplication[]
+  referralsSent             Referral[]           @relation("ReferralInviter")
+  referralReceived          Referral?            @relation("ReferralFriend")
+  posts                     CommunityPost[]
+  comments                  CommunityComment[]
+  reports                   CommunityReport[]
+  campaigns                 AppCampaign[]        @relation("DeveloperCampaigns")
+  submissions               Submission[]         @relation("TesterSubmissions")
+  transactions              WalletTransaction[]
+  billingProfile            BillingProfile?
+  supportTickets            SupportTicket[]
+  accounts                  Account[]
+  sessions                  Session[]
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
 
   @@index([role])
   @@index([rankTier, xpPoints])
 }
 
 model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String? @db.Text
   refresh_token_expires_in Int?
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  access_token             String? @db.Text
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String? @db.Text
+  session_state            String?
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
   @@index([userId])
@@ -161,9 +174,9 @@ model VerificationToken {
 }
 
 model AppCampaign {
-  id               String            @id @default(cuid())
+  id               String               @id @default(cuid())
   developerId      String
-  developer        User              @relation("DeveloperCampaigns", fields: [developerId], references: [id], onDelete: Cascade)
+  developer        User                 @relation("DeveloperCampaigns", fields: [developerId], references: [id], onDelete: Cascade)
   title            String
   platform         PlatformType
   appUrl           String
@@ -174,16 +187,20 @@ model AppCampaign {
   bountyPerTaskUsd Float
   platformFeeUsd   Float
   totalSlots       Int
-  claimedSlots     Int               @default(0)
-  completedSlots   Int               @default(0)
-  status           CampaignStatus    @default(DRAFT)
+  claimedSlots     Int                  @default(0)
+  completedSlots   Int                  @default(0)
+  status           CampaignStatus       @default(DRAFT)
   instructions     TaskInstruction[]
   submissions      Submission[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
   expiresAt        DateTime
-  discoveryAllowed Boolean           @default(false)
-  discoveryMinRep  Int               @default(0)
+  discoveryAllowed Boolean              @default(false)
+  discoveryMinRep  Int                  @default(0)
+  cohortType       CohortType           @default(STANDARD_QA)
+  guaranteedDays   Int?
+  syncGitHubRepo   String?
+  hardwareStrict   Boolean              @default(true)
   applications     MissionApplication[]
   transactions     WalletTransaction[]
 
@@ -200,7 +217,7 @@ model TaskInstruction {
   instructionTitle  String
   instructionDetail String
   proofType         TaskProofType
-  minimumRep        Int               @default(0)
+  minimumRep        Int           @default(0)
 
   @@unique([campaignId, stepNumber])
   @@index([campaignId])
@@ -228,13 +245,13 @@ model QuestReward {
 }
 
 model Referral {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   inviterId   String
-  inviter     User     @relation("ReferralInviter", fields: [inviterId], references: [id], onDelete: Cascade)
-  friendId    String   @unique
-  friend      User     @relation("ReferralFriend", fields: [friendId], references: [id], onDelete: Cascade)
+  inviter     User      @relation("ReferralInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  friendId    String    @unique
+  friend      User      @relation("ReferralFriend", fields: [friendId], references: [id], onDelete: Cascade)
   qualifiedAt DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@index([inviterId, qualifiedAt])
 }
@@ -257,29 +274,29 @@ model MissionApplication {
 }
 
 model CommunityPost {
-  id        String             @id @default(cuid())
-  authorId  String
-  author    User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  body      String
-  hidden    Boolean            @default(false)
-  publicVisible Boolean         @default(false)
-  comments  CommunityComment[]
-  reports   CommunityReport[]
-  createdAt DateTime           @default(now())
+  id            String             @id @default(cuid())
+  authorId      String
+  author        User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body          String
+  hidden        Boolean            @default(false)
+  publicVisible Boolean            @default(false)
+  comments      CommunityComment[]
+  reports       CommunityReport[]
+  createdAt     DateTime           @default(now())
 
   @@index([hidden, createdAt])
 }
 
 model CommunityComment {
-  id        String        @id @default(cuid())
+  id        String            @id @default(cuid())
   postId    String
-  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post      CommunityPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
   authorId  String
-  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author    User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
   body      String
-  hidden    Boolean       @default(false)
+  hidden    Boolean           @default(false)
   reports   CommunityReport[]
-  createdAt DateTime      @default(now())
+  createdAt DateTime          @default(now())
 
   @@index([postId, createdAt])
 }
@@ -302,31 +319,38 @@ model CommunityReport {
 }
 
 model Submission {
-  id              String           @id @default(cuid())
-  campaignId      String
-  campaign        AppCampaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  testerId        String
-  tester          User             @relation("TesterSubmissions", fields: [testerId], references: [id], onDelete: Cascade)
-  proofImageUrl   String?
-  recordingUrl    String?
-  proofImageHash  String?
-  feedbackText    String?
-  osBuild         String?
-  deviceModel     String?
-  screenResolution String?
-  appBuildVersion String?
-  networkType     String?
-  crashLogs       String?           @db.Text
-  networkLogs     String?           @db.Text
-  status          SubmissionStatus @default(PENDING)
-  rejectionReason String?
+  id                  String            @id @default(cuid())
+  campaignId          String
+  campaign            AppCampaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  testerId            String
+  tester              User              @relation("TesterSubmissions", fields: [testerId], references: [id], onDelete: Cascade)
+  proofImageUrl       String?
+  recordingUrl        String?
+  proofImageHash      String?
+  feedbackText        String?
+  osBuild             String?
+  deviceModel         String?
+  screenResolution    String?
+  appBuildVersion     String?
+  networkType         String?
+  crashLogs           String?           @db.Text
+  networkLogs         String?           @db.Text
+  hardwareStatus      HardwareIntegrity @default(UNVERIFIED)
+  gpuRenderer         String?
+  isTouchCapable      Boolean?
+  batteryLevel        Float?
+  isLowPowerMode      Boolean?
+  hardwareFlags       String[]          @default([])
+  githubIssueUrl      String?
+  status              SubmissionStatus  @default(PENDING)
+  rejectionReason     String?
   revisionRequestedAt DateTime?
-  revisionStartedAt DateTime?
-  payoutCents     Int
-  claimedAt       DateTime         @default(now())
-  expiresAt       DateTime
-  reviewedAt      DateTime?
-  createdAt       DateTime         @default(now())
+  revisionStartedAt   DateTime?
+  payoutCents         Int
+  claimedAt           DateTime          @default(now())
+  expiresAt           DateTime
+  reviewedAt          DateTime?
+  createdAt           DateTime          @default(now())
 
   @@unique([campaignId, testerId])
   @@index([campaignId, status])
@@ -336,19 +360,19 @@ model Submission {
 }
 
 model WalletTransaction {
-  id              String            @id @default(cuid())
-  userId          String
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  amountCents     Int
-  type            TransactionType
-  status          TransactionStatus @default(PENDING)
-  stripePaymentId String?
-  campaignId      String?
-  campaign        AppCampaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  id               String            @id @default(cuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountCents      Int
+  type             TransactionType
+  status           TransactionStatus @default(PENDING)
+  stripePaymentId  String?
+  campaignId       String?
+  campaign         AppCampaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   platformFeeCents Int?
-  invoiceSnapshot Json?
-  description     String
-  createdAt       DateTime          @default(now())
+  invoiceSnapshot  Json?
+  description      String
+  createdAt        DateTime          @default(now())
 
   @@index([userId, createdAt])
   @@index([type, status])
@@ -357,32 +381,32 @@ model WalletTransaction {
 }
 
 model BillingProfile {
-  userId         String   @id
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  companyName    String   @db.VarChar(150)
-  taxId          String?  @db.VarChar(80)
-  billingEmail   String?  @db.VarChar(254)
-  addressLine1   String   @db.VarChar(200)
-  addressLine2   String?  @db.VarChar(200)
-  city           String   @db.VarChar(100)
-  region         String?  @db.VarChar(100)
-  postalCode     String   @db.VarChar(30)
-  country        String   @db.VarChar(2)
-  updatedAt      DateTime @updatedAt
+  userId       String   @id
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName  String   @db.VarChar(150)
+  taxId        String?  @db.VarChar(80)
+  billingEmail String?  @db.VarChar(254)
+  addressLine1 String   @db.VarChar(200)
+  addressLine2 String?  @db.VarChar(200)
+  city         String   @db.VarChar(100)
+  region       String?  @db.VarChar(100)
+  postalCode   String   @db.VarChar(30)
+  country      String   @db.VarChar(2)
+  updatedAt    DateTime @updatedAt
 }
 
 model SupportTicket {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role        UserRole
-  category    String   @db.VarChar(40)
-  subject     String   @db.VarChar(150)
-  message     String   @db.VarChar(5000)
-  route       String   @db.VarChar(1000)
-  userAgent   String   @db.VarChar(500)
-  status      String   @default("OPEN")
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      UserRole
+  category  String   @db.VarChar(40)
+  subject   String   @db.VarChar(150)
+  message   String   @db.VarChar(5000)
+  route     String   @db.VarChar(1000)
+  userAgent String   @db.VarChar(500)
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
@@ -399,72 +423,72 @@ model ClipProfile {
 }
 
 model ClipCampaign {
-  id           String   @id @default(cuid())
-  developerId  String
-  developer    User     @relation(fields: [developerId], references: [id], onDelete: Restrict)
-  title        String
-  appUrl       String
-  brief        String   @db.Text
-  platform     String
-  feeCents     Int
-  revisionLimit Int     @default(2)
-  deliveryDays Int      @default(7)
-  liveDays     Int      @default(30)
-  minimumRep   Int      @default(0)
-  open         Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  engagements  ClipEngagement[]
-  messages     ClipMessage[]
-  assets       ClipAsset[]
+  id            String           @id @default(cuid())
+  developerId   String
+  developer     User             @relation(fields: [developerId], references: [id], onDelete: Restrict)
+  title         String
+  appUrl        String
+  brief         String           @db.Text
+  platform      String
+  feeCents      Int
+  revisionLimit Int              @default(2)
+  deliveryDays  Int              @default(7)
+  liveDays      Int              @default(30)
+  minimumRep    Int              @default(0)
+  open          Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  engagements   ClipEngagement[]
+  messages      ClipMessage[]
+  assets        ClipAsset[]
 
   @@index([open, createdAt])
   @@index([developerId, createdAt])
 }
 
 model ClipEngagement {
-  id           String   @id @default(cuid())
-  campaignId   String
-  campaign     ClipCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
-  creatorId    String
-  creator      User     @relation(fields: [creatorId], references: [id], onDelete: Restrict)
-  note         String   @db.VarChar(1500)
-  status       String   @default("APPLIED")
-  feeCents     Int
-  chargeCents  Int
-  termsVersion String   @default("clippers-v1-organic-90")
-  termsAcceptedAt DateTime
-  revisionCount Int     @default(0)
-  reviewNote   String?
-  dueAt        DateTime?
-  reviewDueAt  DateTime?
-  publishDueAt DateTime?
-  checkoutId   String?  @unique
-  fundingAttempt Int   @default(0)
-  paymentIntentId String? @unique
-  transferId   String?  @unique
-  payoutTransactionId String? @unique
+  id                  String       @id @default(cuid())
+  campaignId          String
+  campaign            ClipCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  creatorId           String
+  creator             User         @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  note                String       @db.VarChar(1500)
+  status              String       @default("APPLIED")
+  feeCents            Int
+  chargeCents         Int
+  termsVersion        String       @default("clippers-v1-organic-90")
+  termsAcceptedAt     DateTime
+  revisionCount       Int          @default(0)
+  reviewNote          String?
+  dueAt               DateTime?
+  reviewDueAt         DateTime?
+  publishDueAt        DateTime?
+  checkoutId          String?      @unique
+  fundingAttempt      Int          @default(0)
+  paymentIntentId     String?      @unique
+  transferId          String?      @unique
+  payoutTransactionId String?      @unique
   payoutDestinationId String?
-  refundId     String?  @unique
-  draftId      String?
-  approvedDraftId String?
-  approvedAt   DateTime?
-  proofId      String?
-  publicationUrl String?
-  publicationId String?
-  publicationCode String @unique @default(cuid())
-  verificationMethod String?
-  verifiedAt   DateTime?
-  lastVerificationAt DateTime?
-  fundedAt     DateTime?
-  paidAt       DateTime?
-  licenseEndsAt DateTime?
-  disputeReason String? @db.VarChar(1500)
-  disputeOpenedBy String?
+  refundId            String?      @unique
+  draftId             String?
+  approvedDraftId     String?
+  approvedAt          DateTime?
+  proofId             String?
+  publicationUrl      String?
+  publicationId       String?
+  publicationCode     String       @unique @default(cuid())
+  verificationMethod  String?
+  verifiedAt          DateTime?
+  lastVerificationAt  DateTime?
+  fundedAt            DateTime?
+  paidAt              DateTime?
+  licenseEndsAt       DateTime?
+  disputeReason       String?      @db.VarChar(1500)
+  disputeOpenedBy     String?
   statusBeforeDispute String?
-  moderationNote String?
-  assets       ClipAsset[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  moderationNote      String?
+  assets              ClipAsset[]
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   @@unique([campaignId, creatorId])
   @@index([creatorId, updatedAt])
@@ -472,61 +496,61 @@ model ClipEngagement {
 }
 
 model ClipMessage {
-  id           String   @id @default(cuid())
-  campaignId   String
-  campaign     ClipCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  authorId     String
-  author       User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  body         String   @db.VarChar(2000)
-  createdAt    DateTime @default(now())
+  id         String       @id @default(cuid())
+  campaignId String
+  campaign   ClipCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User         @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  body       String       @db.VarChar(2000)
+  createdAt  DateTime     @default(now())
 
   @@index([campaignId, createdAt])
   @@index([authorId, createdAt])
 }
 
 model ClipAsset {
-  id           String   @id @default(cuid())
+  id           String          @id @default(cuid())
   campaignId   String
-  campaign     ClipCampaign @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  campaign     ClipCampaign    @relation(fields: [campaignId], references: [id], onDelete: Restrict)
   engagementId String?
   engagement   ClipEngagement? @relation(fields: [engagementId], references: [id], onDelete: Restrict)
   ownerId      String
-  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  owner        User            @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   kind         String
-  path         String   @unique
+  path         String          @unique
   name         String
   mimeType     String
   sizeBytes    Int
-  ready        Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  ready        Boolean         @default(false)
+  createdAt    DateTime        @default(now())
 
   @@index([campaignId, kind, createdAt])
   @@index([ownerId, createdAt])
 }
 
 model ClipSocialAccount {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider     String
-  providerId   String
-  displayName  String
-  accessToken  String   @db.Text
-  refreshToken String   @db.Text
-  expiresAt    DateTime
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider         String
+  providerId       String
+  displayName      String
+  accessToken      String   @db.Text
+  refreshToken     String   @db.Text
+  expiresAt        DateTime
   refreshExpiresAt DateTime
-  scope        String
-  updatedAt    DateTime @updatedAt
+  scope            String
+  updatedAt        DateTime @updatedAt
 
   @@unique([provider, providerId])
   @@unique([userId, provider])
 }
 
 model ClipOAuthState {
-  id           String   @id
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt    DateTime
+  id        String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
 
   @@index([expiresAt])
 }

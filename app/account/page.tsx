@@ -12,6 +12,7 @@ import { AnalyticsSummary, type AnalyticsExclusionState, type AnalyticsSummaryDa
 import { AccountSettingsForm } from "@/components/account-settings-form";
 import { AccountSignOutButton } from "@/components/account-signout-button";
 import { NotificationSettingsForm } from "@/components/notification-settings-form";
+import { GitHubTokenForm } from "@/components/github-token-form";
 import { PasswordSettingsForm } from "@/components/password-settings-form";
 import { StripeSettingsCard } from "@/components/stripe-settings-card";
 import { WorkspaceAccessSwitcher } from "@/components/workspace-access-switcher";
@@ -217,6 +218,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                   <p className="mt-1 text-sm text-neutral-400">Control email updates and real-time tester alerts.</p>
                 </div>
                 <NotificationSettingsForm initialPreferences={preferences} initialWebhookUrl={user.discordWebhookUrl || ""} />
+                {user.role !== UserRole.TESTER || user.developerWorkspaceEnabled ? <GitHubTokenForm connected={Boolean(user.githubTokenEncrypted)} /> : null}
               </div>
             ) : null}
 

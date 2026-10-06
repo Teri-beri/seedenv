@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { type ReactNode, useDeferredValue, useEffect, useRef, useState } from "react";
 import { AnalyticsTracker, trackAnalytics } from "@/components/analytics-tracker";
 import { PublicFooter } from "@/components/public-footer";
-import { quoteCampaignFunding, SEEDENV_PLATFORM_FEE_PERCENT } from "@/lib/pricing";
+import { PricingCalculator } from "@/components/PricingCalculator";
 import { availableSlots, discoverMissions, type MissionFilter } from "@/lib/tester-console";
 import { formatCents } from "@/lib/utils";
 import { landingViews, landingViewHref } from "@/lib/landing-views";
@@ -182,7 +182,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
             <h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">A validation pipeline, not a comment box.</h2>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <WorkflowStep number="01" icon={<Code2 className="size-5" />} title="Define Test Scenarios" text="Provide a TestFlight, Play Console, or web build. Specify target devices and acceptance criteria in your brief, then choose focused testing scenarios." />
-              <WorkflowStep number="02" icon={<LockKeyhole className="size-5" />} title="Escrow & Automated Distribution" text="Fund tester rewards with a transparent 5% add-on platform fee. Reviewed, approved submissions enter the Stripe transfer workflow; payment status stays visible." />
+              <WorkflowStep number="02" icon={<LockKeyhole className="size-5" />} title="Escrow & Automated Distribution" text="Fund tester rewards plus a transparent platform fee, or pick a flat-priced bundle. Reviewed, approved submissions enter the Stripe transfer workflow; payment status stays visible." />
               <WorkflowStep number="03" icon={<FileText className="size-5" />} title="Structured Reports & Export" text="Review reproduction videos, device context, and crash or network logs when provided. Export approved proof and attach reproducible evidence to your GitHub issues or release tracker." />
             </div>
           </div>
@@ -319,26 +319,19 @@ function CohortRow({ mission, signedIn, onJoin }: { mission: Mission; signedIn: 
 }
 
 function DeveloperPricing({ href }: { href: string }) {
-  const [pool, setPool] = useState(300);
-  const funding = quoteCampaignFunding(pool);
   return (
     <section id="pricing" className={sectionShell}><div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" /><div className={`${sectionClass} max-w-6xl`}>
       <div className="grid gap-10 lg:grid-cols-2">
         <div>
           <p className={labelClass}>Transparent pricing</p><h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">Fund the work. Keep the math visible.</h2>
-          <p className="mt-4 max-w-xl text-sm leading-7 text-zinc-400">The full tester reward pool is allocated to approved work. SeedEnv adds a {SEEDENV_PLATFORM_FEE_PERCENT * 100}% platform fee on that pool. Stripe processing or payout fees, where applicable, are separate.</p>
+          <p className="mt-4 max-w-xl text-sm leading-7 text-zinc-400">The full tester reward pool is allocated to approved work. Custom drops add a 20% platform fee on that pool ($15 minimum per cohort). Bundles are flat-priced, with the reward pool and fee shown before checkout.</p>
           <Tooltip.Provider delayDuration={150}><div className="mt-6 divide-y divide-white/10 border-y border-white/10">
             <PricingFeature icon={<Layers className="size-4" />} title="Zero monthly seat subscription" text="Fund individual campaigns rather than paying a monthly subscription for each team seat." />
             <PricingFeature icon={<LockKeyhole className="size-4" />} title="Escrow protection" text="Campaign funding precedes activation. Submitted evidence is reviewed against the agreed criteria before rewards enter the payout workflow." />
             <PricingFeature icon={<Fingerprint className="size-4" />} title="Device metadata & fraud filtering" text="Device context, server-side proof hashing, and duplicate-evidence checks support review. Device signals are not a guarantee of identity or fraud prevention." />
           </div></Tooltip.Provider>
         </div>
-        <div className="rounded-lg border border-zinc-800/80 bg-[#12161F] p-5 sm:p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4"><label htmlFor="tester-reward-pool" className="text-sm font-medium text-zinc-200">Tester reward pool (USD)</label><input id="tester-reward-pool" type="number" min={100} max={5000} step={25} value={pool} onChange={(event) => setPool(Math.min(5000, Math.max(100, Number(event.target.value) || 100)))} className="min-h-11 w-28 rounded-lg border border-white/10 bg-[#0F1117] px-3 py-2 text-right font-mono text-sm text-white outline-none focus:border-emerald-400" /></div>
-          <input type="range" min={100} max={5000} step={25} value={pool} aria-label="Tester reward pool slider" onChange={(event) => setPool(Number(event.target.value))} className="mt-5 min-h-11 w-full accent-emerald-500" />
-          <dl className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-5 text-sm"><dt className="text-zinc-400">Tester reward pool</dt><dd className="font-mono text-emerald-400">{formatCents(Math.round(funding.payoutPoolUsd * 100))}</dd><dt className="text-zinc-400">{SEEDENV_PLATFORM_FEE_PERCENT * 100}% platform fee</dt><dd className="font-mono text-zinc-200">{formatCents(Math.round(funding.platformFeeUsd * 100))}</dd><dt className="border-t border-white/10 pt-5 font-medium text-white">Total cohort funding</dt><dd className="border-t border-white/10 pt-5 font-mono font-medium text-amber-300">{formatCents(funding.escrowTotalCents)}</dd></dl>
-          <Link href={href} className={`${primaryAction} mt-7 w-full`}>Deploy a Cohort <ArrowRight className="size-4" /></Link>
-        </div>
+        <PricingCalculator href={href} />
       </div>
     </div></section>
   );

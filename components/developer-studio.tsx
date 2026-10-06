@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { DeveloperInsights, type InsightSubmission } from "@/components/developer-insights";
 import { formatCents } from "@/lib/utils";
 import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templates";
-import { quoteCampaignFunding, SEEDENV_PLATFORM_FEE_PERCENT } from "@/lib/pricing";
+import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, quoteCampaignFunding, type CohortTypeKey } from "@/lib/pricing";
 
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
@@ -29,11 +29,16 @@ type ReviewSubmission = {
   networkType: string | null;
   crashLogs: string | null;
   networkLogs: string | null;
+  hardwareStatus: "VERIFIED_PHYSICAL_NODE" | "EMULATOR_FLAGGED" | "UNVERIFIED";
+  hardwareFlags: string[];
+  gpuRenderer: string | null;
+  githubIssueUrl: string | null;
   payoutCents: number;
   tester: { username: string; avatarUrl: string | null };
   campaign: {
     id: string;
     title: string;
+    syncGitHubRepo: string | null;
     instructions: { stepNumber: number; instructionTitle: string; instructionDetail: string; proofType: string }[];
   };
 };
@@ -58,6 +63,9 @@ type CampaignDraft = {
   bountyPerTaskUsd: number;
   discoveryAllowed: boolean;
   discoveryMinRep: number;
+  cohortType: CohortTypeKey;
+  syncGitHubRepo: string | null;
+  hardwareStrict: boolean;
   instructions: Array<{ stepNumber: number; instructionTitle: string; instructionDetail: string; proofType: TaskProofType; minimumRep: number }>;
 };
 
@@ -78,7 +86,7 @@ const optionStyle = { backgroundColor: "#0E1017", color: "#F8FAFC" };
 
 export type DeveloperStudioView = "overview" | "new-drop" | "review-deck" | "asset-vault";
 
-export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, view }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; view: DeveloperStudioView }) {
+export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, initialCohortType, view }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [highestStep, setHighestStep] = useState(1);
@@ -95,6 +103,9 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     instructions: initialDraft.instructions.map(({ instructionTitle, instructionDetail, proofType, minimumRep }) => ({ instructionTitle, instructionDetail, proofType, minimumRep: resolveTaskMinimumRep({ instructionTitle, minimumRep }) })),
     discoveryAllowed: initialDraft.discoveryAllowed,
     discoveryMinRep: initialDraft.discoveryMinRep,
+    cohortType: initialDraft.cohortType,
+    syncGitHubRepo: initialDraft.syncGitHubRepo || "",
+    hardwareStrict: initialDraft.hardwareStrict,
   } : {
     title: "",
     platform: PlatformType.TESTFLIGHT,
@@ -107,6 +118,15 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     instructions: [defaultTask],
     discoveryAllowed: false,
     discoveryMinRep: 0,
+    cohortType: "STANDARD_QA",
+    ...(initialCohortType && isBundleType(initialCohortType) ? {
+      cohortType: initialCohortType,
+      totalSlots: COHORT_BUNDLES[initialCohortType].slots,
+      bountyPerTaskUsd: COHORT_BUNDLES[initialCohortType].bountyCents / 100,
+      platform: COHORT_BUNDLES[initialCohortType].platform ? PlatformType.PLAY_STORE : PlatformType.TESTFLIGHT,
+    } : {}),
+    syncGitHubRepo: "",
+    hardwareStrict: true,
   });
   const [message, setMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -116,7 +136,8 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const [isPending, startTransition] = useTransition();
 
   const payoutPool = useMemo(() => form.totalSlots * form.bountyPerTaskUsd, [form.totalSlots, form.bountyPerTaskUsd]);
-  const fundingQuote = useMemo(() => quoteCampaignFunding(payoutPool), [payoutPool]);
+  const fundingQuote = useMemo(() => quoteCampaignFunding(payoutPool, form.cohortType), [payoutPool, form.cohortType]);
+  const activeBundle = isBundleType(form.cohortType) ? COHORT_BUNDLES[form.cohortType] : null;
   const totalEscrow = fundingQuote.totalBudgetUsd;
   const platformFee = fundingQuote.platformFeeUsd;
   const testerFundingShare = totalEscrow > 0 ? (fundingQuote.payoutPoolUsd / totalEscrow * 100).toFixed(2) : "0.00";
@@ -140,6 +161,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
         if (task.instructionTitle.trim().length < 3 || task.instructionTitle.length > 90) nextErrors[`instructionTitle-${index}`] = "Task title must be 3 to 90 characters.";
         if (task.instructionDetail.trim().length < 12 || task.instructionDetail.length > 900) nextErrors[`instructionDetail-${index}`] = "Task instructions must be 12 to 900 characters.";
       });
+      if (form.syncGitHubRepo && !/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/.test(form.syncGitHubRepo)) nextErrors.syncGitHubRepo = "Use the owner/repo format, e.g. acme/mobile-app.";
     }
     if (stepToValidate === 3) {
       if (!Number.isInteger(form.totalSlots) || form.totalSlots < 5 || form.totalSlots > 500) nextErrors.totalSlots = "Choose between 5 and 500 tester slots.";
@@ -147,6 +169,15 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
+  }
+
+  function selectCohortType(type: CohortTypeKey) {
+    setErrors({});
+    setForm((current) => {
+      if (!isBundleType(type)) return { ...current, cohortType: type };
+      const bundle = COHORT_BUNDLES[type];
+      return { ...current, cohortType: type, totalSlots: bundle.slots, bountyPerTaskUsd: bundle.bountyCents / 100, platform: bundle.platform ? PlatformType[bundle.platform] : current.platform };
+    });
   }
 
   function updateFormField<Key extends keyof CampaignInput>(key: Key, value: CampaignInput[Key]) {
@@ -317,10 +348,22 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
 
           {step === 1 && (
             <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <fieldset className="md:col-span-2">
+                <legend className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Cohort type</legend>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {([["STANDARD_QA", "Custom Drop", `${COHORT_PLATFORM_FEE_RATE * 100}% fee · $${COHORT_MIN_PLATFORM_FEE_CENTS / 100} min`], ["GOOGLE_PLAY_14_DAY", COHORT_BUNDLES.GOOGLE_PLAY_14_DAY.shortName, "$199 flat · 20 testers"], ["LIVE_STRESS_DROP", COHORT_BUNDLES.LIVE_STRESS_DROP.shortName, "$349 flat · 35 testers"]] as const).map(([type, label, detail]) => (
+                    <button aria-pressed={form.cohortType === type} className={`rounded-lg border p-3 text-left transition-colors ${form.cohortType === type ? "border-emerald-500/50 bg-emerald-500/[0.06]" : "border-zinc-800 bg-zinc-950/40 hover:border-zinc-700"}`} key={type} onClick={() => selectCohortType(type)} type="button">
+                      <span className="block text-sm font-semibold text-zinc-100">{label}</span>
+                      <span className="mt-1 block font-mono text-[11px] text-zinc-500">{detail}</span>
+                    </button>
+                  ))}
+                </div>
+                {activeBundle ? <p className="mt-2 text-xs leading-5 text-zinc-500">{activeBundle.summary}</p> : null}
+              </fieldset>
               <Field error={errors.title} label="App title" maxLength={90} required value={form.title} onChange={(value) => updateFormField("title", value)} />
               <label className="space-y-2 text-sm font-semibold text-white/72">
                 Platform
-                <select style={{ colorScheme: "dark" }} value={form.platform} onChange={(event) => updateFormField("platform", event.target.value as PlatformType)} className={selectClass}>
+                <select disabled={Boolean(activeBundle?.platform)} style={{ colorScheme: "dark" }} value={form.platform} onChange={(event) => updateFormField("platform", event.target.value as PlatformType)} className={`${selectClass} disabled:opacity-60`}>
                   <option style={optionStyle} value={PlatformType.TESTFLIGHT}>TestFlight</option>
                   <option style={optionStyle} value={PlatformType.WEB_STAGING}>Web URL</option>
                   <option style={optionStyle} value={PlatformType.PLAY_STORE}>Staging APK / Play Store</option>
@@ -419,19 +462,36 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                 <label className="mt-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={form.discoveryAllowed} onChange={(event) => setForm((current) => ({ ...current, discoveryAllowed: event.target.checked }))} />Allow Discovery Pass applicants</label>
                 {form.discoveryAllowed ? <label className="mt-3 block text-sm">Discovery REP floor<input type="number" min={0} max={1000000} value={form.discoveryMinRep} onChange={(event) => setForm((current) => ({ ...current, discoveryMinRep: Number(event.target.value) }))} className={`mt-2 ${selectClass}`} /></label> : null}
               </div>
+              <div className="grid gap-4 rounded-xl border border-stroke p-4 md:grid-cols-2">
+                <label className="block text-sm">GitHub issue repo <span className="text-neutral-500">(optional)</span>
+                  <input aria-invalid={Boolean(errors.syncGitHubRepo)} className={`mt-2 ${selectClass} font-mono text-sm`} maxLength={140} placeholder="owner/repo" value={form.syncGitHubRepo || ""} onChange={(event) => updateFormField("syncGitHubRepo", event.target.value.trim())} />
+                  <span className="mt-1 block text-xs text-neutral-500">Submissions can be exported to this repo as issues. Add a token under Settings.</span>
+                  {errors.syncGitHubRepo ? <span className="block text-xs text-rose-300">{errors.syncGitHubRepo}</span> : null}
+                </label>
+                <label className="flex min-h-11 items-start gap-3 text-sm"><input className="mt-1" type="checkbox" checked={form.hardwareStrict} onChange={(event) => updateFormField("hardwareStrict", event.target.checked)} /><span>Flag emulator signals<span className="mt-1 block text-xs text-neutral-500">Submissions from browsers that look like emulators are flagged in review. This is a heuristic, not proof of a physical device.</span></span></label>
+              </div>
             </div>
           )}
 
           {step === 3 && (
             <div className="mt-6 space-y-5">
-              <Slider error={errors.totalSlots} label="Number of testers" min={5} max={500} value={form.totalSlots} onChange={(value) => updateFormField("totalSlots", value)} />
-              <Slider error={errors.bountyPerTaskUsd} label="Bounty per tester ($)" min={1} max={100} value={form.bountyPerTaskUsd} step={0.5} onChange={(value) => updateFormField("bountyPerTaskUsd", value)} />
+              {activeBundle ? (
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+                  <p className="font-mono text-[11px] uppercase tracking-wider text-emerald-400">{activeBundle.name} · flat ${(activeBundle.totalCents / 100).toFixed(0)}</p>
+                  <ul className="mt-3 space-y-1.5 text-sm text-zinc-300">{activeBundle.features.map((feature) => <li key={feature}>· {feature}</li>)}</ul>
+                </div>
+              ) : (
+                <>
+                  <Slider error={errors.totalSlots} label="Number of testers" min={5} max={500} value={form.totalSlots} onChange={(value) => updateFormField("totalSlots", value)} />
+                  <Slider error={errors.bountyPerTaskUsd} label="Bounty per tester ($)" min={1} max={100} value={form.bountyPerTaskUsd} step={0.5} onChange={(value) => updateFormField("bountyPerTaskUsd", value)} />
+                </>
+              )}
               <div className="grid gap-3 md:grid-cols-3">
                 <Metric label={`Tester payout escrow (${testerFundingShare}%)`} value={`$${payoutPool.toFixed(2)}`} />
-                <Metric label={`${SEEDENV_PLATFORM_FEE_PERCENT * 100}% platform & telemetry fee`} value={`$${platformFee.toFixed(2)}`} />
+                <Metric label={activeBundle ? "Flat platform fee" : platformFee === COHORT_MIN_PLATFORM_FEE_CENTS / 100 ? `Platform fee ($${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum)` : `${COHORT_PLATFORM_FEE_RATE * 100}% platform fee`} value={`$${platformFee.toFixed(2)}`} />
                 <Metric label="Total escrow" value={`$${totalEscrow.toFixed(2)}`} gold />
               </div>
-              <p className="text-xs leading-5 text-white/50">The {SEEDENV_PLATFORM_FEE_PERCENT * 100}% platform fee is added to tester rewards. Testers receive {testerFundingShare}% of total funding before any Stripe fees.</p>
+              <p className="text-xs leading-5 text-white/50">{activeBundle ? "Bundle pricing is fixed and verified again at checkout." : `The ${COHORT_PLATFORM_FEE_RATE * 100}% platform fee (minimum $${COHORT_MIN_PLATFORM_FEE_CENTS / 100}) is added to tester rewards.`} Testers receive {testerFundingShare}% of total funding before any Stripe fees.</p>
               <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending}>
                 <BadgeDollarSign className="size-5" /> Deposit Escrow & Launch
               </Button>
@@ -576,7 +636,7 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
       <header>
         <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Tester quality</p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-          <div><h2 className="text-3xl font-semibold tracking-tight">Review Deck</h2><p className="mt-1 text-sm text-neutral-400">Review proof, request a revision, or approve the tester payout.</p></div>
+          <div><h2 className="text-3xl font-semibold tracking-tight">Submissions</h2><p className="mt-1 text-sm text-neutral-400">Review proof, request a revision, or approve the tester payout.</p></div>
           <span className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1 text-xs font-semibold text-zinc-300">{totalCount} awaiting review</span>
         </div>
       </header>
@@ -619,6 +679,10 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                     <p>Device: <span className="text-neutral-300">{active.deviceModel || "Not captured"}</span></p>
                     <p>Resolution: <span className="text-neutral-300">{active.screenResolution || "Not captured"}</span></p>
                     <p>Network: <span className="text-neutral-300">{active.networkType || "Not captured"}</span></p>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
+                    <HardwareBadge status={active.hardwareStatus} flags={active.hardwareFlags} gpuRenderer={active.gpuRenderer} />
+                    <GitHubExportButton key={active.id} submissionId={active.id} repo={active.campaign.syncGitHubRepo} initialIssueUrl={active.githubIssueUrl} />
                   </div>
                 </div>
               </div>
@@ -689,7 +753,7 @@ function AssetVault({ assets }: { assets: Asset[] }) {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Approved tester proof</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight">Asset Vault</h2>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight">Artifacts</h2>
           <p className="mt-1 text-sm text-neutral-400">Screenshots approved across your campaigns.</p>
         </div>
         {assets.length ? <Button asChild variant="outline"><a href="/api/assets/download"><Download className="size-4" /> Download all campaigns (.zip)</a></Button> : null}
@@ -715,9 +779,46 @@ function AssetVault({ assets }: { assets: Asset[] }) {
           <Boxes className="mx-auto size-8 text-zinc-600" />
           <h3 className="mt-3 text-lg font-bold text-white">No approved proof yet</h3>
           <p className="mt-2 text-sm text-neutral-400">Approved tester screenshots will collect here, ready to review and download.</p>
-          <Link className="mt-5 inline-flex text-sm font-semibold text-emerald-400 hover:text-emerald-300" href="/console?view=review-deck">Open Review Deck <ArrowDown className="ml-2 size-4 rotate-[-45deg]" /></Link>
+          <Link className="mt-5 inline-flex text-sm font-semibold text-emerald-400 hover:text-emerald-300" href="/console?view=review-deck">Open Submissions <ArrowDown className="ml-2 size-4 rotate-[-45deg]" /></Link>
         </div>
       )}
     </section>
+  );
+}
+
+function HardwareBadge({ status, flags, gpuRenderer }: { status: ReviewSubmission["hardwareStatus"]; flags: string[]; gpuRenderer: string | null }) {
+  const tone = status === "EMULATOR_FLAGGED" ? "border-amber-500/30 bg-amber-500/10 text-amber-300" : status === "VERIFIED_PHYSICAL_NODE" ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-400" : "border-zinc-700 text-zinc-500";
+  const label = status === "EMULATOR_FLAGGED" ? "Emulator signals" : status === "VERIFIED_PHYSICAL_NODE" ? "No emulator signals" : "Hardware not checked";
+  const detail = [flags.length ? flags.join(" · ") : null, gpuRenderer ? `GPU: ${gpuRenderer}` : null, "Browser heuristic; can be spoofed."].filter(Boolean).join("\n");
+  return <span className={`rounded border px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider ${tone}`} title={detail}>{label}</span>;
+}
+
+function GitHubExportButton({ submissionId, repo, initialIssueUrl }: { submissionId: string; repo: string | null; initialIssueUrl: string | null }) {
+  const [issueUrl, setIssueUrl] = useState(initialIssueUrl);
+  const [error, setError] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
+  if (issueUrl) return <a className="font-mono text-xs text-emerald-400 hover:text-emerald-300" href={issueUrl} rel="noreferrer" target="_blank">View GitHub issue ↗</a>;
+  if (!repo) return <span className="text-xs text-neutral-500">Set a GitHub repo on this cohort to export issues.</span>;
+
+  async function exportIssue() {
+    setIsExporting(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/submissions/${submissionId}/export-github`, { method: "POST" });
+      const body = await response.json().catch(() => ({})) as { issueUrl?: string; message?: string };
+      if (body.issueUrl) setIssueUrl(body.issueUrl);
+      else setError(body.message || "Export failed.");
+    } catch {
+      setError("Export failed. Check your connection.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button disabled={isExporting} onClick={exportIssue} size="sm" type="button" variant="outline">{isExporting ? <LoaderCircle className="size-4 animate-spin" /> : null} Export to {repo}</Button>
+      {error ? <span className="max-w-xs text-right text-xs text-rose-300" role="alert">{error}</span> : null}
+    </div>
   );
 }

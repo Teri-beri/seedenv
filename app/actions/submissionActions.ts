@@ -4,6 +4,8 @@ import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } 
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { classifyHardwareSignals } from "@/lib/hardware-integrity";
 import { getCurrentUser } from "@/lib/auth";
 import { sendDiscordWebhookMessage } from "@/lib/discord";
 import { notificationEnabled, sendNotificationEmail } from "@/lib/notifications";
@@ -30,6 +32,13 @@ const proofSchema = z.object({
   networkType: z.string().max(80).optional().or(z.literal("")),
   crashLogs: z.string().max(20000).optional().or(z.literal("")),
   networkLogs: z.string().max(20000).optional().or(z.literal("")),
+  hardware: z.object({
+    gpuRenderer: z.string().max(200).nullable(),
+    isTouchCapable: z.boolean().nullable(),
+    batteryLevel: z.number().min(0).max(1).nullable(),
+    isLowPowerMode: z.boolean().nullable(),
+    webglBlocked: z.boolean(),
+  }).nullable().optional(),
 });
 
 function hasValidImageSignature(buffer: Buffer, mimeType: string) {
@@ -37,6 +46,14 @@ function hasValidImageSignature(buffer: Buffer, mimeType: string) {
   if (mimeType === "image/jpeg") return buffer.subarray(0, 3).equals(Buffer.from([255, 216, 255]));
   if (mimeType === "image/webp") return buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP";
   return false;
+}
+
+async function requestUserAgent() {
+  try {
+    return (await headers()).get("user-agent") || "";
+  } catch {
+    return "";
+  }
 }
 
 export async function claimTaskSlot(campaignId: string) {
@@ -104,9 +121,10 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
 
   const submission = await prisma.submission.findUnique({
     where: { id: submissionId },
-    include: { campaign: { select: { title: true, developerId: true } } },
+    include: { campaign: { select: { title: true, developerId: true, hardwareStrict: true } } },
   });
   if (!submission || submission.testerId !== tester.id) throw new Error("Submission not found.");
+  const hardware = classifyHardwareSignals(input.hardware ?? null, await requestUserAgent());
   if (submission.status !== SubmissionStatus.PENDING) throw new Error("This submission is no longer pending.");
   assertProofEditable(submission);
 
@@ -159,6 +177,12 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
       networkType: input.networkType || null,
       crashLogs: input.crashLogs || null,
       networkLogs: input.networkLogs || null,
+      hardwareStatus: submission.campaign.hardwareStrict ? hardware.integrity : "UNVERIFIED",
+      hardwareFlags: hardware.flags,
+      gpuRenderer: input.hardware?.gpuRenderer ?? null,
+      isTouchCapable: input.hardware?.isTouchCapable ?? null,
+      batteryLevel: input.hardware?.batteryLevel ?? null,
+      isLowPowerMode: input.hardware?.isLowPowerMode ?? null,
       revisionRequestedAt: null,
       revisionStartedAt: null,
       rejectionReason: null,

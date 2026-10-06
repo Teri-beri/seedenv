@@ -20,8 +20,8 @@ const testerItems = [
 const developerItems = [
   { label: "Console", view: "overview", icon: LayoutDashboard },
   { label: "New Drop", view: "new-drop", icon: PlusCircle },
-  { label: "Review Deck", view: "review-deck", icon: ShieldCheck },
-  { label: "Asset Vault", view: "asset-vault", icon: Boxes },
+  { label: "Submissions", view: "review-deck", icon: ShieldCheck },
+  { label: "Artifacts", view: "asset-vault", icon: Boxes },
   { label: "Billing", view: "billing", icon: CreditCard },
 ];
 

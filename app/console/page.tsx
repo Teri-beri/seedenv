@@ -16,7 +16,7 @@ import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
 import { isPublicHandle, publicProfilePath } from "@/lib/public-profile";
 import { getProofImageUrl } from "@/lib/storage";
-import { SEEDENV_PLATFORM_FEE_PERCENT } from "@/lib/pricing";
+import { COHORT_PLATFORM_FEE_RATE } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ const consoleViews = ["overview", "new-drop", "review-deck", "asset-vault", "bil
 type ConsoleView = (typeof consoleViews)[number];
 const reviewPageSize = 20;
 
-export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string; stripePayment?: string }> }) {
+export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string; stripePayment?: string; cohort?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "DEVELOPER") redirect("/");
@@ -65,14 +65,14 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   const [pendingSubmissions, approvedAssets, campaigns, completedEscrow, auditReports, billing] = await Promise.all([
     prisma.submission.findMany({
       where: pendingReviewWhere,
-      include: { tester: true, campaign: { include: { instructions: { orderBy: { stepNumber: "asc" } } } } },
+      include: { tester: { select: { username: true, avatarUrl: true } }, campaign: { select: { id: true, title: true, syncGitHubRepo: true, instructions: { orderBy: { stepNumber: "asc" } } } } },
       skip: (reviewPage - 1) * reviewPageSize,
       take: reviewPageSize,
       orderBy: { createdAt: "asc" },
     }),
     prisma.submission.findMany({
       where: { status: SubmissionStatus.APPROVED, proofImageUrl: { not: null }, campaign: campaignScope },
-      include: { tester: true, campaign: true },
+      include: { tester: { select: { username: true, avatarUrl: true } }, campaign: { select: { id: true, title: true } } },
       take: 12,
       orderBy: { reviewedAt: "desc" },
     }),
@@ -147,10 +147,10 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {overview ? <>
-          <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: SEEDENV_PLATFORM_FEE_PERCENT }} />
+          <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: COHORT_PLATFORM_FEE_RATE }} />
           <ActiveCohorts cohorts={campaigns} total={activeCohortCount} />
         </> : null}
-        {activeView !== "billing" ? <DeveloperStudio key={launchDraft?.id || "new-drop"} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} view={activeView} /> : null}
+        {activeView !== "billing" ? <DeveloperStudio key={launchDraft?.id || "new-drop"} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} /> : null}
 
         {billing ? <section className="space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-4">

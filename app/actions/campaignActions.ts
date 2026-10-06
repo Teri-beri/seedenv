@@ -1,11 +1,11 @@
 "use server";
 
-import { CampaignStatus, PlatformType, TaskProofType, TransactionStatus, TransactionType } from "@prisma/client";
+import { CampaignStatus, CohortType, PlatformType, TaskProofType, TransactionStatus, TransactionType } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { SEEDENV_PLATFORM_FEE_PERCENT, getStripe } from "@/lib/stripe";
-import { quoteCampaignFunding } from "@/lib/pricing";
+import { getStripe } from "@/lib/stripe";
+import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, quoteCampaignFunding } from "@/lib/pricing";
 import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templates";
 import { billingDetailsSchema } from "@/lib/enterprise-rules";
 
@@ -34,6 +34,9 @@ const campaignSchema = z.object({
   instructions: z.array(taskInstructionSchema).min(1).max(12),
   discoveryAllowed: z.boolean().default(false),
   discoveryMinRep: z.number().int().min(0).max(1000000).default(0),
+  cohortType: z.nativeEnum(CohortType).default(CohortType.STANDARD_QA),
+  syncGitHubRepo: z.string().trim().regex(/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/, "Use the owner/repo format.").optional().or(z.literal("")),
+  hardwareStrict: z.boolean().default(true),
 }).refine((input) => !input.discoveryAllowed || input.discoveryMinRep <= Math.max(...input.instructions.map((item) => item.minimumRep)), {
   message: "The Discovery REP floor cannot exceed the highest task requirement.",
   path: ["discoveryMinRep"],
@@ -41,24 +44,50 @@ const campaignSchema = z.object({
 
 export type CampaignInput = z.infer<typeof campaignSchema>;
 
+// Bundle slots, rewards, fee, and platform are fixed server-side so the client cannot alter a flat-priced package.
+function resolveCohortTerms(input: CampaignInput) {
+  if (!isBundleType(input.cohortType)) return { totalSlots: input.totalSlots, bountyPerTaskUsd: input.bountyPerTaskUsd, platform: input.platform, guaranteedDays: null };
+  const bundle = COHORT_BUNDLES[input.cohortType];
+  return {
+    totalSlots: bundle.slots,
+    bountyPerTaskUsd: bundle.bountyCents / 100,
+    platform: bundle.platform ? PlatformType[bundle.platform] : input.platform,
+    guaranteedDays: bundle.guaranteedDays,
+  };
+}
+
+function checkoutDescription(input: CampaignInput, terms: ReturnType<typeof resolveCohortTerms>) {
+  if (isBundleType(input.cohortType)) {
+    const bundle = COHORT_BUNDLES[input.cohortType];
+    return `${bundle.name}: ${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)} plus a flat $${(bundle.platformFeeCents / 100).toFixed(2)} platform fee`;
+  }
+  return `${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)} plus a ${COHORT_PLATFORM_FEE_RATE * 100}% platform fee on the tester reward pool (minimum $${(COHORT_MIN_PLATFORM_FEE_CENTS / 100).toFixed(2)})`;
+}
+
 function buildCampaignData(input: CampaignInput, developerId: string, status: CampaignStatus) {
-  const testerPayoutPoolUsd = input.totalSlots * input.bountyPerTaskUsd;
-  const { totalBudgetUsd, platformFeeUsd, escrowTotalCents } = quoteCampaignFunding(testerPayoutPoolUsd);
+  const terms = resolveCohortTerms(input);
+  const testerPayoutPoolUsd = terms.totalSlots * terms.bountyPerTaskUsd;
+  const { totalBudgetUsd, platformFeeUsd, escrowTotalCents } = quoteCampaignFunding(testerPayoutPoolUsd, input.cohortType);
 
   return {
     escrowTotalCents,
+    terms,
     data: {
       developerId,
       title: input.title,
-      platform: input.platform,
+      platform: terms.platform,
       appUrl: input.appUrl,
       iconUrl: input.iconUrl || null,
       targetVibe: input.targetVibe,
       description: input.description,
       totalBudgetUsd,
-      bountyPerTaskUsd: input.bountyPerTaskUsd,
+      bountyPerTaskUsd: terms.bountyPerTaskUsd,
       platformFeeUsd,
-      totalSlots: input.totalSlots,
+      totalSlots: terms.totalSlots,
+      cohortType: input.cohortType,
+      guaranteedDays: terms.guaranteedDays,
+      syncGitHubRepo: input.syncGitHubRepo || null,
+      hardwareStrict: input.hardwareStrict,
       discoveryAllowed: input.discoveryAllowed,
       discoveryMinRep: input.discoveryMinRep,
       status,
@@ -139,7 +168,7 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
 
   const profile = await prisma.billingProfile.findUnique({ where: { userId: developer.id } });
   const company = profile ? billingDetailsSchema.parse({ ...profile, taxId: profile.taxId || "", billingEmail: profile.billingEmail || "", addressLine2: profile.addressLine2 || "", region: profile.region || "" }) : null;
-  const { data: campaignData, escrowTotalCents } = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING);
+  const { data: campaignData, escrowTotalCents, terms } = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING);
   let campaign;
   if (draftId) {
     const ownedDraft = await prisma.appCampaign.findFirst({
@@ -190,7 +219,7 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
             unit_amount: escrowTotalCents,
             product_data: {
               name: `SeedEnv escrow: ${campaign.title}`,
-              description: `${input.totalSlots} tester slots at $${input.bountyPerTaskUsd.toFixed(2)} plus ${SEEDENV_PLATFORM_FEE_PERCENT * 100}% platform and telemetry fee on the tester reward pool`,
+              description: checkoutDescription(input, terms),
             },
           },
         },
@@ -201,6 +230,7 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
         type: "SEEDENV_CAMPAIGN_ESCROW",
         campaignId: campaign.id,
         developerId: developer.id,
+        cohortType: input.cohortType,
       },
     });
   } catch (error) {

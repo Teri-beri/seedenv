@@ -38,7 +38,7 @@ export function ConsoleMetricStrip({ metrics }: { metrics: ConsoleMetrics }) {
     { label: "Active cohorts", value: metrics.activeCohorts.toLocaleString(), detail: `${plural(metrics.runsInProgress, "run")} in progress` },
     { label: "Pending audits", value: metrics.pendingAudits.toLocaleString(), detail: metrics.pendingAudits ? `${plural(metrics.pendingAudits, "submission")} awaiting review` : "All submissions cleared" },
     { label: "Verified validators", value: metrics.verifiedValidators.toLocaleString(), detail: "Testers with approved reports" },
-    { label: "Escrow committed", value: formatCents(metrics.escrowCommittedCents), detail: `${Math.round(metrics.platformFeePercent * 100)}% platform fee tier` },
+    { label: "Escrow committed", value: formatCents(metrics.escrowCommittedCents), detail: `${Math.round(metrics.platformFeePercent * 100)}% fee · $15 min on custom drops` },
   ];
   return (
     <section aria-label="Console metrics" className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">

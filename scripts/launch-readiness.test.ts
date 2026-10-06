@@ -6,14 +6,28 @@ import type { User } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { assertProofEditable, startProofRevision } from "../lib/submission-lifecycle";
 import nextConfig from "../next.config";
-import { quoteCampaignFunding, SEEDENV_PLATFORM_FEE_PERCENT } from "../lib/pricing";
+import { calculateCohortEscrow, COHORT_BUNDLES, COHORT_PLATFORM_FEE_RATE, quoteCampaignFunding } from "../lib/pricing";
 
-test("campaign funding adds a fixed 5% fee on the reward pool with cent rounding", () => {
-  assert.equal(SEEDENV_PLATFORM_FEE_PERCENT, 0.05);
-  assert.deepEqual(quoteCampaignFunding(100), { payoutPoolUsd: 100, platformFeeUsd: 5, totalBudgetUsd: 105, escrowTotalCents: 10500 });
-  assert.equal(quoteCampaignFunding(87.5).platformFeeUsd, 4.38);
-  assert.equal(quoteCampaignFunding(127.5).platformFeeUsd, 6.38);
+test("campaign funding adds a 20% fee with a $15 floor and cent rounding", () => {
+  assert.equal(COHORT_PLATFORM_FEE_RATE, 0.2);
+  assert.deepEqual(quoteCampaignFunding(100), { payoutPoolUsd: 100, platformFeeUsd: 20, totalBudgetUsd: 120, escrowTotalCents: 12000 });
+  assert.deepEqual(quoteCampaignFunding(20), { payoutPoolUsd: 20, platformFeeUsd: 15, totalBudgetUsd: 35, escrowTotalCents: 3500 });
+  assert.equal(quoteCampaignFunding(75).platformFeeUsd, 15);
+  assert.equal(quoteCampaignFunding(87.53).platformFeeUsd, 17.51);
   for (const amount of [-1, NaN, Infinity]) assert.throws(() => quoteCampaignFunding(amount));
+});
+
+test("flat bundles ignore custom pools and reconcile to their advertised totals", () => {
+  for (const bundle of Object.values(COHORT_BUNDLES)) {
+    const quote = quoteCampaignFunding(9999, bundle.type);
+    assert.equal(quote.escrowTotalCents, bundle.totalCents);
+    assert.equal(bundle.slots * bundle.bountyCents + bundle.platformFeeCents, bundle.totalCents);
+  }
+  assert.equal(COHORT_BUNDLES.GOOGLE_PLAY_14_DAY.totalCents, 19900);
+  assert.equal(COHORT_BUNDLES.LIVE_STRESS_DROP.totalCents, 34900);
+  const gp = calculateCohortEscrow(0, 0, "GOOGLE_PLAY_14_DAY");
+  assert.deepEqual(gp, { validatorPool: 80, platformFee: 119, stripeProcessingEstimate: 6.07, netPlatformMargin: 112.93, totalAuthorized: 199 });
+  assert.equal(calculateCohortEscrow(10, 2).platformFee, 15);
 });
 
 test("campaign saves enforce automatic REP and preserve the Discovery exception", async () => {
@@ -110,8 +124,8 @@ test("missing Stripe configuration or funding method saves a draft without creat
     };
     assert.deepEqual(await createCampaignWithEscrow(input), { campaignId: "payment-draft-1", checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true });
     assert.equal(created[0].status, "DRAFT");
-    assert.equal(created[0].totalBudgetUsd, 105);
-    assert.equal(created[0].platformFeeUsd, 5);
+    assert.equal(created[0].totalBudgetUsd, 120);
+    assert.equal(created[0].platformFeeUsd, 20);
     assert.deepEqual(await createCampaignWithEscrow(input, "existing-payment-draft"), { campaignId: "existing-payment-draft", checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true });
     assert.equal(updated[0].status, "DRAFT");
     process.env.STRIPE_SECRET_KEY = "configured-for-mocked-test";

@@ -51,6 +51,7 @@ test("Account profile avoids unmigrated invoice columns and unrelated analytics"
     mock.module("../components/account-settings-form.tsx", { namedExports: { AccountSettingsForm: Empty } }),
     mock.module("../components/account-signout-button.tsx", { namedExports: { AccountSignOutButton: Empty } }),
     mock.module("../components/notification-settings-form.tsx", { namedExports: { NotificationSettingsForm: Empty } }),
+    mock.module("../components/github-token-form.tsx", { namedExports: { GitHubTokenForm: Empty } }),
     mock.module("../components/password-settings-form.tsx", { namedExports: { PasswordSettingsForm: Empty } }),
     mock.module("../components/stripe-settings-card.tsx", { namedExports: { StripeSettingsCard: Empty } }),
     mock.module("../components/workspace-access-switcher.tsx", { namedExports: { WorkspaceAccessSwitcher: Empty } }),

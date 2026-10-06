@@ -8,8 +8,8 @@ export type ConsoleView = "overview" | "new-drop" | "review-deck" | "asset-vault
 
 const tabs = [
   { label: "Console", href: "/console", view: "overview" },
-  { label: "Review Deck", href: "/console?view=review-deck", view: "review-deck" },
-  { label: "Asset Vault", href: "/console?view=asset-vault", view: "asset-vault" },
+  { label: "Submissions", href: "/console?view=review-deck", view: "review-deck" },
+  { label: "Artifacts", href: "/console?view=asset-vault", view: "asset-vault" },
   { label: "Billing", href: "/console?view=billing", view: "billing" },
   { label: "Launch Circle", href: "/community", view: null },
 ] as const;

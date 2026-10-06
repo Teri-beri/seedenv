@@ -1,5 +1,4 @@
 import type { BillingMetricsData } from "@/lib/billing";
-import { SEEDENV_PLATFORM_FEE_PERCENT } from "@/lib/pricing";
 import { formatCents } from "@/lib/utils";
 
 function plural(count: number, word: string) {
@@ -10,7 +9,7 @@ export function BillingMetrics({ metrics }: { metrics: BillingMetricsData }) {
   const cards = [
     { label: "Active Escrow Committed", value: formatCents(metrics.activeEscrowCents), detail: `Locked in ${plural(metrics.activeCohorts, "active cohort")}` },
     { label: "Settled Payouts", value: formatCents(metrics.settledPayoutsCents), detail: `${plural(metrics.validatorsPaid, "approved validator task")}` },
-    { label: `Platform Fees (${Math.round(SEEDENV_PLATFORM_FEE_PERCENT * 100)}%)`, value: formatCents(metrics.platformFeesCents), detail: "On confirmed escrow deposits" },
+    { label: "Platform Fees", value: formatCents(metrics.platformFeesCents), detail: "On confirmed escrow deposits" },
     { label: "Awaiting Payment", value: formatCents(metrics.awaitingPaymentCents), detail: metrics.awaitingPaymentCount ? `${plural(metrics.awaitingPaymentCount, "checkout")} not yet confirmed` : "No unconfirmed checkouts" },
   ];
   return (

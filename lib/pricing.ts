@@ -1,16 +1,117 @@
-export const SEEDENV_PLATFORM_FEE_PERCENT = 0.05;
+export type CohortTypeKey = "STANDARD_QA" | "GOOGLE_PLAY_14_DAY" | "LIVE_STRESS_DROP";
 
-export function quoteCampaignFunding(payoutPoolUsd: number) {
+export const COHORT_PLATFORM_FEE_RATE = 0.2;
+export const COHORT_MIN_PLATFORM_FEE_CENTS = 1500;
+export const CLIPPER_PLATFORM_FEE_PERCENT = 0.05;
+
+// Estimate only; Stripe's actual fee depends on card type and country and is charged to SeedEnv.
+export const STRIPE_CARD_RATE = 0.029;
+export const STRIPE_CARD_FIXED_CENTS = 30;
+
+export type CohortBundle = {
+  type: Exclude<CohortTypeKey, "STANDARD_QA">;
+  name: string;
+  shortName: string;
+  totalCents: number;
+  slots: number;
+  bountyCents: number;
+  platformFeeCents: number;
+  platform: "PLAY_STORE" | null;
+  guaranteedDays: number | null;
+  summary: string;
+  features: string[];
+};
+
+export const COHORT_BUNDLES: Record<CohortBundle["type"], CohortBundle> = {
+  GOOGLE_PLAY_14_DAY: {
+    type: "GOOGLE_PLAY_14_DAY",
+    name: "Google Play 14-Day Closed Test",
+    shortName: "Google Play 14-Day",
+    totalCents: 19900,
+    slots: 20,
+    bountyCents: 400,
+    platformFeeCents: 11900,
+    platform: "PLAY_STORE",
+    guaranteedDays: 14,
+    summary: "For new personal Play Console accounts that need 12+ testers opted in to a closed test for 14 continuous days before applying for production access.",
+    features: [
+      "20 tester slots (8 above Google's 12-tester minimum as a buffer)",
+      "14-day cohort window on your closed testing track",
+      "Testers submit device, OS, and usage proof you review in the console",
+      "Full refund, including the platform fee, if fewer than 12 testers stay opted in for 14 continuous days",
+    ],
+  },
+  LIVE_STRESS_DROP: {
+    type: "LIVE_STRESS_DROP",
+    name: "Flash Concurrency Drop",
+    shortName: "Flash Drop",
+    totalCents: 34900,
+    slots: 35,
+    bountyCents: 500,
+    platformFeeCents: 17400,
+    platform: null,
+    guaranteedDays: null,
+    summary: "A scheduled, simultaneous session for real-time features such as WebSockets, live streams, and multiplayer rooms.",
+    features: [
+      "35 tester slots scheduled into one live session window",
+      "Session time and test script set in your cohort brief",
+      "Per-tester device, OS, network type, and crash/network log capture",
+      "Hardware-signal screening flags likely emulators for review",
+    ],
+  },
+};
+
+export function isBundleType(type: CohortTypeKey): type is CohortBundle["type"] {
+  return type !== "STANDARD_QA";
+}
+
+export function standardPlatformFeeCents(payoutPoolCents: number) {
+  return Math.max(Math.round(payoutPoolCents * COHORT_PLATFORM_FEE_RATE), COHORT_MIN_PLATFORM_FEE_CENTS);
+}
+
+export function quoteCampaignFunding(payoutPoolUsd: number, cohortType: CohortTypeKey = "STANDARD_QA") {
+  if (isBundleType(cohortType)) {
+    const bundle = COHORT_BUNDLES[cohortType];
+    const poolCents = bundle.slots * bundle.bountyCents;
+    return { payoutPoolUsd: poolCents / 100, platformFeeUsd: bundle.platformFeeCents / 100, totalBudgetUsd: bundle.totalCents / 100, escrowTotalCents: bundle.totalCents };
+  }
   const payoutPoolCents = Math.round(payoutPoolUsd * 100);
   if (!Number.isSafeInteger(payoutPoolCents) || payoutPoolCents < 0) {
     throw new Error("The reward pool must be a finite, non-negative USD amount.");
   }
-  const platformFeeCents = Math.round(payoutPoolCents * SEEDENV_PLATFORM_FEE_PERCENT);
+  const platformFeeCents = standardPlatformFeeCents(payoutPoolCents);
   const escrowTotalCents = payoutPoolCents + platformFeeCents;
   return {
     payoutPoolUsd: payoutPoolCents / 100,
     platformFeeUsd: platformFeeCents / 100,
     totalBudgetUsd: escrowTotalCents / 100,
     escrowTotalCents,
+  };
+}
+
+export function quoteClipperFunding(feeUsd: number) {
+  const feeCents = Math.round(feeUsd * 100);
+  if (!Number.isSafeInteger(feeCents) || feeCents < 0) throw new Error("The creator fee must be a finite, non-negative USD amount.");
+  return feeCents + Math.round(feeCents * CLIPPER_PLATFORM_FEE_PERCENT);
+}
+
+export type EscrowBreakdown = {
+  validatorPool: number;
+  platformFee: number;
+  stripeProcessingEstimate: number;
+  netPlatformMargin: number;
+  totalAuthorized: number;
+};
+
+export function calculateCohortEscrow(validatorCount: number, stipendPerValidator: number, cohortType: CohortTypeKey = "STANDARD_QA"): EscrowBreakdown {
+  const quote = quoteCampaignFunding(validatorCount * stipendPerValidator, cohortType);
+  const stripeCents = Math.round(quote.escrowTotalCents * STRIPE_CARD_RATE) + STRIPE_CARD_FIXED_CENTS;
+  const feeCents = Math.round(quote.platformFeeUsd * 100);
+  return {
+    validatorPool: quote.payoutPoolUsd,
+    platformFee: quote.platformFeeUsd,
+    stripeProcessingEstimate: stripeCents / 100,
+    netPlatformMargin: (feeCents - stripeCents) / 100,
+    totalAuthorized: quote.totalBudgetUsd,
   };
 }
