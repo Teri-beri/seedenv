@@ -150,12 +150,6 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
           <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: SEEDENV_PLATFORM_FEE_PERCENT }} />
           <ActiveCohorts cohorts={campaigns} total={activeCohortCount} />
         </> : null}
-        {activeView !== "overview" && activeView !== "billing" ? (
-          <section className="mb-6">
-            <p className="font-mono text-xs uppercase tracking-wider text-zinc-500">Developer Console</p>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight text-zinc-100">{activeView === "new-drop" ? "New Drop" : activeView === "review-deck" ? "Review Deck" : "Asset Vault"}</h2>
-          </section>
-        ) : null}
         {activeView !== "billing" ? <DeveloperStudio key={launchDraft?.id || "new-drop"} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} view={activeView} /> : null}
 
         {billing ? <section className="space-y-6">
