@@ -29,6 +29,15 @@ function isGridVisibleAt(target: EventTarget | null) {
   return true;
 }
 
+const dotEdgeClearance = 4;
+
+// Every trail dot must sit on visible grid, including its glow, so dots near the
+// sticky header, buttons, or panels never bleed past the grid's borders.
+function dotFitsGrid(x: number, y: number) {
+  const points = [[x, y], [x, y - dotEdgeClearance], [x, y + dotEdgeClearance], [x - dotEdgeClearance, y], [x + dotEdgeClearance, y]];
+  return points.every(([pointX, pointY]) => isGridVisibleAt(document.elementFromPoint(pointX, pointY)));
+}
+
 export function CursorGridTrail() {
   const pathname = usePathname();
   const layerRef = useRef<HTMLDivElement | null>(null);
@@ -59,7 +68,7 @@ export function CursorGridTrail() {
       const centerY = Math.round(event.clientY / cellSize) * cellSize;
       for (let x = centerX - cellSize; x <= centerX + cellSize; x += cellSize) {
         for (let y = centerY - cellSize; y <= centerY + cellSize; y += cellSize) {
-          if (Math.hypot(event.clientX - x, event.clientY - y) > trailRadius) continue;
+          if (Math.hypot(event.clientX - x, event.clientY - y) > trailRadius || !dotFitsGrid(x, y)) continue;
           const key = `${x}:${y}`;
           let dot = dots.get(key);
           if (!dot) {
