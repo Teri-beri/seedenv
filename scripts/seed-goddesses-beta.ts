@@ -1,5 +1,6 @@
 import { CampaignStatus, PlatformType, PrismaClient, TaskProofType } from "@prisma/client";
 import { quoteCampaignFunding } from "../lib/pricing";
+import { assertSeedTargetIsSafe } from "./seed-guard";
 
 const prisma = new PrismaClient();
 const appUrl = "https://testflight.apple.com/join/mRBmnG8M";
@@ -9,6 +10,8 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log("Creates or updates the active Goddesses App Beta Validation mission.");
   process.exit(0);
 }
+
+assertSeedTargetIsSafe("seed-goddesses-beta creates an unfunded ACTIVE campaign");
 
 async function main() {
   const developer = await prisma.user.findFirst({ where: { role: "DEVELOPER" }, orderBy: { createdAt: "asc" } });

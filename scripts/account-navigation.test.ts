@@ -6,7 +6,8 @@ import { landingViews, landingViewHref, resolveLandingView } from "../lib/landin
 
 test("production npm startup applies pending database migrations before serving traffic", async () => {
   const pkg = JSON.parse(await readFile("package.json", "utf8"));
-  assert.equal(pkg.scripts.start, "prisma migrate deploy && tsx scripts/ensure-schema.ts && npm run seed:goddesses-beta && next start");
+  assert.equal(pkg.scripts.start, "prisma migrate deploy && tsx scripts/ensure-schema.ts && next start");
+  assert.doesNotMatch(pkg.scripts.start, /seed/, "production startup must never seed demo data");
   assert.match(await readFile("render.yaml", "utf8"), /startCommand: npm run start/);
   assert.match(await readFile("prisma/migrations/20261005_enterprise_billing_support/migration.sql", "utf8"), /ADD COLUMN "campaignId" TEXT/);
   assert.match(await readFile("prisma/migrations/migration_lock.toml", "utf8"), /provider = "postgresql"/);

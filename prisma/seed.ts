@@ -1,5 +1,8 @@
 import { PrismaClient, CampaignStatus, PlatformType, RankTier, TaskProofType, TransactionStatus, TransactionType, UserRole } from "@prisma/client";
 import { quoteCampaignFunding } from "../lib/pricing";
+import { assertSeedTargetIsSafe } from "../scripts/seed-guard";
+
+assertSeedTargetIsSafe("prisma/seed.ts deletes ALL users, campaigns, submissions, and wallet transactions");
 
 const prisma = new PrismaClient();
 
