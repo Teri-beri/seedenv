@@ -113,7 +113,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
   }
 
   return (
-    <div id="top" className="min-h-screen bg-[#0A0D12] text-white [color-scheme:dark]">
+    <div id="top" className="min-h-screen text-white [color-scheme:dark]">
       <AnalyticsTracker />
       <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-[#0A0D12]/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">

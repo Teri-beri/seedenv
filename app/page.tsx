@@ -2,6 +2,7 @@ import { CampaignStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { PublicLanding } from "@/components/public-landing";
+import TelemetryGridCanvas from "@/components/TelemetryGridCanvas";
 import { prisma } from "@/lib/prisma";
 import { landingViewHref, resolveLandingView } from "@/lib/landing-views";
 import { redirect } from "next/navigation";
@@ -53,5 +54,12 @@ export default async function Home({ searchParams }: { searchParams?: Promise<{ 
     getOptionalViewer(),
   ]);
 
-  return <PublicLanding missions={directory.missions} viewer={viewer} directoryUnavailable={directory.unavailable} />;
+  return (
+    <div className="relative isolate min-h-screen bg-[#0A0D12]">
+      <TelemetryGridCanvas />
+      <div className="relative z-10">
+        <PublicLanding missions={directory.missions} viewer={viewer} directoryUnavailable={directory.unavailable} />
+      </div>
+    </div>
+  );
 }
