@@ -538,8 +538,16 @@ model AnalyticsEvent {
   referrer   String?
   userAgent  String?
   metadata   Json?
+  visitorId  String?
+  source     String?
+  country    String?
+  device     String?
+  browser    String?
+  os         String?
+  loadMs     Int?
   createdAt  DateTime @default(now())
 
   @@index([eventName, createdAt])
   @@index([path, createdAt])
+  @@index([createdAt])
 }

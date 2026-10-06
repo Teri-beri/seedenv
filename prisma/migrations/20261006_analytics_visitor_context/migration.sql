@@ -1,0 +1,10 @@
+ALTER TABLE "AnalyticsEvent"
+  ADD COLUMN IF NOT EXISTS "visitorId" TEXT,
+  ADD COLUMN IF NOT EXISTS "source" TEXT,
+  ADD COLUMN IF NOT EXISTS "country" TEXT,
+  ADD COLUMN IF NOT EXISTS "device" TEXT,
+  ADD COLUMN IF NOT EXISTS "browser" TEXT,
+  ADD COLUMN IF NOT EXISTS "os" TEXT,
+  ADD COLUMN IF NOT EXISTS "loadMs" INTEGER;
+
+CREATE INDEX IF NOT EXISTS "AnalyticsEvent_createdAt_idx" ON "AnalyticsEvent"("createdAt");

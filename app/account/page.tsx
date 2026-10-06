@@ -3,11 +3,12 @@ import { ArrowLeft, ArrowRight, BadgeCheck, BriefcaseBusiness, CheckCircle2, Shi
 import { getServerSession } from "next-auth";
 import Image from "next/image";
 import Link from "next/link";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { NotificationPreferences } from "@/app/actions/accountActions";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import AuthCheck from "@/components/AuthCheck";
-import { AnalyticsSummary, type AnalyticsSummaryData } from "@/components/analytics-summary";
+import { AnalyticsSummary, type AnalyticsExclusionState, type AnalyticsSummaryData } from "@/components/analytics-summary";
 import { AccountSettingsForm } from "@/components/account-settings-form";
 import { AccountSignOutButton } from "@/components/account-signout-button";
 import { NotificationSettingsForm } from "@/components/notification-settings-form";
@@ -15,7 +16,8 @@ import { PasswordSettingsForm } from "@/components/password-settings-form";
 import { StripeSettingsCard } from "@/components/stripe-settings-card";
 import { WorkspaceAccessSwitcher } from "@/components/workspace-access-switcher";
 import { DeveloperBottomNav, TesterBottomNav } from "@/components/navigation";
-import { getAnalyticsSummary } from "@/lib/analytics";
+import { getAnalyticsSummary, parseAnalyticsRange } from "@/lib/analytics";
+import { ANALYTICS_OPT_OUT_COOKIE, clientIp, excludedIps } from "@/lib/analytics-context";
 import { prisma } from "@/lib/prisma";
 import { rankProgress } from "@/lib/rank";
 import { getStripe } from "@/lib/stripe";
@@ -42,7 +44,7 @@ function normalizeNotificationPreferences(value: unknown): NotificationPreferenc
   };
 }
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string; draft?: string; stripePayment?: string; stripeConnect?: string; referralError?: string }> }) {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string; draft?: string; stripePayment?: string; stripeConnect?: string; referralError?: string; range?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/auth/signin?callbackUrl=/account");
   const params = await searchParams;
@@ -121,8 +123,16 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     : null;
 
   let sitePerformance: AnalyticsSummaryData | null = null;
+  let analyticsExclusion: AnalyticsExclusionState | null = null;
   if (canViewSitePerformance && activeTab === "site-performance") {
-    sitePerformance = await getAnalyticsSummary();
+    const [summary, cookieStore, headerStore] = await Promise.all([getAnalyticsSummary(parseAnalyticsRange(params.range)), cookies(), headers()]);
+    const ip = clientIp(headerStore);
+    sitePerformance = summary;
+    analyticsExclusion = {
+      browserExcluded: cookieStore.get(ANALYTICS_OPT_OUT_COOKIE)?.value === "1",
+      ip,
+      ipExcluded: Boolean(ip && excludedIps().has(ip)),
+    };
   }
 
   return (
@@ -162,7 +172,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
           <section className="mt-6">
             {params.referralError === "1" ? <p role="alert" className="mb-5 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-200">Your sign-in succeeded, but the referral code could not be applied. Open Quest Center in your Tester workspace to enter a valid code. Referrals must be entered within seven days of joining and before your first approved task.</p> : null}
-            {user.role !== UserRole.ADMIN ? (
+            {activeTab === "profile" && user.role !== UserRole.ADMIN ? (
               <div className="mb-6 max-w-3xl">
                 <WorkspaceAccessSwitcher activeRole={user.role} testerEnabled={user.testerWorkspaceEnabled} developerEnabled={user.developerWorkspaceEnabled} />
               </div>
@@ -206,13 +216,13 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               </div>
             ) : null}
 
-            {activeTab === "site-performance" && sitePerformance ? (
+            {activeTab === "site-performance" && sitePerformance && analyticsExclusion ? (
               <div className="space-y-4">
                 <div>
                   <h1 className="text-2xl font-bold text-white">Site Performance</h1>
-                  <p className="mt-1 text-sm text-neutral-400">Private conversion and traffic metrics for the last 30 days.</p>
+                  <p className="mt-1 text-sm text-neutral-400">Private, privacy-safe traffic from real visitors only.</p>
                 </div>
-                <AnalyticsSummary data={sitePerformance} />
+                <AnalyticsSummary data={sitePerformance} exclusion={analyticsExclusion} />
               </div>
             ) : null}
 
