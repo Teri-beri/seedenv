@@ -30,7 +30,7 @@ export default async function StatusPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0D12] text-white [color-scheme:dark]">
-      <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+      <main id="main-content" className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
         <BackButton fallbackHref="/" className="-ml-1 mb-2" />
         <nav aria-label="Breadcrumb" className="font-mono text-xs text-zinc-500">
           <ol className="flex items-center gap-2">

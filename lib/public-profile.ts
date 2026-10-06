@@ -1,6 +1,9 @@
 import { CampaignStatus, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
+// Demo accounts created by prisma/seed.ts must never surface as real public developers.
+export const SEED_ACCOUNT_EMAIL_SUFFIX = "@seedenv.dev";
+
 const handlePattern = /^[a-zA-Z0-9_]{3,32}$/;
 
 export function normalizeProfileHandle(raw: string) {
@@ -39,6 +42,7 @@ export async function getPublicDeveloperProfile(rawHandle: string) {
   const matches = await prisma.user.findMany({
     where: {
       username: { equals: handle, mode: "insensitive" },
+      NOT: { email: { endsWith: SEED_ACCOUNT_EMAIL_SUFFIX } },
       OR: [{ role: { in: [UserRole.DEVELOPER, UserRole.ADMIN] } }, { developerWorkspaceEnabled: true }],
     },
     take: 2,

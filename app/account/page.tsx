@@ -138,7 +138,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
   return (
     <AuthCheck>
-      <main className="mobile-app-shell mobile-settings terminal-grid min-h-screen bg-[radial-gradient(circle_at_12%_0%,rgba(109,40,217,0.2),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_50%,#090A0F_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
+      <main id="main-content" className="mobile-app-shell mobile-settings terminal-grid min-h-screen bg-[radial-gradient(circle_at_12%_0%,rgba(109,40,217,0.2),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(245,158,11,0.12),transparent_24%),linear-gradient(180deg,#090A0F_0%,#10131C_50%,#090A0F_100%)] px-4 py-8 text-white sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
           <header className="mobile-settings-header flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-4">

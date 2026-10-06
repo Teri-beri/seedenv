@@ -67,7 +67,7 @@ export default function TerimusPage() {
         </div>
       </header>
 
-      <main>
+      <main id="main-content">
         <section className={`${container} py-16 sm:py-24`}>
           <p className={metaLabel}>Independent software studio · Est. 2026</p>
           <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-zinc-100 sm:text-4xl">Designing and operating focused software infrastructure.</h1>

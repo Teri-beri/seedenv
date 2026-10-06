@@ -61,23 +61,34 @@ const sections = [
     ],
   },
   {
-    title: "6. Third-Party Links & External Software",
+    title: "6. Cookies & Local Storage",
+    body: ["SeedEnv uses a small number of first-party cookies and browser storage entries that are necessary to run the Platform. We do not use advertising cookies, cross-site tracking pixels, or third-party analytics trackers."],
+    bullets: [
+      { label: "Authentication (strictly necessary)", text: "next-auth.session-token, next-auth.csrf-token, and next-auth.callback-url (prefixed with __Secure- or __Host- over HTTPS) keep you signed in, protect forms against cross-site request forgery, and return you to the right page after sign-in. They expire when you sign out or when your session ends." },
+      { label: "Analytics opt-out (functional)", text: "seedenv_analytics_optout remembers that a browser has opted out of, or is excluded from, our self-hosted, privacy-preserving visit counts. It lasts up to two years." },
+      { label: "Connected social sign-in (strictly necessary)", text: "clip-tiktok-state is a short-lived security value used only while you connect a TikTok account in Clippers. It expires after 10 minutes." },
+      { label: "Browser storage", text: "Session storage holds a random, non-identifying visit identifier used to de-duplicate page-view counts for the current tab. Local storage may hold workspace preferences you set in the developer console. Neither is shared with third parties." },
+      { label: "Your choices", text: "You can block or delete cookies in your browser settings. Blocking strictly necessary cookies will prevent you from signing in." },
+    ],
+  },
+  {
+    title: "7. Third-Party Links & External Software",
     body: ["The Platform may contain links to external developer websites, app stores, or third-party beta distribution tools (e.g., TestFlight, Google Play Internal Testing, Firebase App Distribution). We are not responsible for the privacy practices, content, or data collection policies of external developers or third-party platforms."],
   },
   {
-    title: "7. Children's Privacy",
+    title: "8. Children's Privacy",
     body: ["SeedEnv is strictly intended for individuals who are 18 years of age or older. We do not knowingly collect or solicit personal information from children under 13 (or under 16 in certain jurisdictions)."],
   },
 ];
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-screen bg-[#090A0F] px-4 py-16 text-white">
+    <main id="main-content" className="min-h-screen bg-[#090A0F] px-4 py-16 text-white">
       <article className="mx-auto max-w-4xl rounded-2xl border border-white/[0.08] bg-zinc-950/75 p-6 shadow-2xl shadow-black/80 sm:p-10">
         <a className="inline-flex items-center rounded-lg border border-white/[0.08] bg-zinc-950/70 px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white" href="/auth/signin">← Back to sign up</a>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-400">SeedEnv</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight">Privacy Policy</h1>
-        <p className="mt-3 text-sm text-zinc-500">Last Updated: October 2, 2026</p>
+        <p className="mt-3 text-sm text-zinc-500">Last Updated: October 6, 2026</p>
 
         <div className="mt-8 space-y-5 text-sm leading-7 text-zinc-400">
           <p>At <strong className="font-semibold text-zinc-200">SeedEnv</strong> (&quot;Company,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;), we respect your privacy and are committed to protecting the personal information you share with us.</p>
@@ -95,7 +106,7 @@ export default function PrivacyPage() {
           ))}
 
           <section>
-            <h2 className="text-xl font-semibold tracking-tight text-white">8. Contact Us</h2>
+            <h2 className="text-xl font-semibold tracking-tight text-white">9. Contact Us</h2>
             <p className="mt-4 text-sm leading-7 text-zinc-400">If you have questions, concerns, or requests regarding this Privacy Policy or your personal information, please contact us:</p>
             <p className="mt-3 text-sm leading-7 text-zinc-400"><strong className="font-semibold text-zinc-200">Email:</strong> <a className="text-amber-400 transition-colors hover:text-amber-300" href="mailto:terimus@seedenv.com">terimus@seedenv.com</a></p>
           </section>

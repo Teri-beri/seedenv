@@ -42,7 +42,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
   const selectedView = testerViews.find((item) => item.id === activeView) || testerViews[0];
 
   return (
-      <main className="mobile-app-shell mobile-tester-console terminal-grid min-h-screen bg-[radial-gradient(ellipse_at_top_left,rgba(109,40,217,0.16),transparent_40%),linear-gradient(180deg,#090A0F,#10131C_45%,#090A0F)] pb-28 text-white lg:pb-12">
+      <main id="main-content" className="mobile-app-shell mobile-tester-console terminal-grid min-h-screen bg-[radial-gradient(ellipse_at_top_left,rgba(109,40,217,0.16),transparent_40%),linear-gradient(180deg,#090A0F,#10131C_45%,#090A0F)] pb-28 text-white lg:pb-12">
         <header className="mobile-app-header border-b border-[#1F2430] bg-[#090A0F]/85">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
             <Link className="flex items-center gap-3" href="/">

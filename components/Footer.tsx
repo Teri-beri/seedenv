@@ -4,9 +4,9 @@ import { StatusPill } from "@/components/StatusPill";
 
 const columns = [
   { title: "Product", links: [["Live Cohorts", "/#cohorts"], ["Launch Circle", "/community"], ["Developer Platform", "/#engine"], ["Native Console (PWA)", "/#pwa"], ["Pricing Calculator", "/#pricing"]] },
-  { title: "Developers", links: [["TestFlight Setup Guide", "/docs#testflight"], ["Telemetry Format", "/docs#telemetry"], ["Escrow & Fees", "/docs#escrow"], ["Documentation", "/docs"]] },
+  { title: "Developers", links: [["TestFlight Setup Guide", "/docs#testflight"], ["Telemetry Format", "/docs#telemetry"], ["Escrow & Fees", "/docs#escrow"], ["Documentation", "/docs"], ["FAQ", "/faq"]] },
   { title: "Validators", links: [["Capability Tiers", "/#validators"], ["Payout Schedule (Stripe)", "/docs#payouts"], ["Guidelines & NDA", "/docs#guidelines"]] },
-  { title: "Trust & Legal", links: [["Terms of Service", "/terms"], ["Privacy Policy", "/privacy"], ["Security Disclosure", "/security"], ["Operational Status", "/status"]] },
+  { title: "Trust & Legal", links: [["Terms of Service", "/terms"], ["Privacy Policy", "/privacy"], ["Security Disclosure", "/security"], ["Operational Status", "/status"], ["Contact", "/contact"], ["TERIMUS LLC", "/terimus"]] },
 ];
 
 export function Footer() {

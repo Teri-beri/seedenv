@@ -39,6 +39,7 @@ const sections = [
     bullets: [
       { label: "Reward Eligibility", text: "Testers are only eligible for campaign rewards, bounties, or incentives upon meeting all verified requirements set by the Developer and approved under SeedEnv platform standards." },
       { label: "Platform Fees", text: "SeedEnv may charge platform fees, processing fees, or commissions on campaign transactions. Any applicable fees will be disclosed prior to checkout or funding." },
+      { label: "Refunds", text: "Unused tester reward funds held for a campaign (rewards not yet approved or paid) are refundable on request. Contact support at terimus@seedenv.com; requests are reviewed manually and refunded to the original payment method, less any non-recoverable payment processing fees charged by Stripe. The SeedEnv platform fee (5%, added on top of the tester reward pool at funding) is non-refundable once a campaign is funded. Rewards already approved or paid to testers cannot be refunded." },
       { label: "Fraud & Chargebacks", text: "SeedEnv reserves the right to withhold, freeze, or reverse pending payouts, rewards, or wallet balances if fraudulent activity, manipulated submissions, or abusive payment chargebacks are detected." },
       { label: "Taxes", text: "Users are solely responsible for determining and paying any applicable income, sales, or local taxes arising from payments or rewards received." },
     ],
@@ -91,12 +92,12 @@ const sections = [
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen bg-[#090A0F] px-4 py-16 text-white">
+    <main id="main-content" className="min-h-screen bg-[#090A0F] px-4 py-16 text-white">
       <article className="mx-auto max-w-4xl rounded-2xl border border-white/[0.08] bg-zinc-950/75 p-6 shadow-2xl shadow-black/80 sm:p-10">
         <a className="inline-flex items-center rounded-lg border border-white/[0.08] bg-zinc-950/70 px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white" href="/auth/signin">← Back to sign up</a>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-400">SeedEnv</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-tight">Terms of Service</h1>
-        <p className="mt-3 text-sm text-zinc-500">Last Updated: October 2, 2026</p>
+        <p className="mt-3 text-sm text-zinc-500">Last Updated: October 6, 2026</p>
 
         <div className="mt-8 space-y-5 text-sm leading-7 text-zinc-400">
           <p>Welcome to <strong className="font-semibold text-zinc-200">SeedEnv</strong> (&quot;Company,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). These Terms of Service (&quot;Terms&quot;) govern your access to and use of the SeedEnv website, applications, APIs, and related services (collectively, the &quot;Platform&quot;).</p>

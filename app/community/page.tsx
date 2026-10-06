@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { MemberShell } from "@/components/member-shell";
 import { MemberAction } from "@/components/member-action";
@@ -8,6 +9,11 @@ import { optionalCircleMember, circleAuthorSelect } from "@/lib/public-launch-ci
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Launch Circle",
+  description: "Developer launch updates, build notes, and discussion from the SeedEnv community.",
+};
 
 type FeedSort = "latest" | "discussed";
 type FeedScope = "all" | "public" | "members";

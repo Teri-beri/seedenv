@@ -13,7 +13,7 @@ export default async function AuthErrorPage({ searchParams }: { searchParams: Pr
   const message = errorCopy[code] || "SeedEnv could not complete authentication. Please try again.";
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#090A0F] px-4 py-12 text-white">
+    <main id="main-content" className="flex min-h-screen items-center justify-center bg-[#090A0F] px-4 py-12 text-white">
       <section className="w-full max-w-md rounded-xl border border-[#1F2430] bg-[#0E1017] p-10 text-center shadow-2xl shadow-black/40">
         <div className="relative mx-auto mb-6 size-20 overflow-hidden rounded-2xl border border-[#1F2430] bg-[#090A0F]">
           <Image src="/seedenv-logo-v3.png" alt="SeedEnv" fill sizes="80px" className="object-contain" priority />
