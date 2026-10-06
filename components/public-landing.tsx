@@ -36,6 +36,8 @@ type AuthRequest = { role: "DEVELOPER" | "TESTER"; callbackUrl: string; title: s
 
 const primaryAction = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
 const secondaryAction = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-[#171923] px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:border-zinc-600 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
+const headerTextLink = "inline-flex min-h-11 items-center gap-1 font-mono text-xs text-zinc-400 transition-colors hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded";
+const headerPrimaryAction = "items-center gap-1.5 rounded-lg bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold tracking-tight text-zinc-950 shadow-sm transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
 const sectionClass = "mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8";
 const labelClass = "font-mono text-xs uppercase text-zinc-400";
 const platformLabels = { TESTFLIGHT: "iOS / TestFlight", PLAY_STORE: "Android / Play Console", WEB_STAGING: "Web / PWA" };
@@ -120,21 +122,26 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
           <Link href="/" className="flex min-h-11 shrink-0 items-center gap-2 sm:gap-3" aria-label="SeedEnv home">
             <Image src="/seedenv-logo-v3.png" alt="" width={36} height={36} className="size-8 shrink-0 object-contain sm:size-9" priority />
             <span className="text-base font-semibold sm:text-lg">SeedEnv</span>
-            <span className="font-mono text-[10px] text-zinc-500 sm:text-xs">v1.2</span>
+            <span className="font-mono text-[10px] text-zinc-500 sm:text-xs lg:hidden xl:inline">v1.2</span>
           </Link>
-          <nav aria-label="Landing sections" className="hidden min-w-0 items-center justify-center gap-1 xl:flex">
-            {landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => setActiveAnchor(item.anchor)} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-2.5 text-sm transition-colors ${activeAnchor === item.anchor ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}>{item.label}</Link>)}
+          <nav aria-label="Landing sections" className="hidden min-w-0 items-center justify-center gap-0.5 lg:flex">
+            {landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => setActiveAnchor(item.anchor)} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-sm transition-colors xl:px-2.5 ${activeAnchor === item.anchor ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}>{item.label}</Link>)}
           </nav>
-          <nav className="ml-auto flex shrink-0 items-center gap-2 xl:ml-0" aria-label="Landing actions">
-            {signedIn ? <Link href={workspaceHref} className={secondaryAction}>Console <ArrowRight className="hidden size-4 sm:block" /></Link> : (
-              <button type="button" className={secondaryAction} onClick={() => setAuthRequest({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Access SeedEnv" })}>Sign In <ArrowRight className="hidden size-4 sm:block" /></button>
-            )}
-            <span className="hidden sm:inline-flex"><Link href={developerHref} className={primaryAction}>Deploy a Cohort <ArrowRight className="size-4" /></Link></span>
-            <button type="button" aria-label={mobileNavigationOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileNavigationOpen} aria-controls="landing-mobile-navigation" className="grid size-11 place-items-center rounded-lg border border-white/10 text-zinc-300 xl:hidden" onClick={() => setMobileNavigationOpen((open) => !open)}>{mobileNavigationOpen ? <X className="size-5" /> : <Menu className="size-5" />}</button>
-            <span className="hidden lg:inline-flex"><Link href="/community" className={secondaryAction}>Launch Circle</Link></span>
+          <nav className="ml-auto flex shrink-0 items-center gap-2 md:gap-4 lg:ml-0 xl:gap-6" aria-label="Landing actions">
+            <div className="hidden items-center gap-4 md:flex xl:gap-6">
+              <Link href="/community" className={headerTextLink}>Launch Circle</Link>
+              {signedIn ? (
+                <Link href={workspaceHref} className={headerTextLink}><span>Console</span><span aria-hidden="true" className="text-zinc-600">→</span></Link>
+              ) : (
+                <button type="button" className={headerTextLink} onClick={() => setAuthRequest({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Access SeedEnv" })}><span>Sign In</span><span aria-hidden="true" className="text-zinc-600">→</span></button>
+              )}
+              <div aria-hidden="true" className="h-4 w-px bg-zinc-800" />
+            </div>
+            <Link href={developerHref} className={`${headerPrimaryAction} hidden sm:inline-flex`}><span>Deploy a Cohort</span><span aria-hidden="true" className="font-bold text-zinc-600">→</span></Link>
+            <button type="button" aria-label={mobileNavigationOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileNavigationOpen} aria-controls="landing-mobile-navigation" className="grid size-11 place-items-center rounded-lg border border-white/10 text-zinc-300 lg:hidden" onClick={() => setMobileNavigationOpen((open) => !open)}>{mobileNavigationOpen ? <X className="size-5" /> : <Menu className="size-5" />}</button>
           </nav>
         </div>
-        {mobileNavigationOpen ? <nav id="landing-mobile-navigation" aria-label="Mobile landing sections" className="grid grid-cols-2 gap-2 border-t border-white/10 px-4 py-3 sm:px-6 xl:hidden">{landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => { setMobileNavigationOpen(false); setActiveAnchor(item.anchor); }} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm ${activeAnchor === item.anchor ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}>{item.label}</Link>)}<Link href={developerHref} className={`${primaryAction} col-span-2 sm:hidden`} onClick={() => setMobileNavigationOpen(false)}>Deploy a Cohort <ArrowRight className="size-4" /></Link><Link href="/community" className={`${secondaryAction} col-span-2 lg:hidden`} onClick={() => setMobileNavigationOpen(false)}>Launch Circle <ArrowRight className="size-4" /></Link></nav> : null}
+        {mobileNavigationOpen ? <nav id="landing-mobile-navigation" aria-label="Mobile landing sections" className="grid grid-cols-2 gap-2 border-t border-white/10 px-4 py-3 sm:px-6 lg:hidden">{landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => { setMobileNavigationOpen(false); setActiveAnchor(item.anchor); }} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm ${activeAnchor === item.anchor ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}>{item.label}</Link>)}<Link href={developerHref} className={`${primaryAction} col-span-2 sm:hidden`} onClick={() => setMobileNavigationOpen(false)}>Deploy a Cohort <ArrowRight className="size-4" /></Link>{signedIn ? <Link href={workspaceHref} className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Console <ArrowRight className="size-4" /></Link> : <button type="button" className={`${secondaryAction} md:hidden`} onClick={() => { setMobileNavigationOpen(false); setAuthRequest({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Access SeedEnv" }); }}>Sign In <ArrowRight className="size-4" /></button>}<Link href="/community" className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Launch Circle <ArrowRight className="size-4" /></Link></nav> : null}
       </header>
 
       <main className="terminal-grid">
