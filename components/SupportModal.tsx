@@ -1,13 +1,19 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { MessageSquare, Send, X } from "lucide-react";
+import { Send, X } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { submitSupportRequest } from "@/app/actions/enterpriseActions";
+import { SupportTrigger } from "@/components/SupportTrigger";
 import { supportCategories, type SupportRequest } from "@/lib/enterprise-rules";
+
+function isTypingTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || Boolean(target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])"));
+}
 
 export function SupportModal() {
   const { data: session, status } = useSession();
@@ -20,11 +26,21 @@ export function SupportModal() {
   const [ticketId, setTicketId] = useState("");
   const [emailNotified, setEmailNotified] = useState(false);
   const [pending, startTransition] = useTransition();
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "?" || event.metaKey || event.ctrlKey || event.altKey || event.repeat || event.defaultPrevented) return;
+      if (isTypingTarget(event.target)) return;
+      event.preventDefault();
+      setOpen((current) => !current);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
   const inputClass = "mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-[#0F1117] px-3 py-2 text-white outline-none focus:border-emerald-400";
   return <Dialog.Root open={open} onOpenChange={setOpen}>
-    <Dialog.Trigger asChild><button type="button" className="fixed bottom-4 right-4 z-40 inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/15 bg-[#171923] px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-zinc-800"><MessageSquare className="size-4" /><span className="hidden sm:inline">Support &amp; Feedback</span><span className="sr-only sm:hidden">Support &amp; Feedback</span></button></Dialog.Trigger>
+    <Dialog.Trigger asChild><SupportTrigger /></Dialog.Trigger>
     <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-50 bg-black/65" /><Dialog.Content className="fixed inset-y-0 right-0 z-50 w-full max-w-lg overflow-y-auto border-l border-white/10 bg-[#12161F] p-6 text-white focus:outline-none sm:p-8">
-      <Dialog.Title className="pr-12 text-xl font-semibold">Support &amp; Feedback</Dialog.Title>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pr-12"><Dialog.Title className="text-xl font-semibold">Support &amp; Feedback</Dialog.Title><span className="hidden font-mono text-[11px] text-zinc-500 sm:inline">[Press <kbd className="rounded border border-zinc-700 bg-zinc-800/80 px-1 text-zinc-300">?</kbd> to toggle]</span></div>
       <Dialog.Description className="mt-3 text-sm leading-6 text-zinc-400">Billing questions, cohort disputes, and technical reports. Account identity, current route, and browser/OS context accompany signed-in requests. Do not include passwords, API keys, or payment credentials.</Dialog.Description>
       {session?.user?.role === "ADMIN" ? <Link href="/admin/support" className="mt-4 inline-flex min-h-11 items-center text-sm text-emerald-300">Open Support Queue</Link> : null}
       <Dialog.Close asChild><button type="button" aria-label="Close support drawer" className="absolute right-4 top-4 grid size-11 place-items-center rounded-lg text-zinc-400 hover:bg-zinc-800"><X className="size-5" /></button></Dialog.Close>

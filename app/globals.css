@@ -345,3 +345,14 @@ select {
     scroll-snap-align: start;
   }
 }
+
+.support-trigger {
+  bottom: max(1.25rem, calc(env(safe-area-inset-bottom) + 0.5rem));
+  right: max(1.25rem, calc(env(safe-area-inset-right) + 0.5rem));
+}
+
+@media (max-width: 1023px) {
+  body:has(.mobile-app-tabbar) .support-trigger {
+    bottom: calc(var(--mobile-tabbar-height, 4.75rem) + max(0.75rem, env(safe-area-inset-bottom)));
+  }
+}
