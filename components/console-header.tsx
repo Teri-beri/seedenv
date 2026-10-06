@@ -11,7 +11,6 @@ const tabs = [
   { label: "Review Deck", href: "/console?view=review-deck", view: "review-deck" },
   { label: "Asset Vault", href: "/console?view=asset-vault", view: "asset-vault" },
   { label: "Billing", href: "/console?view=billing", view: "billing" },
-  { label: "Settings", href: "/account", view: null },
 ] as const;
 
 export function ConsoleHeader({ activeView, paymentsMode, account }: { activeView: ConsoleView; paymentsMode: "live" | "test"; account: DropdownAccount }) {
