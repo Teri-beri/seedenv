@@ -264,71 +264,69 @@ export function DeveloperInsights({
     }
   }
 
+  const reportCounts: Record<ReportFilter, number> = {
+    All: submissions.length,
+    "Pending Review": submissions.filter(
+      (submission) => submission.status === SubmissionStatus.PENDING,
+    ).length,
+    Approved: submissions.filter(
+      (submission) => submission.status === SubmissionStatus.APPROVED,
+    ).length,
+    Flagged: submissions.filter(isFlaggedSubmission).length,
+  };
+
   return (
-    <section className="space-y-5" aria-label="Developer insights">
-      <div
-        className="flex max-w-full gap-5 overflow-x-auto border-b border-white/10"
-        role="tablist"
-        aria-label="Developer workspace views"
-      >
-        {(
-          [
-            ["telemetry", "Audit Hub"],
-            ["compliance", "Play Beta Tracker"],
-            ["ecosystem", "Launch Ecosystem"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            aria-selected={tab === value}
-            className={`shrink-0 border-b-2 px-1 py-3 text-xs font-bold uppercase tracking-[0.14em] transition ${tab === value ? "border-amber-500 text-amber-300" : "border-transparent text-zinc-500 hover:text-white"}`}
-            key={value}
-            onClick={() => setTab(value)}
-            role="tab"
-            type="button"
+    <section className="space-y-4" aria-label="Developer insights">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+        <div
+          className="flex max-w-full items-center gap-4 overflow-x-auto"
+          role="tablist"
+          aria-label="Developer workspace views"
+        >
+          {(
+            [
+              ["telemetry", "Telemetry & Audit Log"],
+              ["compliance", "Play Beta Tracker"],
+              ["ecosystem", "Launch Ecosystem"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              aria-selected={tab === value}
+              className={`shrink-0 text-sm transition-colors ${tab === value ? "font-semibold text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+              key={value}
+              onClick={() => setTab(value)}
+              role="tab"
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {tab === "telemetry" ? (
+          <div
+            className="flex max-w-full items-center gap-1 overflow-x-auto"
+            role="toolbar"
+            aria-label="Filter tester reports"
           >
-            {label}
-          </button>
-        ))}
+            {(["All", "Pending Review", "Approved", "Flagged"] as const).map(
+              (filter) => (
+                <button
+                  aria-pressed={reportFilter === filter}
+                  className={`shrink-0 rounded-md px-2.5 py-1 font-mono text-xs transition-colors ${reportFilter === filter ? "bg-zinc-800/80 text-white" : "text-zinc-500 hover:text-zinc-200"}`}
+                  key={filter}
+                  onClick={() => setReportFilter(filter)}
+                  type="button"
+                >
+                  {filter} ({reportCounts[filter]})
+                </button>
+              ),
+            )}
+          </div>
+        ) : null}
       </div>
 
       {tab === "telemetry" ? (
         <div className="space-y-4">
-          <div
-            className="flex max-w-full gap-2 overflow-x-auto pb-1"
-            role="toolbar"
-            aria-label="Filter tester reports"
-          >
-            {(["All", "Pending Review", "Flagged", "Approved"] as const).map(
-              (filter) => {
-                const count =
-                  filter === "All"
-                    ? submissions.length
-                    : filter === "Pending Review"
-                      ? submissions.filter(
-                          (submission) =>
-                            submission.status === SubmissionStatus.PENDING,
-                        ).length
-                      : filter === "Approved"
-                        ? submissions.filter(
-                            (submission) =>
-                              submission.status === SubmissionStatus.APPROVED,
-                          ).length
-                        : submissions.filter(isFlaggedSubmission).length;
-                return (
-                  <button
-                    aria-pressed={reportFilter === filter}
-                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${reportFilter === filter ? "border-amber-400/40 bg-amber-500/10 text-amber-200" : "border-white/10 text-zinc-500 hover:text-white"}`}
-                    key={filter}
-                    onClick={() => setReportFilter(filter)}
-                    type="button"
-                  >
-                    {filter}
-                    <span className="ml-2 font-mono opacity-70">{count}</span>
-                  </button>
-                );
-              },
-            )}
-          </div>
           {selected ? (
             <TelemetryHub
               submissions={filteredSubmissions}
@@ -379,73 +377,18 @@ type TelemetryProps = {
 
 function AuditEmptyState({ filter }: { filter: ReportFilter }) {
   return (
-    <div className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-      <section className="luxury-panel rounded-2xl p-5">
-        <p className="text-xs uppercase tracking-[0.24em] text-amber-500">
-          Developer telemetry &amp; audit hub
-        </p>
-        <h2 className="mt-2 text-2xl font-black text-white">
-          Completed tester reports
-        </h2>
-        <p className="mt-5 rounded-xl border border-dashed border-white/15 bg-zinc-950/40 p-5 text-sm leading-6 text-zinc-400">
-          {filter === "All"
-            ? "No tester reports yet. Reports will appear here after a tester submits proof."
-            : `No reports match the ${filter} filter.`}
-        </p>
-      </section>
-      <section
-        className="luxury-panel rounded-2xl p-5"
-        aria-label="Diagnostic report schema preview"
-      >
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-amber-500">
-              Inspection schema
-            </p>
-            <h2 className="mt-2 text-2xl font-black text-white">
-              Diagnostic details
-            </h2>
-          </div>
-          <button
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-zinc-500"
-            disabled
-            type="button"
-          >
-            <ClipboardCopy className="size-3.5" /> Copy Diagnostic Payload
-            (JSON)
-          </button>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {(
-            [
-              "OS version",
-              "Device model",
-              "Screen resolution",
-              "Session duration",
-              "App build",
-              "Network type",
-            ] as const
-          ).map((label) => (
-            <div
-              className="rounded-xl border border-white/10 bg-zinc-950/45 p-3"
-              key={label}
-            >
-              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">
-                {label}
-              </p>
-              <div className="mt-3 h-3 w-2/3 animate-pulse rounded bg-white/[0.08]" />
-            </div>
-          ))}
-        </div>
-        <div className="mt-4 rounded-xl border border-white/10 bg-zinc-950/45 p-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">
-            Feedback and diagnostic logs
-          </p>
-          <div className="mt-3 h-2 w-full animate-pulse rounded bg-white/[0.07]" />
-          <div className="mt-2 h-2 w-4/5 animate-pulse rounded bg-white/[0.07]" />
-          <div className="mt-2 h-2 w-3/5 animate-pulse rounded bg-white/[0.07]" />
-        </div>
-      </section>
+    <div className="overflow-hidden rounded-xl border border-zinc-800">
+      <div className="grid grid-cols-[1.4fr_1fr_1fr_0.8fr] gap-4 border-b border-zinc-800 bg-zinc-900/40 px-4 py-2.5 font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+        <span>Submission</span>
+        <span>Cohort</span>
+        <span>Device</span>
+        <span className="text-right">Status</span>
+      </div>
+      <p className="px-6 py-12 text-center text-sm leading-6 text-zinc-500">
+        {filter === "All"
+          ? "No telemetry logs or screen recordings submitted yet. Submissions from assigned validators will appear here as they come in."
+          : `No ${filter.toLowerCase()} submissions right now.`}
+      </p>
     </div>
   );
 }
@@ -466,22 +409,22 @@ function TelemetryHub({
 }: TelemetryProps) {
   return (
     <div className="grid gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-      <div className="luxury-panel rounded-2xl p-5">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-amber-500">
-              Developer telemetry &amp; audit hub
+            <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+              Submissions
             </p>
-            <h2 className="mt-2 text-2xl font-black">Tester reports</h2>
+            <h2 className="mt-2 text-lg font-semibold tracking-tight">Tester reports</h2>
           </div>
-          <FileJson className="size-5 text-amber-500" />
+          <FileJson className="size-5 text-zinc-500" />
         </div>
         <div className="mt-5 space-y-2">
           {submissions.length ? (
             submissions.map((submission) => (
               <button
                 aria-pressed={selectedId === submission.id}
-                className={`w-full rounded-xl border p-3 text-left transition ${selectedId === submission.id ? "border-amber-400/40 bg-amber-500/10" : "border-white/10 bg-zinc-950/45 hover:border-white/20"}`}
+                className={`w-full rounded-xl border p-3 text-left transition ${selectedId === submission.id ? "border-zinc-600 bg-zinc-800/60" : "border-zinc-800 bg-zinc-950/45 hover:border-zinc-700"}`}
                 key={submission.id}
                 onClick={() => setSelectedId(submission.id)}
                 type="button"
@@ -507,21 +450,21 @@ function TelemetryHub({
               </button>
             ))
           ) : (
-            <p className="rounded-xl border border-white/10 p-5 text-sm text-zinc-500">
+            <p className="rounded-xl border border-zinc-800 p-5 text-sm text-zinc-500">
               No reports match the selected filter.
             </p>
           )}
         </div>
       </div>
-      <div className="luxury-panel rounded-2xl p-5">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
         {selected ? (
           <div>
             <header className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-amber-500">
+                <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
                   {selected.campaign.title}
                 </p>
-                <h2 className="mt-2 text-2xl font-black">Validation report</h2>
+                <h2 className="mt-2 text-lg font-semibold tracking-tight">Validation report</h2>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span
@@ -530,7 +473,7 @@ function TelemetryHub({
                   {severity.label}
                 </span>
                 <button
-                  className="inline-flex items-center gap-2 rounded-lg border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/15"
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/15"
                   onClick={copyDiagnosticPayload}
                   type="button"
                 >
@@ -550,7 +493,7 @@ function TelemetryHub({
                 ] as const
               ).map(([label, value]) => (
                 <div
-                  className="rounded-xl border border-white/10 bg-zinc-950/55 p-3"
+                  className="rounded-xl border border-zinc-800 bg-zinc-950/55 p-3"
                   key={label}
                 >
                   <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">
@@ -563,8 +506,8 @@ function TelemetryHub({
               ))}
             </div>
             <div className="mt-5 grid gap-4 lg:grid-cols-2">
-              <div className="rounded-xl border border-white/10 bg-zinc-950/55 p-4">
-                <p className="font-mono text-xs uppercase tracking-[0.14em] text-amber-500">
+              <div className="rounded-xl border border-zinc-800 bg-zinc-950/55 p-4">
+                <p className="font-mono text-xs uppercase tracking-wider text-zinc-500">
                   Tester feedback
                 </p>
                 <div className="mt-3 space-y-3 text-sm text-zinc-300">
@@ -597,7 +540,7 @@ function TelemetryHub({
                 </div>
               </div>
               <div className="space-y-4">
-                <div className="relative flex min-h-48 items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-zinc-950">
+                <div className="relative flex min-h-48 items-center justify-center overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
                   <span className="absolute left-3 top-3 rounded-full bg-black/70 px-2 py-1 font-mono text-[10px] text-zinc-400">
                     Proof media
                   </span>
@@ -621,7 +564,7 @@ function TelemetryHub({
                     </p>
                   )}
                 </div>
-                <div className="rounded-xl border border-white/10 bg-zinc-950 p-4">
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
                   <button
                     aria-expanded={logOpen}
                     className="flex w-full items-center justify-between text-left font-mono text-xs text-zinc-300"
@@ -640,7 +583,7 @@ function TelemetryHub({
                     </pre>
                   ) : null}
                   <button
-                    className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-amber-400"
+                    className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-emerald-400"
                     onClick={() => copyIssue("logs")}
                     type="button"
                   >
@@ -651,21 +594,21 @@ function TelemetryHub({
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
               <button
-                className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-amber-400/40 hover:text-white"
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white"
                 onClick={() => copyIssue("GitHub")}
                 type="button"
               >
                 <Code2 className="size-3.5" /> Copy GitHub Issue
               </button>
               <button
-                className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-amber-400/40 hover:text-white"
+                className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white"
                 onClick={() => copyIssue("Linear")}
                 type="button"
               >
                 <Send className="size-3.5" /> Copy for Linear
               </button>
               <button
-                className="inline-flex items-center gap-2 rounded-lg border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-500/20"
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15"
                 onClick={exportTelemetry}
                 type="button"
               >
@@ -674,7 +617,7 @@ function TelemetryHub({
             </div>
           </div>
         ) : (
-          <p className="rounded-xl border border-white/10 p-8 text-sm text-zinc-500">
+          <p className="rounded-xl border border-zinc-800 p-8 text-sm text-zinc-500">
             Select a report to inspect its audit details.
           </p>
         )}
@@ -807,10 +750,10 @@ function PlayTracker() {
     <section className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-amber-500">
+          <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
             Google Play beta preparation
           </p>
-          <h2 className="mt-2 text-2xl font-black text-white">
+          <h2 className="mt-2 text-lg font-semibold tracking-tight text-white">
             Readiness checklist
           </h2>
           <p className="mt-1 text-sm text-neutral-400">
@@ -819,7 +762,7 @@ function PlayTracker() {
         </div>
         <div className="flex flex-wrap gap-2">
           <a
-            className="inline-flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:border-white/20 hover:text-white"
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:border-zinc-700 hover:text-white"
             href="https://play.google.com/console"
             rel="noreferrer"
             target="_blank"
@@ -827,7 +770,7 @@ function PlayTracker() {
             <ExternalLink className="size-3.5" /> Open Play Console
           </a>
           <button
-            className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-neutral-950 transition hover:bg-amber-400"
+            className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-zinc-200"
             onClick={exportChecklist}
             type="button"
           >
@@ -837,7 +780,7 @@ function PlayTracker() {
       </header>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-white/10 bg-zinc-950/55 p-4">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/55 p-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
             Readiness items
           </p>
@@ -845,20 +788,20 @@ function PlayTracker() {
             {completedCount} / {playBetaSteps.length}
           </p>
         </div>
-        <div className="rounded-xl border border-white/10 bg-zinc-950/55 p-4">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/55 p-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
             Progress
           </p>
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-amber-500 transition-[width]"
+              className="h-full rounded-full bg-emerald-400 transition-[width]"
               style={{
                 width: `${(completedCount / playBetaSteps.length) * 100}%`,
               }}
             />
           </div>
         </div>
-        <div className="rounded-xl border border-white/10 bg-zinc-950/55 p-4">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/55 p-4">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
             Progress storage
           </p>
@@ -868,7 +811,7 @@ function PlayTracker() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-zinc-950/45">
+      <div className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950/45">
         {playBetaSteps.map((item) => (
           <label
             className="flex cursor-pointer items-start gap-3 border-b border-white/[0.06] p-4 last:border-b-0 hover:bg-white/[0.02]"
@@ -876,7 +819,7 @@ function PlayTracker() {
           >
             <input
               checked={Boolean(completed[item.id])}
-              className="mt-1 size-4 accent-amber-500"
+              className="mt-1 size-4 accent-emerald-500"
               onChange={() => toggleStep(item.id)}
               type="checkbox"
             />
@@ -899,7 +842,7 @@ function PlayTracker() {
       </p>
       {notice ? (
         <p
-          className="rounded-lg border border-white/10 bg-zinc-950/50 p-3 text-xs text-zinc-300"
+          className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3 text-xs text-zinc-300"
           role="status"
         >
           {notice}
@@ -918,13 +861,13 @@ function Ecosystem({
   items: Resource[];
 }) {
   return (
-    <section className="luxury-panel rounded-2xl p-5">
+    <section className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-amber-500">
+          <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
             Launch &amp; growth resource hub
           </p>
-          <h2 className="mt-2 text-2xl font-black">Launch Ecosystem</h2>
+          <h2 className="mt-2 text-lg font-semibold tracking-tight">Launch Ecosystem</h2>
         </div>
         <div
           className="flex flex-wrap gap-2"
@@ -942,7 +885,7 @@ function Ecosystem({
           ).map((value) => (
             <button
               aria-pressed={filter === value}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${filter === value ? "border-amber-400/40 bg-amber-500/10 text-amber-200" : "border-white/10 text-zinc-500 hover:text-white"}`}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${filter === value ? "border-zinc-600 bg-zinc-800/80 text-white" : "border-zinc-800 text-zinc-500 hover:text-white"}`}
               key={value}
               onClick={() => setFilter(value)}
               type="button"
@@ -959,11 +902,11 @@ function Ecosystem({
           const external = resource.href.startsWith("https://");
           return (
             <article
-              className="rounded-xl border border-white/10 bg-zinc-950/55 p-4 transition hover:-translate-y-0.5 hover:border-amber-400/30"
+              className="rounded-xl border border-zinc-800 bg-zinc-950/55 p-4 transition hover:-translate-y-0.5 hover:border-zinc-700"
               key={resource.name}
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="flex size-9 items-center justify-center rounded-lg border border-amber-400/20 bg-amber-500/10 text-amber-300">
+                <div className="flex size-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300">
                   <Icon className="size-4" />
                 </div>
                 <span className="rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-200">
@@ -975,7 +918,7 @@ function Ecosystem({
                 {resource.description}
               </p>
               <a
-                className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-amber-400 hover:text-amber-300"
+                className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300"
                 href={resource.href}
                 rel={external ? "noreferrer" : undefined}
                 target={external ? "_blank" : undefined}

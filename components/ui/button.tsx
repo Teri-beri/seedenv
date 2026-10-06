@@ -11,6 +11,8 @@ const buttonVariants = cva(
         primary: "border border-amber-400/30 bg-gradient-to-r from-amber-500 to-amber-600 font-semibold text-neutral-950 shadow-lg shadow-amber-500/10 transition-all hover:from-amber-400 hover:to-amber-500",
         royal: "border border-violet-400/20 bg-gradient-to-b from-royal to-royalDeep text-white shadow-[0_14px_34px_rgba(109,40,217,0.22)] hover:brightness-110",
         ghost: "border border-[#1F2430] bg-[#0E1017]/80 text-white/86 backdrop-blur-md transition-all hover:border-violet-500/30 hover:bg-white/[0.075]",
+        light: "border border-transparent bg-white text-zinc-950 hover:bg-zinc-200",
+        outline: "border border-zinc-800 bg-zinc-900/40 text-zinc-200 hover:border-zinc-700 hover:text-white",
         danger: "bg-red-500/15 text-red-200 ring-1 ring-red-400/30 hover:bg-red-500/25",
       },
       size: {

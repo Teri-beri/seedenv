@@ -2,14 +2,12 @@
 
 import { UserRole } from "@prisma/client";
 import { Boxes, BriefcaseBusiness, CreditCard, Flame, Gamepad2, LayoutDashboard, LoaderCircle, Medal, PlusCircle, Settings, ShieldCheck, Sprout, Trophy, UserRound } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useTransition } from "react";
 import { resolveTesterView } from "@/lib/tester-console";
 import { activateAccountWorkspace, type WorkspaceRole } from "@/app/actions/accountActions";
-import { Button } from "@/components/ui/button";
 
 const testerItems = [
   { label: "Discover", icon: Gamepad2, href: "/dashboard?view=discover", view: "discover" },
@@ -70,39 +68,6 @@ export function RoleSwitcher({ activeRole, testerWorkspaceEnabled, developerWork
   );
 }
 
-export function DeveloperHeader({ activeView }: { activeView: "overview" | "new-drop" | "review-deck" | "asset-vault" | "billing" }) {
-  return (
-    <header className="mobile-app-header sticky top-0 z-30 border-b border-stroke bg-obsidian/95 px-3 py-3 backdrop-blur-xl sm:px-6 lg:px-8 lg:py-4">
-      <div className="mx-auto flex max-w-7xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex shrink-0 items-center gap-3">
-          <Link href="/" aria-label="SeedEnv public landing" className="relative size-11 overflow-hidden rounded-2xl border border-stroke bg-surface shadow-[0_18px_40px_rgba(0,0,0,0.32)]">
-            <Image src="/seedenv-logo-v3.png" alt="SeedEnv" fill sizes="44px" className="object-contain" />
-          </Link>
-          <div>
-            <p className="text-xs uppercase tracking-[0.28em] text-aurum">SeedEnv</p>
-            <h1 className="text-lg font-black">Developer Console</h1>
-          </div>
-        </div>
-        <nav aria-label="Developer console sections" className="-mx-3 hidden max-w-full items-center gap-1 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex sm:gap-2 sm:px-0 sm:pb-0">
-          {developerItems.map(({ label, view, icon: Icon }) => (
-            <Button className={`shrink-0 whitespace-nowrap ${activeView === view ? "border-amber-500/40 bg-amber-500/10 text-amber-200" : ""}`} key={label} variant="ghost" size="sm" asChild>
-              <Link aria-current={activeView === view ? "page" : undefined} href={`/console?view=${view}`}>
-                <Icon className="size-4" />
-                {label}
-              </Link>
-            </Button>
-          ))}
-          <Button className="shrink-0 whitespace-nowrap" variant="ghost" size="sm" asChild>
-            <Link href="/account">
-              <Settings className="size-4" /> Account
-            </Link>
-          </Button>
-        </nav>
-      </div>
-    </header>
-  );
-}
-
 export function TesterBottomNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -136,9 +101,9 @@ export function DeveloperBottomNav() {
   const view = searchParams.get("view") || "overview";
   const items = [...developerItems.map((item) => ({ label: item.view === "overview" ? "Home" : item.view === "new-drop" ? "New" : item.view === "review-deck" ? "Review" : item.view === "asset-vault" ? "Assets" : "Billing", href: `/console?view=${item.view}`, icon: item.icon, active: pathname === "/console" && view === item.view })), { label: "Settings", href: "/account", icon: Settings, active: pathname === "/account" }];
   return (
-    <nav aria-label="Developer app navigation" className="mobile-app-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-stroke bg-obsidian/95 px-1 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl sm:hidden">
+    <nav aria-label="Developer app navigation" className="mobile-app-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-zinc-950/95 px-1 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:hidden">
       <div className="grid grid-cols-6 gap-0.5">
-        {items.map(({ label, href, icon: Icon, active }) => <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold ${active ? "bg-amber-500/10 text-amber-300" : "text-neutral-400"}`}><Icon className="size-5" />{label}</Link>)}
+        {items.map(({ label, href, icon: Icon, active }) => <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold ${active ? "bg-zinc-800/80 text-white" : "text-zinc-400"}`}><Icon className="size-5" />{label}</Link>)}
       </div>
     </nav>
   );
