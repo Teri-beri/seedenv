@@ -25,7 +25,7 @@ test("PDF receipts embed Unicode billing details and produce valid bounded pages
   const bytes = await generateInvoicePdf({ id: "receipt-test", date: new Date("2026-10-05T12:00:00Z"), amountCents: 10500, paymentReference: "pi_test", snapshot });
   assert.equal(Buffer.from(bytes).subarray(0, 5).toString(), "%PDF-");
   const pdf = await PDFDocument.load(bytes);
-  assert.equal(pdf.getTitle(), "SeedEnv receipt receipt-test");
+  assert.equal(pdf.getTitle(), "SeedEnv receipt INV-2026-PTTEST");
   assert.ok(pdf.getPageCount() >= 1);
   assert.equal(pdf.getPage(0).getWidth(), 595);
   assert.ok(bytes.length > 1000);
