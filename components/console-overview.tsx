@@ -11,6 +11,7 @@ export type ConsoleMetrics = {
   verifiedValidators: number;
   escrowCommittedCents: number;
   platformFeePercent: number;
+  balanceCents: number;
 };
 
 export type ConsoleCohort = {
@@ -42,13 +43,13 @@ export function ConsoleMetricStrip({ metrics }: { metrics: ConsoleMetrics }) {
     { label: "Active cohorts", value: metrics.activeCohorts.toLocaleString(), detail: `${plural(metrics.runsInProgress, "run")} in progress` },
     { label: "Pending audits", value: metrics.pendingAudits.toLocaleString(), detail: metrics.pendingAudits ? `${plural(metrics.pendingAudits, "submission")} awaiting review` : "All submissions cleared" },
     { label: "Verified validators", value: metrics.verifiedValidators.toLocaleString(), detail: "Testers with approved reports" },
-    { label: "Total charged", value: formatCents(metrics.escrowCommittedCents), detail: `Net of refunds · ${Math.round(metrics.platformFeePercent * 100)}% fee, $15 min per custom drop` },
-  ];
+    { label: "Prepaid balance", value: formatCents(metrics.balanceCents), detail: `${formatCents(metrics.escrowCommittedCents)} spent on testers, net of refunds`, href: "/console?view=billing" },
+  ] as Array<{ label: string; value: string; detail: string; href?: string }>;
   return (
     <section aria-label="Console metrics" className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
       {cards.map((card) => (
         <div key={card.label} className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4">
-          <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">{card.label}</p>
+          <p className="flex items-center justify-between gap-2 font-mono text-[11px] uppercase tracking-wider text-zinc-500">{card.label}{card.href ? <a href={card.href} className="normal-case tracking-normal text-emerald-400 hover:text-emerald-300">Add funds</a> : null}</p>
           <p className="mt-2 font-mono text-2xl font-semibold tracking-tight text-zinc-100">{card.value}</p>
           <p className="mt-1 truncate text-xs text-zinc-500">{card.detail}</p>
         </div>

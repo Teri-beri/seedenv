@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { DeveloperInsights, type InsightSubmission } from "@/components/developer-insights";
 import { formatCents } from "@/lib/utils";
 import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templates";
-import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, projectPerTesterCharges, quoteCampaignFunding, type CohortTypeKey } from "@/lib/pricing";
+import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, projectPerTesterCharges, quoteCampaignFunding, quoteTopUp, topUpForShortfall, type CohortTypeKey } from "@/lib/pricing";
 
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
@@ -89,7 +89,7 @@ const optionStyle = { backgroundColor: "#0E1017", color: "#F8FAFC" };
 
 export type DeveloperStudioView = "overview" | "new-drop" | "review-deck" | "asset-vault";
 
-export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, initialCohortType, view }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView }) {
+export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0 }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [highestStep, setHighestStep] = useState(1);
@@ -147,7 +147,18 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const activeBundle = isBundleType(form.cohortType) ? COHORT_BUNDLES[form.cohortType] : null;
   const totalEscrow = fundingQuote.totalBudgetUsd;
   const platformFee = fundingQuote.platformFeeUsd;
+  const [topUpTesters, setTopUpTesters] = useState(5);
+  const topUpOptions = useMemo(() => {
+    const stipendCents = Math.round(form.bountyPerTaskUsd * 100);
+    return [...new Set([1, 5, 10, form.totalSlots].filter((count) => count <= form.totalSlots))].map((count) => {
+      const needed = projectPerTesterCharges(count, stipendCents).maxTotalCents - balanceCents;
+      const creditCents = topUpForShortfall(needed);
+      return { count, creditCents, quote: quoteTopUp(creditCents) };
+    });
+  }, [form.totalSlots, form.bountyPerTaskUsd, balanceCents]);
+  const chosenTopUp = topUpOptions.find((option) => option.count === topUpTesters) || topUpOptions[0];
   const perTester = useMemo(() => projectPerTesterCharges(form.totalSlots, Math.round(form.bountyPerTaskUsd * 100)), [form.totalSlots, form.bountyPerTaskUsd]);
+  const needsTopUp = !activeBundle && (perTester.firstCharge?.totalCents ?? 0) > balanceCents;
   const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
   const testerFundingShare = totalEscrow > 0 ? (fundingQuote.payoutPoolUsd / totalEscrow * 100).toFixed(2) : "0.00";
 
@@ -273,7 +284,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     setMessage(null);
     startTransition(async () => {
       try {
-        const result = await createCampaignWithEscrow(form, draftId);
+        const result = await createCampaignWithEscrow(form, draftId, needsTopUp && chosenTopUp ? { topUpCents: chosenTopUp.creditCents } : undefined);
         if (result.requiresPaymentSetup) {
           router.push(`/account?tab=portfolio&draft=${encodeURIComponent(result.campaignId)}#stripe-setup`);
           return;
@@ -527,25 +538,39 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               ) : (
                 <>
                   <div className="grid gap-3 md:grid-cols-3">
-                    <Metric label="Charged now" value="$0.00" />
+                    <Metric label="Prepaid balance" value={usd(balanceCents)} />
                     <Metric label="Per accepted tester" value={perTester.typicalCharge ? usd(perTester.typicalCharge.totalCents) : "$0.00"} />
                     <Metric label={`Maximum if all ${form.totalSlots} fill`} value={usd(perTester.maxTotalCents)} gold />
                   </div>
                   <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 font-mono text-xs text-zinc-400">
                     <p className="mb-2 text-[11px] uppercase tracking-wider text-zinc-500">Full cohort breakdown</p>
                     <dl className="space-y-1.5">
-                      <div className="flex justify-between"><dt>Tester stipends ({form.totalSlots} × ${form.bountyPerTaskUsd.toFixed(2)})</dt><dd className="text-zinc-200">{usd(perTester.stipendCents)}</dd></div>
+                      <div className="flex justify-between"><dt>Tester rewards ({form.totalSlots} × ${form.bountyPerTaskUsd.toFixed(2)})</dt><dd className="text-zinc-200">{usd(perTester.stipendCents)}</dd></div>
                       <div className="flex justify-between"><dt>Platform fee ({COHORT_PLATFORM_FEE_RATE * 100}%, ${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum)</dt><dd className="text-zinc-200">{usd(perTester.platformFeeCents)}</dd></div>
-                      <div className="flex justify-between"><dt>Card processing (Stripe 2.9% + 30¢ per charge)</dt><dd className="text-zinc-200">{usd(perTester.processingFeeCents)}</dd></div>
-                      <div className="flex justify-between border-t border-zinc-800 pt-1.5"><dt className="text-zinc-300">Maximum total</dt><dd className="text-emerald-400">{usd(perTester.maxTotalCents)}</dd></div>
+                      <div className="flex justify-between border-t border-zinc-800 pt-1.5"><dt className="text-zinc-300">Maximum drawn from balance</dt><dd className="text-emerald-400">{usd(perTester.maxTotalCents)}</dd></div>
                     </dl>
                     {perTester.firstCharge && perTester.typicalCharge && perTester.firstCharge.totalCents !== perTester.typicalCharge.totalCents ? (
-                      <p className="mt-3 text-[11px] leading-5 text-zinc-500">The first accepted tester is charged {usd(perTester.firstCharge.totalCents)} because it carries the ${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum fee; each tester after is about {usd(perTester.typicalCharge.totalCents)}.</p>
+                      <p className="mt-3 text-[11px] leading-5 text-zinc-500">The first accepted tester draws {usd(perTester.firstCharge.totalCents)} because it carries the ${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum fee; each tester after is about {usd(perTester.typicalCharge.totalCents)}.</p>
                     ) : null}
                   </div>
-                  <p className="text-xs leading-5 text-white/50">Nothing is charged at launch. Your saved card is charged each time you accept a tester, so you only pay for testers who actually join. Slots freed by withdrawn or rejected testers are reused before any new charge. Ending the cohort, or 30 days passing, refunds paid slots nobody used (stipend + platform fee; card processing is non-refundable).</p>
+                  {needsTopUp ? (
+                    <fieldset className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+                      <legend className="px-1 font-mono text-[11px] uppercase tracking-wider text-zinc-500">Top up to launch</legend>
+                      <p className="text-xs leading-5 text-zinc-400">Your balance doesn&apos;t cover the first tester yet. Add funds once, then each accepted tester draws from the balance with no further card charges.</p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {topUpOptions.map((option) => (
+                          <label key={option.count} className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs transition-colors ${chosenTopUp?.count === option.count ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200" : "border-zinc-800 text-zinc-300 hover:border-zinc-600"}`}>
+                            <span className="flex items-center gap-2"><input type="radio" name="top-up" className="accent-emerald-500" checked={chosenTopUp?.count === option.count} onChange={() => setTopUpTesters(option.count)} />{option.count === form.totalSlots ? `Full cohort (${option.count})` : `${option.count} tester${option.count === 1 ? "" : "s"}`}</span>
+                            <span className="font-mono">{usd(option.creditCents)}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {chosenTopUp ? <p className="mt-3 font-mono text-[11px] text-zinc-500">{usd(chosenTopUp.quote.creditCents)} credit + {usd(chosenTopUp.quote.processingFeeCents)} card processing (Stripe 2.9% + 30¢, once per top-up) = <span className="text-zinc-200">{usd(chosenTopUp.quote.totalCents)}</span></p> : null}
+                    </fieldset>
+                  ) : null}
+                  <p className="text-xs leading-5 text-white/50">You only pay for testers who actually join: each accepted tester draws their reward plus the platform fee from your prepaid balance. Places freed by withdrawn or rejected testers are reused first. Ending the cohort, or 30 days passing, returns unused places to your balance, and you can refund your balance to your card any time (card processing is non-refundable).</p>
                   <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending}>
-                    <BadgeDollarSign className="size-5" /> Launch Cohort · no charge now
+                    <BadgeDollarSign className="size-5" /> {needsTopUp && chosenTopUp ? `Add ${usd(chosenTopUp.creditCents)} & Launch` : "Launch Cohort"}
                   </Button>
                 </>
               )}

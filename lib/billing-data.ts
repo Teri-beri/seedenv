@@ -13,6 +13,14 @@ export type BillingOverview = {
   billingDetails: BillingDetails;
   paymentMethod: PaymentMethodSummary;
   paymentMethodUnavailable: boolean;
+  balance: FundingBalanceSummary;
+};
+
+export type FundingBalanceSummary = {
+  balanceCents: number;
+  autoReloadCents: number;
+  pendingTopUps: number;
+  withdrawals: Array<{ id: string; amountCents: number; status: TransactionStatus; createdAt: string }>;
 };
 
 const emptyBillingDetails: BillingDetails = { companyName: "", taxId: "", billingEmail: "", addressLine1: "", addressLine2: "", city: "", region: "", postalCode: "", country: "US" };
@@ -33,13 +41,13 @@ async function loadDefaultPaymentMethod(stripeCustomerId: string | null): Promis
 
 export async function getBillingOverview(userId: string, stripeCustomerId: string | null): Promise<BillingOverview> {
   const depositScope = { userId, type: TransactionType.ESCROW_DEPOSIT };
-  const [transactions, fees, awaiting, fundedCampaigns, settled, profile, payment] = await Promise.all([
+  const [transactions, fees, awaiting, fundedCampaigns, settled, profile, payment, member, pendingTopUps, withdrawals] = await Promise.all([
     prisma.walletTransaction.findMany({
-      where: depositScope,
+      where: { userId, type: { in: [TransactionType.ESCROW_DEPOSIT, TransactionType.BALANCE_TOPUP] } },
       orderBy: { createdAt: "desc" },
       take: 200,
       select: {
-        id: true, amountCents: true, status: true, platformFeeCents: true, invoiceSnapshot: true, campaignId: true, createdAt: true,
+        id: true, type: true, stripePaymentId: true, amountCents: true, status: true, platformFeeCents: true, invoiceSnapshot: true, campaignId: true, createdAt: true,
         campaign: { select: { id: true, title: true, platform: true, status: true } },
       },
     }),
@@ -52,6 +60,9 @@ export async function getBillingOverview(userId: string, stripeCustomerId: strin
     prisma.submission.aggregate({ where: { status: SubmissionStatus.APPROVED, campaign: { developerId: userId } }, _sum: { payoutCents: true }, _count: true }),
     prisma.billingProfile.findUnique({ where: { userId } }),
     loadDefaultPaymentMethod(stripeCustomerId),
+    prisma.user.findUnique({ where: { id: userId }, select: { fundingBalanceCents: true, autoReloadCents: true } }),
+    prisma.balanceTopUp.count({ where: { userId, status: "PENDING", source: "CHECKOUT", stripeCheckoutSessionId: { not: null } } }),
+    prisma.walletTransaction.findMany({ where: { userId, type: TransactionType.BALANCE_WITHDRAWAL }, orderBy: { createdAt: "desc" }, take: 5, select: { id: true, amountCents: true, status: true, createdAt: true } }),
   ]);
 
   const approvedByCampaign = fundedCampaigns.length
@@ -80,5 +91,11 @@ export async function getBillingOverview(userId: string, stripeCustomerId: strin
       : emptyBillingDetails,
     paymentMethod: payment.method,
     paymentMethodUnavailable: payment.unavailable,
+    balance: {
+      balanceCents: member?.fundingBalanceCents ?? 0,
+      autoReloadCents: member?.autoReloadCents ?? 0,
+      pendingTopUps,
+      withdrawals: withdrawals.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
+    },
   };
 }

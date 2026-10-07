@@ -1,7 +1,8 @@
 import type { CampaignStatus, PlatformType, TransactionStatus } from "@prisma/client";
 import { invoiceSnapshotSchema, invoiceTotalMatches } from "@/lib/enterprise-rules";
 
-export type EscrowStatus = "ESCROW_ACTIVE" | "SETTLED" | "AWAITING_PAYMENT" | "FAILED";
+export type EscrowStatus = "ESCROW_ACTIVE" | "SETTLED" | "AWAITING_PAYMENT" | "FAILED" | "CREDITED";
+export type InvoiceKind = "COHORT" | "SLOT" | "SLOT_FROM_BALANCE" | "TOP_UP";
 
 export type InvoiceLedgerRow = {
   id: string;
@@ -14,6 +15,7 @@ export type InvoiceLedgerRow = {
   feeCents: number;
   processingFeeCents: number;
   totalCents: number;
+  kind: InvoiceKind;
   escrowStatus: EscrowStatus;
   downloadable: boolean;
 };
@@ -43,12 +45,18 @@ export function buildInvoiceLedgerRow(transaction: {
   invoiceSnapshot: unknown;
   campaignId: string | null;
   createdAt: Date;
+  type?: string;
+  stripePaymentId?: string | null;
   campaign: { id: string; title: string; platform: PlatformType; status: CampaignStatus } | null;
 }): InvoiceLedgerRow {
   const snapshot = invoiceSnapshotSchema.safeParse(transaction.invoiceSnapshot);
   const feeCents = snapshot.success ? snapshot.data.platformFeeCents : transaction.platformFeeCents || 0;
   const processingFeeCents = snapshot.success ? snapshot.data.processingFeeCents ?? 0 : 0;
   const testerPoolCents = snapshot.success ? snapshot.data.rewardPoolCents : Math.max(0, transaction.amountCents - feeCents);
+  const snapshotKind = snapshot.success ? snapshot.data.kind ?? (snapshot.data.processingFeeCents === undefined ? "COHORT" : "SLOT") : "COHORT";
+  const kind: InvoiceKind = transaction.type === "BALANCE_TOPUP" || snapshotKind === "TOP_UP"
+    ? "TOP_UP"
+    : snapshotKind === "SLOT" && transaction.stripePaymentId === null ? "SLOT_FROM_BALANCE" : snapshotKind;
   return {
     id: transaction.id,
     invoiceNumber: invoiceNumber(transaction.id, transaction.createdAt),
@@ -60,7 +68,8 @@ export function buildInvoiceLedgerRow(transaction: {
     feeCents,
     processingFeeCents,
     totalCents: transaction.amountCents,
-    escrowStatus: escrowStatusFor(transaction.status, transaction.campaign?.status),
+    kind,
+    escrowStatus: kind === "TOP_UP" && transaction.status === "COMPLETED" ? "CREDITED" : escrowStatusFor(transaction.status, transaction.campaign?.status),
     downloadable: transaction.status === "COMPLETED" && snapshot.success && invoiceTotalMatches(snapshot.data, transaction.amountCents),
   };
 }

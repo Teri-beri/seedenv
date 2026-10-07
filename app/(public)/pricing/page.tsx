@@ -1,19 +1,21 @@
 import Link from "next/link";
 import { PricingCalculator } from "@/components/PricingCalculator";
 import { publicPageMetadata } from "@/lib/seo";
-import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, projectPerTesterCharges } from "@/lib/pricing";
+import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, cardProcessingFeeCents, projectPerTesterCharges } from "@/lib/pricing";
 
 const feePercent = Math.round(COHORT_PLATFORM_FEE_RATE * 100);
 const minFee = COHORT_MIN_PLATFORM_FEE_CENTS / 100;
 const playBundle = COHORT_BUNDLES.GOOGLE_PLAY_14_DAY;
 const flashBundle = COHORT_BUNDLES.LIVE_STRESS_DROP;
 
-export const metadata = publicPageMetadata("Pricing", `Browse SeedEnv for free. Custom tester cohorts launch free and charge per accepted tester (${feePercent}% platform fee, $${minFee} minimum); Google Play 14-day closed tests are $199 flat.`, "/pricing");
+export const metadata = publicPageMetadata("Pricing", `Browse SeedEnv for free. Custom tester cohorts draw from a refundable prepaid balance only for testers you accept (${feePercent}% platform fee, $${minFee} minimum); Google Play 14-day closed tests are $199 flat.`, "/pricing");
 
 export default function PricingPage() {
   const example = projectPerTesterCharges(25, 400);
   const small = projectPerTesterCharges(10, 400);
   const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+  const exampleProcessing = cardProcessingFeeCents(example.maxTotalCents);
+  const smallProcessing = cardProcessingFeeCents(small.maxTotalCents);
 
   return (
     <>
@@ -22,12 +24,13 @@ export default function PricingPage() {
       <div className="my-8 max-w-2xl"><PricingCalculator href="/auth/signin?role=DEVELOPER&callbackUrl=%2Fconsole%3Fview%3Dnew-drop" /></div>
 
       <h2>Custom Mission Drop</h2>
-      <p>Choose the number of testers and the reward per tester. Launching is free with a saved card: you are charged only when you accept a tester, so you never pay for places that don&apos;t fill. Each charge is that tester&apos;s reward, a {feePercent}% platform fee (with a ${minFee}.00 minimum per cohort, collected on the first accepted tester), and card processing (Stripe&apos;s 2.9% + 30¢) listed separately. Fees are never deducted from the advertised tester reward.</p>
+      <p>Choose the number of testers and the reward per tester. You fund a <strong>prepaid balance</strong> (top-ups from $10) instead of paying the whole budget up front. Each time you accept a tester, their reward plus a {feePercent}% platform fee (with a ${minFee}.00 minimum per cohort, taken with the first accepted tester) is drawn from the balance, with no card charge per tester. Card processing (Stripe&apos;s 2.9% + 30¢) is charged once per top-up and listed separately. Fees are never deducted from the advertised tester reward.</p>
       <dl className="mt-6 grid max-w-2xl grid-cols-[1fr_auto] gap-4 border-y border-white/10 py-6 text-sm sm:text-base">
-        <dt className="text-neutral-300">25 testers × $4, all accepted</dt><dd>{usd(example.stipendCents)} + {usd(example.platformFeeCents)} fee + {usd(example.processingFeeCents)} processing = <span className="font-semibold text-emerald-300">{usd(example.maxTotalCents)}</span></dd>
-        <dt className="text-neutral-300">10 testers × $4 (minimum fee applies)</dt><dd>{usd(small.stipendCents)} + {usd(small.platformFeeCents)} fee + {usd(small.processingFeeCents)} processing = <span className="font-semibold text-emerald-300">{usd(small.maxTotalCents)}</span></dd>
+        <dt className="text-neutral-300">25 testers × $4, all accepted</dt><dd>{usd(example.stipendCents)} + {usd(example.platformFeeCents)} fee + {usd(exampleProcessing)} processing (one top-up) = <span className="font-semibold text-emerald-300">{usd(example.maxTotalCents + exampleProcessing)}</span></dd>
+        <dt className="text-neutral-300">10 testers × $4 (minimum fee applies)</dt><dd>{usd(small.stipendCents)} + {usd(small.platformFeeCents)} fee + {usd(smallProcessing)} processing (one top-up) = <span className="font-semibold text-emerald-300">{usd(small.maxTotalCents + smallProcessing)}</span></dd>
       </dl>
-      <p><strong>If testers don&apos;t show up:</strong> a paid place freed by a tester who withdraws, misses the 24-hour start window or is rejected is reused for your next acceptance before any new charge. End the cohort at any time, or let it reach its 30-day expiry, and every paid place nobody is using is refunded automatically (reward + platform fee; card processing is non-refundable). Testers already working are still paid for approved work.</p>
+      <p><strong>If testers don&apos;t show up:</strong> a paid place freed by a tester who withdraws, misses the 24-hour start window or is rejected is reused for your next acceptance before anything new is drawn. End the cohort at any time, or let it reach its 30-day expiry, and every paid place nobody is using goes back to your balance automatically (reward + platform fee). Testers already working are still paid for approved work.</p>
+      <p><strong>Your balance is yours:</strong> reuse it for your next cohort, or refund it to your card from Billing at any time. Only the card processing on past top-ups is non-refundable. Optional auto-reload tops up your saved card when an acceptance would exceed your balance.</p>
 
       <h2 id="google-play">{playBundle.name} — $199 flat</h2>
       <p>Google requires new personal developer accounts to run a closed test with at least 12 opted-in testers for 14 continuous days before applying for production access. This bundle recruits {playBundle.slots} testers ({playBundle.slots} × ${(playBundle.bountyCents / 100).toFixed(2)} = ${(playBundle.slots * playBundle.bountyCents / 100).toFixed(2)} in tester rewards, plus a ${(playBundle.platformFeeCents / 100).toFixed(2)} platform fee).</p>

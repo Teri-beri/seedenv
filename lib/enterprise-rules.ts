@@ -20,6 +20,7 @@ export const invoiceSnapshotSchema = z.object({
   rewardPoolCents: z.number().int().nonnegative(),
   platformFeeCents: z.number().int().nonnegative(),
   processingFeeCents: z.number().int().nonnegative().optional(),
+  kind: z.enum(["COHORT", "SLOT", "TOP_UP"]).optional(),
   company: billingDetailsSchema.nullable(),
 });
 export type InvoiceSnapshot = z.infer<typeof invoiceSnapshotSchema>;

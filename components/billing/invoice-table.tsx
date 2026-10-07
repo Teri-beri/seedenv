@@ -11,6 +11,7 @@ const statusChip: Record<EscrowStatus, { label: string; className: string }> = {
   SETTLED: { label: "Settled", className: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" },
   AWAITING_PAYMENT: { label: "Awaiting Payment", className: "border-zinc-700 bg-zinc-800/60 text-zinc-400" },
   FAILED: { label: "Failed", className: "border-red-500/20 bg-red-500/10 text-red-400" },
+  CREDITED: { label: "Credited", className: "border-sky-500/20 bg-sky-500/10 text-sky-400" },
 };
 
 const dateInputClass = "h-8 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 font-mono text-xs text-zinc-300 outline-none transition-colors focus:border-zinc-600 [color-scheme:dark]";
@@ -39,8 +40,8 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
     <section className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/30">
       <div className="flex flex-col gap-3 border-b border-zinc-800 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-zinc-100">Cohort Escrow Invoices</h3>
-          <p className="mt-0.5 text-xs text-zinc-500">One receipt per funded cohort. PDF receipts are issued by TERIMUS LLC once Stripe confirms payment.</p>
+          <h3 className="text-sm font-semibold text-zinc-100">Receipts</h3>
+          <p className="mt-0.5 text-xs text-zinc-500">Card payments (balance top-ups and bundles) and each tester place drawn from your balance. PDF receipts are issued by TERIMUS LLC.</p>
         </div>
         {invoices.length ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -71,11 +72,11 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
             <thead>
               <tr className="whitespace-nowrap border-b border-zinc-800 font-mono text-[11px] uppercase tracking-wider text-zinc-500">
                 <th className="px-5 py-2.5 font-medium">Invoice</th>
-                <th className="px-3 py-2.5 font-medium">Cohort</th>
+                <th className="px-3 py-2.5 font-medium">Item</th>
                 <th className="px-3 py-2.5 font-medium">Date</th>
-                <th className="px-3 py-2.5 text-right font-medium">Tester Pool</th>
+                <th className="px-3 py-2.5 text-right font-medium">Rewards / Credit</th>
                 <th className="px-3 py-2.5 text-right font-medium">Fee</th>
-                <th className="px-3 py-2.5 text-right font-medium">Total Charged</th>
+                <th className="px-3 py-2.5 text-right font-medium">Total</th>
                 <th className="px-3 py-2.5 font-medium">Status</th>
                 <th className="px-5 py-2.5 text-right font-medium"><span className="sr-only">Receipt</span></th>
               </tr>
@@ -96,7 +97,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
                     <td className="whitespace-nowrap px-3 py-3 font-mono text-xs text-zinc-400">{formatDate(invoice.date)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-xs text-zinc-300">{formatCents(invoice.testerPoolCents)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-xs text-zinc-500">{formatCents(invoice.feeCents)}{invoice.processingFeeCents ? <span className="block text-[10px] text-zinc-600">+{formatCents(invoice.processingFeeCents)} card</span> : null}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-sm font-semibold text-zinc-100">{formatCents(invoice.totalCents)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-sm font-semibold text-zinc-100">{formatCents(invoice.totalCents)}{invoice.kind === "SLOT_FROM_BALANCE" ? <span className="block text-[10px] font-normal text-zinc-600">from balance</span> : invoice.kind === "TOP_UP" ? <span className="block text-[10px] font-normal text-zinc-600">card</span> : null}</td>
                     <td className="whitespace-nowrap px-3 py-3"><span className={`inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${chip.className}`}>{chip.label}</span></td>
                     <td className="whitespace-nowrap px-5 py-3 text-right">
                       {invoice.downloadable ? (

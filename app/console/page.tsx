@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import AuthCheck from "@/components/AuthCheck";
+import { BalanceCard } from "@/components/billing/balance-card";
 import { BillingMetrics } from "@/components/billing/billing-metrics";
 import { BillingInfoForm, PaymentMethodCard } from "@/components/billing/billing-profile";
 import { InvoiceTable } from "@/components/billing/invoice-table";
@@ -27,7 +28,7 @@ const consoleViews = ["overview", "new-drop", "review-deck", "asset-vault", "bil
 type ConsoleView = (typeof consoleViews)[number];
 const reviewPageSize = 20;
 
-export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string; stripePayment?: string; cohort?: string; launched?: string }> }) {
+export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string; stripePayment?: string; cohort?: string; launched?: string; topup?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "DEVELOPER") redirect("/");
@@ -36,7 +37,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
 
   const security = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { passwordHash: true, role: true, username: true, email: true, avatarUrl: true, stripeCustomerId: true, companyName: true, billingProfile: { select: { companyName: true } }, _count: { select: { accounts: true } } },
+    select: { passwordHash: true, role: true, username: true, email: true, avatarUrl: true, stripeCustomerId: true, fundingBalanceCents: true, companyName: true, billingProfile: { select: { companyName: true } }, _count: { select: { accounts: true } } },
   });
   if (security && !security.passwordHash && security._count.accounts === 0) redirect("/onboarding/setup?next=/console");
   const ownerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();
@@ -126,6 +127,9 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   const checkoutCampaign = activeView === "billing" && params.campaign
     ? await prisma.appCampaign.findFirst({ where: { id: params.campaign, developerId: session.user.id }, select: { title: true, status: true } })
     : null;
+  const launchedCampaign = overview && params.launched
+    ? await prisma.appCampaign.findFirst({ where: { id: params.launched, developerId: session.user.id }, select: { title: true, status: true } })
+    : null;
   const testDraftCampaign = activeView === "billing" && params.testDraft
     ? await prisma.appCampaign.findFirst({ where: { id: params.testDraft, developerId: session.user.id, status: CampaignStatus.DRAFT }, select: { title: true } })
     : null;
@@ -163,18 +167,18 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {overview ? <>
-          {params.launched ? <p className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">Cohort launched with no charge. Your saved card is charged only when you accept a tester from Applications.</p> : null}
-          <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: COHORT_PLATFORM_FEE_RATE }} />
+          {params.launched ? <p className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">{launchedCampaign?.status === CampaignStatus.ESCROW_PENDING ? `${launchedCampaign.title} goes live as soon as Stripe confirms your top-up, usually within a few seconds. Refresh shortly.` : "Cohort launched. Each tester you accept in Applications draws their reward and the platform fee from your prepaid balance."}</p> : null}
+          <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: COHORT_PLATFORM_FEE_RATE, balanceCents: security?.fundingBalanceCents ?? 0 }} />
           <ActiveCohorts cohorts={cohortRows} total={activeCohortCount} />
         </> : null}
-        {activeView !== "billing" ? <DeveloperStudio key={launchDraft?.id || "new-drop"} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} /> : null}
+        {activeView !== "billing" ? <DeveloperStudio key={launchDraft?.id || "new-drop"} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} /> : null}
 
         {billing ? <section className="space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="font-mono text-xs uppercase tracking-wider text-zinc-500">Billing</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-zinc-100">Escrow, payments &amp; invoices</h2>
-              <p className="mt-1 text-sm text-zinc-400">Per-tester charges, bundle payments, refunds, and downloadable receipts.</p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-zinc-100">Balance, payments &amp; receipts</h2>
+              <p className="mt-1 text-sm text-zinc-400">Prepaid balance, tester places drawn from it, bundle payments, refunds, and downloadable receipts.</p>
             </div>
             <a className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200" href="/console?view=new-drop">
               <Plus className="size-3.5" /> Fund New Cohort
@@ -184,6 +188,10 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
           {params.escrow === "success" ? <p className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">{checkoutCampaign?.status === CampaignStatus.ACTIVE ? `Payment confirmed for ${checkoutCampaign.title}; the drop is active.` : `Checkout returned${checkoutCampaign ? ` for ${checkoutCampaign.title}` : ""}. Escrow remains pending until Stripe confirms the payment.`}</p> : null}
           {params.escrow === "cancelled" ? <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-200" role="status">Checkout was cancelled{checkoutCampaign ? ` for ${checkoutCampaign.title}` : ""}. No payment was confirmed.</p> : null}
           {testDraftCampaign ? <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-100" role="status">Test draft saved for {testDraftCampaign.title}. No payment was taken, and it is not available to testers.</p> : null}
+
+          {params.topup === "cancelled" && checkoutCampaign ? <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-200" role="status">Top-up cancelled, so {checkoutCampaign.title} is not live yet. It returns to your drafts within about an hour; nothing was charged.</p> : null}
+
+          <BalanceCard {...billing.balance} hasCard={Boolean(billing.paymentMethod)} topUpResult={checkoutCampaign ? undefined : params.topup} />
 
           <BillingMetrics metrics={billing.metrics} />
 

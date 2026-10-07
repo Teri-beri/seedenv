@@ -1,13 +1,11 @@
-import { CampaignStatus, Prisma, type SlotChargeStatus, TransactionStatus, TransactionType } from "@prisma/client";
-import { billingDetailsSchema } from "@/lib/enterprise-rules";
+import { CampaignStatus, Prisma, TransactionStatus, TransactionType } from "@prisma/client";
+import { autoReloadBalance, billingCompanySnapshot, sweepStaleTopUps } from "@/lib/funding-balance";
 import { quoteSlotCharge, type SlotChargeQuote } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
 import { serializable } from "@/lib/quest-ledger";
 import { startWindowHours } from "@/lib/quest-rules";
 import { getStripe } from "@/lib/stripe";
 import { formatCents, usdToCents } from "@/lib/utils";
-
-export const STALE_SLOT_CHARGE_MS = 15 * 60 * 1000;
 
 type CampaignWindow = { status: CampaignStatus; cancelledAt: Date | null; expiresAt: Date };
 
@@ -34,59 +32,6 @@ async function activeHolds(tx: Prisma.TransactionClient, campaignId: string) {
   return tx.missionApplication.count({ where: { campaignId, status: "ACCEPTED", startBy: { gt: new Date() } } });
 }
 
-function stripeErrorCode(error: unknown) {
-  return typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code || "") : "";
-}
-
-function declineMessage(code: string) {
-  if (code === "authentication_required") return "Your bank asked for card authentication, which can't happen automatically. Update your card in Billing and accept again.";
-  if (code === "card_declined" || code === "insufficient_funds" || code === "expired_card") return "Your card was declined, so this tester was not accepted. Update your card in Billing and try again.";
-  return "We couldn't charge your saved card, so this tester was not accepted. Check your card in Billing and try again.";
-}
-
-async function savedPaymentMethod(stripeCustomerId: string | null) {
-  if (!stripeCustomerId) return null;
-  try {
-    const customer = await getStripe().customers.retrieve(stripeCustomerId);
-    if (customer.deleted) return null;
-    const method = customer.invoice_settings.default_payment_method;
-    return typeof method === "string" ? method : method?.id || null;
-  } catch {
-    return null;
-  }
-}
-
-async function recordSucceededCharge(tx: Prisma.TransactionClient, chargeId: string, paymentIntentId: string) {
-  const charge = await tx.slotCharge.findUnique({ where: { id: chargeId }, include: { campaign: { select: { id: true, title: true, developerId: true } } } });
-  if (!charge) throw new Error("Slot charge record is missing.");
-  if (charge.status === "SUCCEEDED" || charge.status === "REFUNDED") return charge;
-  const profile = await tx.billingProfile.findUnique({ where: { userId: charge.campaign.developerId } });
-  const company = profile ? billingDetailsSchema.safeParse({ ...profile, taxId: profile.taxId || "", billingEmail: profile.billingEmail || "", addressLine2: profile.addressLine2 || "", region: profile.region || "" }) : null;
-  const transaction = await tx.walletTransaction.create({
-    data: {
-      userId: charge.campaign.developerId,
-      amountCents: charge.totalCents,
-      campaignId: charge.campaignId,
-      platformFeeCents: charge.platformFeeCents,
-      invoiceSnapshot: {
-        version: 1,
-        cohortId: charge.campaignId,
-        cohortTitle: charge.campaign.title,
-        rewardPoolCents: charge.stipendCents,
-        platformFeeCents: charge.platformFeeCents,
-        processingFeeCents: charge.processingFeeCents,
-        company: company?.success ? company.data : null,
-      },
-      type: TransactionType.ESCROW_DEPOSIT,
-      status: TransactionStatus.COMPLETED,
-      stripePaymentId: paymentIntentId,
-      description: `Tester slot for ${charge.campaign.title} (${charge.campaignId})`,
-    },
-    select: { id: true },
-  });
-  return tx.slotCharge.update({ where: { id: chargeId }, data: { status: "SUCCEEDED", stripePaymentIntentId: paymentIntentId, transactionId: transaction.id, failureReason: null } });
-}
-
 export type SlotChargePreview = { credit: boolean; quote: SlotChargeQuote | null };
 
 // What accepting one more tester would cost right now, per pay-per-tester campaign (read-only).
@@ -111,27 +56,30 @@ export async function previewNextSlotCharges(campaignIds: string[]) {
   return previews;
 }
 
-export type AcceptWithFundingResult = { accepted: boolean; charged: SlotChargeQuote | null; message: string };
+export type AcceptWithFundingResult = { accepted: boolean; charged: SlotChargeQuote | null; message: string; balanceCents?: number };
 
-// Accepts a tester on a pay-per-tester cohort, charging the developer's saved card for one slot first.
-export async function acceptApplicationWithFunding(developerId: string, applicationId: string): Promise<AcceptWithFundingResult> {
-  const plan = await serializable(async (tx) => {
+type AcceptPlan =
+  | { kind: "credit" }
+  | { kind: "debited"; quote: SlotChargeQuote; balanceCents: number }
+  | { kind: "short"; quote: SlotChargeQuote; balanceCents: number };
+
+function acceptFromBalance(developerId: string, applicationId: string) {
+  return serializable(async (tx): Promise<AcceptPlan> => {
     const application = await tx.missionApplication.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!application || application.campaign.developerId !== developerId || application.status !== "PENDING") throw new Error("Pending application not found for your campaign.");
     const campaign = application.campaign;
     if (campaign.fundingModel !== "PAY_PER_TESTER") throw new Error("This cohort is prepaid; accept testers normally.");
     if (campaign.status !== CampaignStatus.ACTIVE || campaignHasEnded(campaign)) throw new Error("This cohort is not accepting testers.");
-    const [holds, inFlight, paid] = await Promise.all([
+    const [holds, paid] = await Promise.all([
       activeHolds(tx, campaign.id),
-      tx.slotCharge.findMany({ where: { campaignId: campaign.id, status: "PENDING" }, select: { applicationId: true } }),
       tx.slotCharge.findMany({ where: { campaignId: campaign.id, status: "SUCCEEDED" }, select: { stipendCents: true, platformFeeCents: true } }),
     ]);
-    if (inFlight.some((charge) => charge.applicationId === application.id)) throw new Error("A charge for this tester is already processing. Refresh in a moment.");
-    if (campaign.claimedSlots + holds + inFlight.length >= campaign.totalSlots) throw new Error("All tester places in this cohort are already reserved.");
+    if (campaign.claimedSlots + holds >= campaign.totalSlots) throw new Error("All tester places in this cohort are already reserved.");
+    const accept = () => tx.missionApplication.update({ where: { id: application.id }, data: { status: "ACCEPTED", startBy: acceptanceDeadline(campaign.expiresAt) } });
 
     if (unusedPaidSlots(paid.length, campaign.claimedSlots, holds) > 0) {
-      await tx.missionApplication.update({ where: { id: application.id }, data: { status: "ACCEPTED", startBy: acceptanceDeadline(campaign.expiresAt) } });
-      return { kind: "credit" as const };
+      await accept();
+      return { kind: "credit" };
     }
 
     const quote = quoteSlotCharge(
@@ -139,75 +87,78 @@ export async function acceptApplicationWithFunding(developerId: string, applicat
       paid.reduce((sum, charge) => sum + charge.stipendCents, 0),
       paid.reduce((sum, charge) => sum + charge.platformFeeCents, 0),
     );
-    const charge = await tx.slotCharge.create({ data: { campaignId: campaign.id, applicationId: application.id, ...quote } });
-    return { kind: "charge" as const, chargeId: charge.id, quote, campaignId: campaign.id, campaignTitle: campaign.title };
-  });
+    const debited = await tx.user.updateMany({ where: { id: developerId, fundingBalanceCents: { gte: quote.totalCents } }, data: { fundingBalanceCents: { decrement: quote.totalCents } } });
+    const developer = await tx.user.findUnique({ where: { id: developerId }, select: { fundingBalanceCents: true } });
+    const balanceCents = developer?.fundingBalanceCents ?? 0;
+    if (!debited.count) return { kind: "short", quote, balanceCents };
 
-  if (plan.kind === "credit") return { accepted: true, charged: null, message: "Accepted using an already-paid slot. No new charge. The tester has up to 24 hours to start." };
-
-  const developer = await prisma.user.findUnique({ where: { id: developerId }, select: { stripeCustomerId: true } });
-  const fail = async (reason: string) => {
-    await prisma.slotCharge.updateMany({ where: { id: plan.chargeId, status: "PENDING" }, data: { status: "FAILED", failureReason: reason.slice(0, 500) } });
-  };
-  if (!process.env.STRIPE_SECRET_KEY) {
-    await fail("Stripe is not configured.");
-    throw new Error("Payments are not configured yet. Please try again later.");
-  }
-  const paymentMethod = await savedPaymentMethod(developer?.stripeCustomerId || null);
-  if (!developer?.stripeCustomerId || !paymentMethod) {
-    await fail("No saved payment method.");
-    throw new Error("Add a card in Billing before accepting testers.");
-  }
-
-  class ChargeDeclined extends Error {}
-  let paymentIntentId: string;
-  try {
-    const intent = await getStripe().paymentIntents.create({
-      amount: plan.quote.totalCents,
-      currency: "usd",
-      customer: developer.stripeCustomerId,
-      payment_method: paymentMethod,
-      off_session: true,
-      confirm: true,
-      description: `SeedEnv tester slot: ${plan.campaignTitle}`,
-      metadata: { type: "SEEDENV_SLOT_CHARGE", slotChargeId: plan.chargeId, campaignId: plan.campaignId, applicationId },
-    }, { idempotencyKey: `seedenv-slot-${plan.chargeId}` });
-    if (intent.status !== "succeeded") {
-      try { await getStripe().paymentIntents.cancel(intent.id); } catch { /* already final */ }
-      await fail(`Payment status ${intent.status}`);
-      throw new ChargeDeclined(declineMessage(intent.status === "requires_action" ? "authentication_required" : ""));
-    }
-    paymentIntentId = intent.id;
-  } catch (error) {
-    const current = await prisma.slotCharge.findUnique({ where: { id: plan.chargeId }, select: { status: true } });
-    if (current?.status === "PENDING") await fail(stripeErrorCode(error) || (error instanceof Error ? error.message : "Charge failed"));
-    if (error instanceof ChargeDeclined) throw error;
-    throw new Error(declineMessage(stripeErrorCode(error)));
-  }
-
-  return serializable(async (tx) => {
-    await recordSucceededCharge(tx, plan.chargeId, paymentIntentId);
-    const application = await tx.missionApplication.findUnique({ where: { id: applicationId }, include: { campaign: true } });
-    const campaign = application?.campaign;
-    const holds = campaign ? await activeHolds(tx, campaign.id) : 0;
-    if (!application || !campaign || application.status !== "PENDING" || campaign.status !== CampaignStatus.ACTIVE || campaignHasEnded(campaign) || campaign.claimedSlots + holds >= campaign.totalSlots) {
-      return { accepted: false, charged: plan.quote, message: `Charged ${formatCents(plan.quote.totalCents)}, but this application changed before acceptance. The paid slot will be used for your next accepted tester or refunded when the cohort ends.` };
-    }
-    await tx.missionApplication.update({ where: { id: application.id }, data: { status: "ACCEPTED", startBy: acceptanceDeadline(campaign.expiresAt) } });
-    return { accepted: true, charged: plan.quote, message: `Accepted. Charged ${formatCents(plan.quote.totalCents)} (stipend ${formatCents(plan.quote.stipendCents)} + platform fee ${formatCents(plan.quote.platformFeeCents)} + card processing ${formatCents(plan.quote.processingFeeCents)}). The tester has up to 24 hours to start.` };
+    const transaction = await tx.walletTransaction.create({
+      data: {
+        userId: developerId,
+        amountCents: quote.totalCents,
+        campaignId: campaign.id,
+        platformFeeCents: quote.platformFeeCents,
+        invoiceSnapshot: {
+          version: 1,
+          kind: "SLOT",
+          cohortId: campaign.id,
+          cohortTitle: campaign.title,
+          rewardPoolCents: quote.stipendCents,
+          platformFeeCents: quote.platformFeeCents,
+          processingFeeCents: 0,
+          company: await billingCompanySnapshot(tx, developerId),
+        },
+        type: TransactionType.ESCROW_DEPOSIT,
+        status: TransactionStatus.COMPLETED,
+        description: `Tester slot for ${campaign.title} (${campaign.id}), paid from balance`,
+      },
+      select: { id: true },
+    });
+    await tx.slotCharge.create({ data: { campaignId: campaign.id, applicationId: application.id, ...quote, processingFeeCents: 0, status: "SUCCEEDED", transactionId: transaction.id } });
+    await accept();
+    return { kind: "debited", quote, balanceCents };
   });
 }
 
+// Accepts a tester on a pay-per-tester cohort, drawing one slot (reward + platform fee) from the prepaid balance.
+// If the balance is short and auto-reload is on, the saved card is topped up once and the acceptance retried.
+export async function acceptApplicationWithFunding(developerId: string, applicationId: string): Promise<AcceptWithFundingResult> {
+  let plan = await acceptFromBalance(developerId, applicationId);
+  let reloadNote = "";
+  if (plan.kind === "short") {
+    const developer = await prisma.user.findUnique({ where: { id: developerId }, select: { autoReloadCents: true } });
+    if ((developer?.autoReloadCents ?? 0) > 0) {
+      const reload = await autoReloadBalance(developerId, plan.quote.totalCents - plan.balanceCents, applicationId);
+      if (reload) reloadNote = ` Auto-reload added ${formatCents(reload.creditCents)} to your balance (card charged ${formatCents(reload.totalCents)}).`;
+      plan = await acceptFromBalance(developerId, applicationId);
+    }
+  }
+  if (plan.kind === "credit") return { accepted: true, charged: null, message: "Accepted using an already-paid place. Nothing new was drawn from your balance. The tester has up to 24 hours to start." };
+  if (plan.kind === "short") {
+    return { accepted: false, charged: null, balanceCents: plan.balanceCents, message: `Your balance is ${formatCents(plan.balanceCents)}; this tester needs ${formatCents(plan.quote.totalCents)}. Add funds in Billing, then accept again.` };
+  }
+  return {
+    accepted: true,
+    charged: plan.quote,
+    balanceCents: plan.balanceCents,
+    message: `Accepted. ${formatCents(plan.quote.totalCents)} drawn from your balance (reward ${formatCents(plan.quote.stipendCents)} + platform fee ${formatCents(plan.quote.platformFeeCents)}); ${formatCents(plan.balanceCents)} left.${reloadNote} The tester has up to 24 hours to start.`,
+  };
+}
+
+// Returns an unused place to the developer's balance. Legacy card-charged places are refunded to the card.
 async function refundSlotCharge(chargeId: string) {
   const charge = await prisma.slotCharge.findUnique({ where: { id: chargeId }, include: { campaign: { select: { developerId: true, title: true } } } });
-  if (!charge || charge.status !== "SUCCEEDED" || !charge.stripePaymentIntentId) return 0;
+  if (!charge || charge.status !== "SUCCEEDED") return 0;
   const amount = charge.stipendCents + charge.platformFeeCents;
-  const refund = await getStripe().refunds.create({ payment_intent: charge.stripePaymentIntentId, amount, metadata: { type: "SEEDENV_SLOT_REFUND", slotChargeId: charge.id } }, { idempotencyKey: `seedenv-slot-refund-${charge.id}` });
+  const refund = charge.stripePaymentIntentId
+    ? await getStripe().refunds.create({ payment_intent: charge.stripePaymentIntentId, amount, metadata: { type: "SEEDENV_SLOT_REFUND", slotChargeId: charge.id } }, { idempotencyKey: `seedenv-slot-refund-${charge.id}` })
+    : null;
   return serializable(async (tx) => {
-    const updated = await tx.slotCharge.updateMany({ where: { id: charge.id, status: "SUCCEEDED" }, data: { status: "REFUNDED", stripeRefundId: refund.id, refundedAt: new Date() } });
+    const updated = await tx.slotCharge.updateMany({ where: { id: charge.id, status: "SUCCEEDED" }, data: { status: "REFUNDED", stripeRefundId: refund?.id ?? null, refundedAt: new Date() } });
     if (!updated.count) return 0;
+    if (!refund) await tx.user.update({ where: { id: charge.campaign.developerId }, data: { fundingBalanceCents: { increment: amount } } });
     await tx.appCampaign.update({ where: { id: charge.campaignId }, data: { refundedCents: { increment: amount } } });
-    await tx.walletTransaction.create({ data: { userId: charge.campaign.developerId, amountCents: amount, campaignId: charge.campaignId, platformFeeCents: -charge.platformFeeCents, type: TransactionType.ESCROW_REFUND, status: TransactionStatus.COMPLETED, stripePaymentId: refund.id, description: `Unused tester slot refunded for ${charge.campaign.title} (${charge.campaignId})` } });
+    await tx.walletTransaction.create({ data: { userId: charge.campaign.developerId, amountCents: amount, campaignId: charge.campaignId, platformFeeCents: -charge.platformFeeCents, type: TransactionType.ESCROW_REFUND, status: TransactionStatus.COMPLETED, stripePaymentId: refund?.id ?? null, description: refund ? `Unused tester slot refunded for ${charge.campaign.title} (${charge.campaignId})` : `Unused tester place credited to balance for ${charge.campaign.title} (${charge.campaignId})` } });
     return amount;
   });
 }
@@ -237,10 +188,10 @@ async function refundPrepaidCampaign(campaignId: string) {
   });
 }
 
-// Refunds any paid-but-unused tester slots once a cohort has ended (cancelled or expired). Safe to repeat.
+// Returns paid-but-unused tester places (to the balance) once a cohort has ended (cancelled or expired). Safe to repeat.
 export async function reconcileCampaignFunding(campaignId: string, now = new Date()) {
   const campaign = await prisma.appCampaign.findUnique({ where: { id: campaignId } });
-  if (!campaign || !campaignHasEnded(campaign, now) || !process.env.STRIPE_SECRET_KEY) return { refundedCents: 0, finalized: false };
+  if (!campaign || !campaignHasEnded(campaign, now)) return { refundedCents: 0, finalized: false };
   let refundedCents = 0;
   if (campaign.fundingModel === "PAY_PER_TESTER") {
     const [holds, paid] = await Promise.all([
@@ -249,7 +200,7 @@ export async function reconcileCampaignFunding(campaignId: string, now = new Dat
     ]);
     // Refund newest charges first so the cumulative platform-fee floor unwinds in order.
     for (const charge of paid.slice(0, unusedPaidSlots(paid.length, campaign.claimedSlots, holds))) refundedCents += await refundSlotCharge(charge.id);
-  } else {
+  } else if (process.env.STRIPE_SECRET_KEY) {
     refundedCents += await refundPrepaidCampaign(campaignId);
   }
   const inProgress = await prisma.submission.count({ where: { campaignId, status: "PENDING" } });
@@ -258,32 +209,13 @@ export async function reconcileCampaignFunding(campaignId: string, now = new Dat
   return { refundedCents, finalized };
 }
 
-async function resolveStaleCharge(chargeId: string) {
-  const stripe = getStripe();
-  const found = await stripe.paymentIntents.search({ query: `metadata['slotChargeId']:'${chargeId.replace(/[^a-zA-Z0-9_-]/g, "")}'`, limit: 1 });
-  const intent = found.data[0];
-  if (intent?.status === "succeeded") {
-    await serializable((tx) => recordSucceededCharge(tx, chargeId, intent.id));
-    return "SUCCEEDED" as SlotChargeStatus;
-  }
-  if (intent && !["canceled", "requires_payment_method"].includes(intent.status)) {
-    try { await stripe.paymentIntents.cancel(intent.id); } catch { return "PENDING" as SlotChargeStatus; }
-  }
-  await prisma.slotCharge.updateMany({ where: { id: chargeId, status: "PENDING" }, data: { status: "FAILED", failureReason: "Charge did not complete." } });
-  return "FAILED" as SlotChargeStatus;
-}
-
 let sweepInFlight: Promise<{ refundedCents: number; campaigns: number }> | null = null;
 
-// Background safety net: settles interrupted charges and refunds unused slots on ended cohorts.
+// Background safety net: settles interrupted top-ups and returns unused places on ended cohorts.
 export function sweepCampaignFunding(now = new Date(), limit = 25) {
-  if (!process.env.STRIPE_SECRET_KEY) return Promise.resolve({ refundedCents: 0, campaigns: 0 });
   if (sweepInFlight) return sweepInFlight;
   sweepInFlight = (async () => {
-    const stale = await prisma.slotCharge.findMany({ where: { status: "PENDING", createdAt: { lte: new Date(now.getTime() - STALE_SLOT_CHARGE_MS) } }, take: limit, select: { id: true } });
-    for (const charge of stale) {
-      try { await resolveStaleCharge(charge.id); } catch (error) { console.warn("SeedEnv stale slot charge check failed:", error instanceof Error ? error.message : error); }
-    }
+    try { await sweepStaleTopUps(now, limit); } catch (error) { console.warn("SeedEnv stale top-up sweep failed:", error instanceof Error ? error.message : error); }
     const ended = await prisma.appCampaign.findMany({
       where: { status: { in: [CampaignStatus.ACTIVE, CampaignStatus.PAUSED, CampaignStatus.ESCROW_PENDING] }, OR: [{ cancelledAt: { not: null } }, { expiresAt: { lte: now } }] },
       orderBy: { expiresAt: "asc" },
@@ -299,7 +231,7 @@ export function sweepCampaignFunding(now = new Date(), limit = 25) {
   return sweepInFlight;
 }
 
-// Ends a cohort: closes applications, keeps in-progress testers' pay safe, and refunds unused paid slots.
+// Ends a cohort: closes applications, keeps in-progress testers' pay safe, and returns unused paid places.
 export async function cancelCohort(developerId: string, campaignId: string, isAdmin = false) {
   const summary = await serializable(async (tx) => {
     const campaign = await tx.appCampaign.findUnique({ where: { id: campaignId } });

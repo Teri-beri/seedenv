@@ -1,3 +1,4 @@
+import { handleTopUpCheckout } from "@/lib/funding-balance";
 import { prisma } from "@/lib/prisma";
 import { serializable } from "@/lib/quest-ledger";
 import { reconcileCampaignFunding } from "@/lib/slot-funding";
@@ -26,6 +27,7 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     await stripe.customers.update(customerId, { invoice_settings: { default_payment_method: paymentMethod } });
     return { paymentMethodSaved: true, userId: user.id };
   }
+  if (metadata.type === "SEEDENV_BALANCE_TOPUP") return handleTopUpCheckout(session);
   if (metadata.type !== "SEEDENV_CAMPAIGN_ESCROW") return { ignored: true };
   if (session.mode !== "payment" || session.status !== "complete" || session.payment_status !== "paid") return { awaitingPayment: true };
   const paymentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;

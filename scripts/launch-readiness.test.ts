@@ -129,7 +129,8 @@ test("missing Stripe configuration or funding method saves a draft without creat
     assert.deepEqual(await createCampaignWithEscrow(input, "existing-payment-draft"), { campaignId: "existing-payment-draft", checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true });
     assert.equal(updated[0].status, "DRAFT");
     process.env.STRIPE_SECRET_KEY = "configured-for-mocked-test";
-    assert.deepEqual(await createCampaignWithEscrow(input), { campaignId: "payment-draft-2", checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true });
+    // Custom drops are funded from the prepaid balance; only flat bundles still need a saved card first.
+    assert.deepEqual(await createCampaignWithEscrow({ ...input, cohortType: "GOOGLE_PLAY_14_DAY" }), { campaignId: "payment-draft-2", checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true });
     assert.equal(created[1].status, "DRAFT");
     assert.equal(created.length, 2);
   } finally {

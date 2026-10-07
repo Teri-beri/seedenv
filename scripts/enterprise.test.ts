@@ -52,7 +52,7 @@ test("invoice route rejects anonymous, foreign, pending, and inconsistent paymen
     signedIn = true;
     present = false;
     assert.equal((await GET(new Request("http://localhost/api/billing/invoices/receipt-test"), params)).status, 404);
-    assert.deepEqual(queries[0], { id: "receipt-test", userId: "owner", type: "ESCROW_DEPOSIT", status: "COMPLETED" });
+    assert.deepEqual(queries[0], { id: "receipt-test", userId: "owner", type: { in: ["ESCROW_DEPOSIT", "BALANCE_TOPUP"] }, status: "COMPLETED" });
     present = true;
     amount = 1;
     assert.equal((await GET(new Request("http://localhost/api/billing/invoices/receipt-test"), params)).status, 409);
@@ -112,44 +112,73 @@ test("support identity is server-derived, rate-limited, durable, and admin-resol
   } finally { for (const item of modules.reverse()) item.restore(); }
 });
 
-test("custom drops launch pay-per-tester with no checkout and no upfront deposit", async () => {
+async function launchCustom(balanceCents: number, topUpCents?: number) {
   const priorKey = process.env.STRIPE_SECRET_KEY;
   process.env.STRIPE_SECRET_KEY = "mocked-provider-config";
-  let created: Record<string, unknown> = {};
-  let deposits = 0;
-  let checkouts = 0;
+  const seen = { created: {} as Record<string, unknown>, deposits: 0, topUps: [] as Array<Record<string, unknown>>, checkout: null as null | { line_items: Array<{ price_data: { unit_amount: number } }>; metadata: Record<string, string>; cancel_url: string } };
   const modules = [
     mock.module("next/cache", { namedExports: { revalidatePath: () => undefined } }),
-    mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "owner", role: "DEVELOPER", stripeCustomerId: "cus_test" }) } }),
+    mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "owner", role: "DEVELOPER", email: "dev@example.invalid", name: "Dev", username: "dev", stripeCustomerId: "cus_test", fundingBalanceCents: balanceCents }) } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: {
       billingProfile: { findUnique: async () => ({ ...company }) },
-      appCampaign: { create: async ({ data }: { data: Record<string, unknown> }) => { created = data; return { id: "cohort-test", ...data }; } },
-      walletTransaction: { create: async () => { deposits += 1; return { id: "deposit-test" }; } },
+      appCampaign: { create: async ({ data }: { data: Record<string, unknown> }) => { seen.created = data; return { id: "cohort-test", ...data }; }, updateMany: async () => ({ count: 1 }) },
+      walletTransaction: { create: async () => { seen.deposits += 1; return { id: "deposit-test" }; } },
+      balanceTopUp: {
+        create: async ({ data }: { data: Record<string, unknown> }) => { seen.topUps.push(data); return { id: "topup-test", ...data }; },
+        update: async () => ({}),
+        updateMany: async () => ({ count: 0 }),
+      },
     } } }),
-    mock.module("../lib/stripe.ts", { namedExports: { getStripe: () => ({ customers: { retrieve: async () => ({ deleted: false, invoice_settings: { default_payment_method: "pm_test" } }) }, checkout: { sessions: { create: async () => { checkouts += 1; return { url: "https://checkout.stripe.com/mock" }; } } } }) } }),
+    mock.module("../lib/stripe.ts", { namedExports: { getStripe: () => ({
+      customers: { retrieve: async () => ({ deleted: false, invoice_settings: { default_payment_method: null } }) },
+      checkout: { sessions: { create: async (args: NonNullable<typeof seen.checkout>) => { seen.checkout = args; return { id: "cs_test", url: "https://checkout.stripe.com/mock" }; } } },
+    }) } }),
   ];
   try {
-    const { createCampaignWithEscrow } = await import(`../app/actions/campaignActions.ts?invoice=${randomUUID()}`);
-    const result = await createCampaignWithEscrow({ title: "TestFlight QA", platform: "TESTFLIGHT", appUrl: "https://example.invalid", targetVibe: "Developer Tools", description: "A safe test of company invoice details at checkout.", totalSlots: 25, bountyPerTaskUsd: 4, instructions: [{ instructionTitle: "Onboarding", instructionDetail: "Follow signup and record any confusing steps.", proofType: "SCREENSHOT", minimumRep: 0 }], discoveryAllowed: false, discoveryMinRep: 0 });
-    assert.equal(result.launched, true);
-    assert.equal(result.checkoutUrl, null);
-    assert.equal(result.escrowTotalCents, 0);
-    assert.equal(created.status, "ACTIVE");
-    assert.equal(created.fundingModel, "PAY_PER_TESTER");
-    assert.equal(deposits, 0);
-    assert.equal(checkouts, 0);
+    modules.push(mock.module("../lib/stripe-customer.ts", { namedExports: { ensureStripeCustomer: async () => "cus_test" } }));
+    const balance = await import(`../lib/funding-balance.ts?custom=${randomUUID()}`);
+    modules.push(mock.module("../lib/funding-balance.ts", { namedExports: balance }));
+    const { createCampaignWithEscrow } = await import(`../app/actions/campaignActions.ts?custom=${randomUUID()}`);
+    const result = await createCampaignWithEscrow({ title: "TestFlight QA", platform: "TESTFLIGHT", appUrl: "https://example.invalid", targetVibe: "Developer Tools", description: "A safe test of company invoice details at checkout.", totalSlots: 25, bountyPerTaskUsd: 4, instructions: [{ instructionTitle: "Onboarding", instructionDetail: "Follow signup and record any confusing steps.", proofType: "SCREENSHOT", minimumRep: 0 }], discoveryAllowed: false, discoveryMinRep: 0 }, undefined, topUpCents ? { topUpCents } : undefined);
+    return { result, seen };
   } finally {
     for (const item of modules.reverse()) item.restore();
     if (priorKey === undefined) delete process.env.STRIPE_SECRET_KEY;
     else process.env.STRIPE_SECRET_KEY = priorKey;
   }
+}
+
+test("custom drops launch straight to live when the prepaid balance covers the first tester", async () => {
+  const { result, seen } = await launchCustom(1900);
+  assert.equal(result.launched, true);
+  assert.equal(result.checkoutUrl, null);
+  assert.equal(seen.created.status, "ACTIVE");
+  assert.equal(seen.created.fundingModel, "PAY_PER_TESTER");
+  assert.equal(seen.deposits, 0);
+  assert.equal(seen.checkout, null);
 });
 
-test("per-slot receipts include the passed-through processing line in their total", () => {
-  const slot = { ...snapshot, rewardPoolCents: 400, platformFeeCents: 1500, processingFeeCents: 88 };
-  assert.equal(invoiceSnapshotSchema.safeParse(slot).success, true);
-  assert.equal(invoiceTotalMatches(invoiceSnapshotSchema.parse(slot), 1988), true);
-  assert.equal(invoiceTotalMatches(invoiceSnapshotSchema.parse(slot), 1900), false);
+test("custom drops without enough balance wait for one top-up checkout, with no saved card required", async () => {
+  const { result, seen } = await launchCustom(500, 5000);
+  assert.equal(result.checkoutUrl, "https://checkout.stripe.com/mock");
+  assert.equal(seen.created.status, "ESCROW_PENDING");
+  assert.equal(seen.deposits, 0);
+  assert.equal(seen.topUps[0].creditCents, 5000);
+  assert.equal(seen.topUps[0].campaignId, "cohort-test");
+  assert.deepEqual(seen.checkout?.line_items.map((item) => item.price_data.unit_amount), [5000, 181]);
+  assert.equal(seen.checkout?.metadata.type, "SEEDENV_BALANCE_TOPUP");
+  // A tiny requested top-up is raised to cover the first tester's shortfall.
+  const small = await launchCustom(500, 100);
+  assert.equal(small.seen.topUps[0].creditCents, 1400);
+});
+
+test("balance-funded slot receipts total reward + fee, and top-up receipts include processing", () => {
+  const slot = { ...snapshot, kind: "SLOT", rewardPoolCents: 400, platformFeeCents: 1500, processingFeeCents: 0 };
+  assert.equal(invoiceTotalMatches(invoiceSnapshotSchema.parse(slot), 1900), true);
+  const topUp = { ...snapshot, kind: "TOP_UP", rewardPoolCents: 5000, platformFeeCents: 0, processingFeeCents: 181 };
+  assert.equal(invoiceSnapshotSchema.safeParse(topUp).success, true);
+  assert.equal(invoiceTotalMatches(invoiceSnapshotSchema.parse(topUp), 5181), true);
+  assert.equal(invoiceTotalMatches(invoiceSnapshotSchema.parse(topUp), 5000), false);
 });
 
 test("flat bundles override client slots, rewards, and platform at checkout", async () => {

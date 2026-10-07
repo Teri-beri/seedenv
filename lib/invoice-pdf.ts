@@ -53,12 +53,20 @@ export async function generateInvoicePdf(input: { id: string; date: Date; amount
     line(`${company.city}, ${company.region} ${company.postalCode}, ${company.country}`);
   } else line("Billing details were not supplied at checkout.");
   cursor -= 20;
-  line(`Cohort: ${input.snapshot.cohortTitle}`, 14);
-  line(`Cohort ID: ${input.snapshot.cohortId}`);
-  line(`${input.snapshot.processingFeeCents === undefined ? "Tester reward pool" : "Tester stipend (one slot)"}: ${money(input.snapshot.rewardPoolCents)}`);
-  line(`Platform fee (recorded at checkout): ${money(input.snapshot.platformFeeCents)}`);
-  if (input.snapshot.processingFeeCents !== undefined) line(`Card processing (passed through): ${money(input.snapshot.processingFeeCents)}`);
-  line(`Total paid: ${money(input.amountCents)}`, 14);
+  const kind = input.snapshot.kind ?? (input.snapshot.processingFeeCents === undefined ? "COHORT" : "SLOT");
+  if (kind === "TOP_UP") {
+    line("Prepaid balance top-up", 14);
+    line(`Balance credit: ${money(input.snapshot.rewardPoolCents)}`);
+    line(`Card processing (Stripe 2.9% + 30¢): ${money(input.snapshot.processingFeeCents ?? 0)}`);
+  } else {
+    line(`Cohort: ${input.snapshot.cohortTitle}`, 14);
+    line(`Cohort ID: ${input.snapshot.cohortId}`);
+    line(`${kind === "SLOT" ? "Tester stipend (one slot)" : "Tester reward pool"}: ${money(input.snapshot.rewardPoolCents)}`);
+    line(`Platform fee: ${money(input.snapshot.platformFeeCents)}`);
+    if (input.snapshot.processingFeeCents) line(`Card processing (passed through): ${money(input.snapshot.processingFeeCents)}`);
+    if (kind === "SLOT" && !input.snapshot.processingFeeCents) line("Paid from your SeedEnv prepaid balance.");
+  }
+  line(`${kind === "SLOT" ? "Total drawn" : "Total paid"}: ${money(input.amountCents)}`, 14);
   cursor -= 20;
   line("Unless itemized above, Stripe processing and payout fees are separate. This receipt does not certify VAT registration or replace a jurisdiction-specific tax invoice.", 9);
   document.setTitle(`SeedEnv receipt ${invoiceNumber(input.id, input.date)}`);

@@ -116,30 +116,29 @@ export function calculateCohortEscrow(validatorCount: number, stipendPerValidato
   };
 }
 
-// Card processing passed through on pay-per-tester charges, grossed up so the fee itself is covered.
+// Card processing passed through on balance top-ups, grossed up so the fee itself is covered.
 export function cardProcessingFeeCents(baseCents: number) {
   if (!Number.isSafeInteger(baseCents) || baseCents <= 0) return 0;
   const totalCents = Math.ceil((baseCents + STRIPE_CARD_FIXED_CENTS) / (1 - STRIPE_CARD_RATE));
   return totalCents - baseCents;
 }
 
-export type SlotChargeQuote = { stipendCents: number; platformFeeCents: number; processingFeeCents: number; totalCents: number };
+export type SlotChargeQuote = { stipendCents: number; platformFeeCents: number; totalCents: number };
 
 // The platform fee is cumulative: 20% of all funded stipends with a $15 cohort floor, minus fees already collected.
+// Slots are paid from the developer's prepaid balance, so no card processing applies per tester.
 export function quoteSlotCharge(stipendCents: number, retainedStipendCents: number, retainedPlatformFeeCents: number): SlotChargeQuote {
   if (!Number.isSafeInteger(stipendCents) || stipendCents <= 0) throw new Error("The tester stipend must be a positive amount.");
   const owed = standardPlatformFeeCents(Math.max(0, retainedStipendCents) + stipendCents);
   const platformFeeCents = Math.max(0, owed - Math.max(0, retainedPlatformFeeCents));
-  const baseCents = stipendCents + platformFeeCents;
-  const processingFeeCents = cardProcessingFeeCents(baseCents);
-  return { stipendCents, platformFeeCents, processingFeeCents, totalCents: baseCents + processingFeeCents };
+  return { stipendCents, platformFeeCents, totalCents: stipendCents + platformFeeCents };
 }
 
-export type PerTesterProjection = { firstCharge: SlotChargeQuote | null; typicalCharge: SlotChargeQuote | null; stipendCents: number; platformFeeCents: number; processingFeeCents: number; maxTotalCents: number };
+export type PerTesterProjection = { firstCharge: SlotChargeQuote | null; typicalCharge: SlotChargeQuote | null; stipendCents: number; platformFeeCents: number; maxTotalCents: number };
 
-// Maximum spend if every slot is filled, charged one accepted tester at a time.
+// Maximum spend if every slot is filled, drawn from the balance one accepted tester at a time.
 export function projectPerTesterCharges(slots: number, stipendCents: number): PerTesterProjection {
-  const projection: PerTesterProjection = { firstCharge: null, typicalCharge: null, stipendCents: 0, platformFeeCents: 0, processingFeeCents: 0, maxTotalCents: 0 };
+  const projection: PerTesterProjection = { firstCharge: null, typicalCharge: null, stipendCents: 0, platformFeeCents: 0, maxTotalCents: 0 };
   if (!Number.isSafeInteger(slots) || slots <= 0 || !Number.isSafeInteger(stipendCents) || stipendCents <= 0) return projection;
   for (let index = 0; index < slots; index += 1) {
     const charge = quoteSlotCharge(stipendCents, projection.stipendCents, projection.platformFeeCents);
@@ -147,8 +146,27 @@ export function projectPerTesterCharges(slots: number, stipendCents: number): Pe
     projection.typicalCharge = charge;
     projection.stipendCents += charge.stipendCents;
     projection.platformFeeCents += charge.platformFeeCents;
-    projection.processingFeeCents += charge.processingFeeCents;
     projection.maxTotalCents += charge.totalCents;
   }
   return projection;
+}
+
+export const MIN_TOP_UP_CENTS = 1000;
+export const MAX_TOP_UP_CENTS = 500000;
+export const AUTO_RELOAD_OPTIONS_CENTS = [2500, 5000, 10000, 25000] as const;
+
+export type TopUpQuote = { creditCents: number; processingFeeCents: number; totalCents: number };
+
+// Card processing is charged once per top-up, on top of the credit added to the balance.
+export function quoteTopUp(creditCents: number): TopUpQuote {
+  if (!Number.isSafeInteger(creditCents) || creditCents < MIN_TOP_UP_CENTS || creditCents > MAX_TOP_UP_CENTS) {
+    throw new Error(`Top-ups must be between $${MIN_TOP_UP_CENTS / 100} and $${(MAX_TOP_UP_CENTS / 100).toLocaleString("en-US")}.`);
+  }
+  const processingFeeCents = cardProcessingFeeCents(creditCents);
+  return { creditCents, processingFeeCents, totalCents: creditCents + processingFeeCents };
+}
+
+// Smallest valid top-up that covers a shortfall, rounded up to a whole dollar.
+export function topUpForShortfall(shortfallCents: number) {
+  return Math.min(MAX_TOP_UP_CENTS, Math.max(MIN_TOP_UP_CENTS, Math.ceil(Math.max(0, shortfallCents) / 100) * 100));
 }

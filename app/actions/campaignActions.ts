@@ -6,7 +6,8 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
-import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, quoteCampaignFunding } from "@/lib/pricing";
+import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, MAX_TOP_UP_CENTS, quoteCampaignFunding, quoteSlotCharge, topUpForShortfall } from "@/lib/pricing";
+import { createTopUpCheckout } from "@/lib/funding-balance";
 import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templates";
 import { billingDetailsSchema } from "@/lib/enterprise-rules";
 import { cancelCohort } from "@/lib/slot-funding";
@@ -149,12 +150,49 @@ export async function saveTestCampaignDraft(data: CampaignInput) {
   return { campaignId: campaign.id, title: campaign.title, status: campaign.status, chargedCents: 0 };
 }
 
-export async function createCampaignWithEscrow(data: CampaignInput, draftId?: string) {
+export async function createCampaignWithEscrow(data: CampaignInput, draftId?: string, options?: { topUpCents?: number }) {
   const input = campaignSchema.parse(data);
   const developer = await requireDeveloper();
   if (!process.env.STRIPE_SECRET_KEY) {
     const draft = await saveCampaignDraft(developer.id, input, draftId);
     return { campaignId: draft.id, checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true };
+  }
+
+  if (!isBundleType(input.cohortType)) {
+    const firstTester = quoteSlotCharge(Math.round(input.bountyPerTaskUsd * 100), 0, 0);
+    const funded = developer.fundingBalanceCents >= firstTester.totalCents;
+    const { data: liveData } = buildCampaignData(input, developer.id, funded ? CampaignStatus.ACTIVE : CampaignStatus.ESCROW_PENDING);
+    const payPerTester = { ...liveData, fundingModel: CohortFundingModel.PAY_PER_TESTER };
+    let live;
+    if (draftId) {
+      const ownedDraft = await prisma.appCampaign.findFirst({ where: { id: draftId, developerId: developer.id, status: CampaignStatus.DRAFT }, select: { id: true } });
+      if (!ownedDraft) throw new Error("This saved draft is unavailable or already launched.");
+      live = await prisma.$transaction(async (transaction) => {
+        await transaction.taskInstruction.deleteMany({ where: { campaignId: draftId } });
+        return transaction.appCampaign.update({ where: { id: draftId }, data: payPerTester });
+      });
+    } else {
+      live = await prisma.appCampaign.create({ data: payPerTester });
+    }
+    revalidatePath("/console");
+    if (funded) {
+      revalidatePath("/explore");
+      return { campaignId: live.id, checkoutUrl: null, escrowTotalCents: 0, launched: true };
+    }
+    // Not enough balance for the first tester: the cohort goes live as soon as this top-up is paid.
+    const requested = Number.isSafeInteger(options?.topUpCents) ? Number(options?.topUpCents) : 0;
+    const creditCents = Math.min(MAX_TOP_UP_CENTS, Math.max(requested, topUpForShortfall(firstTester.totalCents - developer.fundingBalanceCents)));
+    try {
+      const checkout = await createTopUpCheckout(developer, creditCents, {
+        campaignId: live.id,
+        successPath: `/console?view=overview&launched=${live.id}`,
+        cancelPath: `/console?view=billing&topup=cancelled&campaign=${live.id}`,
+      });
+      return { campaignId: live.id, checkoutUrl: checkout.url, escrowTotalCents: checkout.quote.totalCents };
+    } catch (error) {
+      await prisma.appCampaign.updateMany({ where: { id: live.id, status: CampaignStatus.ESCROW_PENDING }, data: { status: CampaignStatus.DRAFT } });
+      throw error;
+    }
   }
 
   if (process.env.STRIPE_SECRET_KEY) {
@@ -171,25 +209,6 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
       const draft = await saveCampaignDraft(developer.id, input, draftId);
       return { campaignId: draft.id, checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true };
     }
-  }
-
-  if (!isBundleType(input.cohortType)) {
-    const { data: liveData } = buildCampaignData(input, developer.id, CampaignStatus.ACTIVE);
-    const payPerTester = { ...liveData, fundingModel: CohortFundingModel.PAY_PER_TESTER };
-    let live;
-    if (draftId) {
-      const ownedDraft = await prisma.appCampaign.findFirst({ where: { id: draftId, developerId: developer.id, status: CampaignStatus.DRAFT }, select: { id: true } });
-      if (!ownedDraft) throw new Error("This saved draft is unavailable or already launched.");
-      live = await prisma.$transaction(async (transaction) => {
-        await transaction.taskInstruction.deleteMany({ where: { campaignId: draftId } });
-        return transaction.appCampaign.update({ where: { id: draftId }, data: payPerTester });
-      });
-    } else {
-      live = await prisma.appCampaign.create({ data: payPerTester });
-    }
-    revalidatePath("/console");
-    revalidatePath("/explore");
-    return { campaignId: live.id, checkoutUrl: null, escrowTotalCents: 0, launched: true };
   }
 
   const profile = await prisma.billingProfile.findUnique({ where: { userId: developer.id } });
@@ -278,8 +297,10 @@ export async function endCohort(campaignId: string) {
     revalidatePath("/console");
     revalidatePath("/explore");
     revalidatePath("/applications");
-    const parts = [result.refundedCents ? `${formatCents(result.refundedCents)} refunded to your card` : "No unused paid slots to refund"];
-    if (result.inProgress) parts.push(`${result.inProgress} tester${result.inProgress === 1 ? " is" : "s are"} already working and will still be reviewed and paid; anything they don't use is refunded automatically`);
+    const funding = await prisma.appCampaign.findUnique({ where: { id }, select: { fundingModel: true } });
+    const toBalance = funding?.fundingModel === CohortFundingModel.PAY_PER_TESTER;
+    const parts = [result.refundedCents ? `${formatCents(result.refundedCents)} ${toBalance ? "returned to your prepaid balance" : "refunded to your card"}` : toBalance ? "No unused paid places to return" : "No unused escrow to refund"];
+    if (result.inProgress) parts.push(`${result.inProgress} tester${result.inProgress === 1 ? " is" : "s are"} already working and will still be reviewed and paid; anything they don't use is returned automatically`);
     return { ok: true as const, message: `Cohort ended. ${parts.join(". ")}.` };
   } catch (error) {
     return { ok: false as const, message: error instanceof Error ? error.message : "The cohort could not be ended." };
