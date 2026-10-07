@@ -1,6 +1,14 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { CompactSignupForm } from "@/components/compact-signup-form";
 import { GridBackground } from "@/components/grid-background";
+
+export const metadata: Metadata = {
+  title: "Sign in to SeedEnv",
+  description: "Log in or create your SeedEnv account. Developers launch beta-testing cohorts; testers get paid to test iOS, Android and web apps.",
+  alternates: { canonical: "/auth/signin" },
+  openGraph: { title: "Sign in to SeedEnv", description: "Log in or create your SeedEnv account to launch or join paid beta-testing cohorts.", url: "/auth/signin" },
+};
 
 export default function SignInPage() {
   return (
