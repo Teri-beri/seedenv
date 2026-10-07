@@ -5,7 +5,7 @@ import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } 
 import { Plus } from "lucide-react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import AuthCheck from "@/components/AuthCheck";
 import { BalanceCard } from "@/components/billing/balance-card";
 import { BillingMetrics } from "@/components/billing/billing-metrics";

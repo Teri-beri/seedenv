@@ -3,7 +3,7 @@ import { sweepOverdueSubmissionsLazily } from "@/lib/submission-approval";
 import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import AuthCheck from "@/components/AuthCheck";
 import { TesterConsole } from "@/components/tester-console";
 import { getCurrentUser } from "@/lib/auth";

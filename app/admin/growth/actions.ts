@@ -3,7 +3,7 @@
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { runProductUpdate } from "@/lib/growth/pipeline";
 import { productUpdateInputSchema } from "@/lib/growth/schemas";
 import { productionGrowthContext } from "@/lib/growth/server";

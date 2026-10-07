@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 test("public Launch Circle excludes hidden/member-only content and personal account fields", async () => {
   let query: { where?: unknown; select?: { author?: { select?: Record<string, boolean> }; comments?: { where?: unknown } } } = {};
   const modules = [
-    mock.module("../app/api/auth/[...nextauth]/route.ts", { namedExports: { authOptions: {} } }),
+    mock.module("../lib/auth-options.ts", { namedExports: { authOptions: {} } }),
     mock.module("../lib/member.ts", { namedExports: { requireMember: async () => { throw new Error("No member."); } } }),
     mock.module("next-auth", { namedExports: { getServerSession: async () => null } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: { communityPost: { findMany: async (input: typeof query) => { query = input; return [{ id: "public-post", body: "A public launch update", createdAt: new Date("2026-10-05"), publicVisible: true, author: { id: "developer", username: "Studio", role: "DEVELOPER", xpPoints: 0 }, comments: [], _count: { comments: 0 } }]; } } } } }),

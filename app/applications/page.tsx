@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { MemberShell } from "@/components/member-shell";
 import { ApplicationCenter } from "@/components/application-center";
 import { requireMember } from "@/lib/member";

@@ -1,7 +1,7 @@
 import { UserRole } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { saveMemberReferral } from "@/lib/quest-ledger";
 import { requireMember } from "@/lib/member";

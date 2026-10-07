@@ -6,7 +6,7 @@ import Link from "next/link";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { NotificationPreferences } from "@/app/actions/accountActions";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import AuthCheck from "@/components/AuthCheck";
 import { AnalyticsSummary, type AnalyticsExclusionState, type AnalyticsSummaryData } from "@/components/analytics-summary";
 import { AccountSettingsForm } from "@/components/account-settings-form";

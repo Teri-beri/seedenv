@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { MAX_AUDIT_ATTEMPTS } from "@/lib/ai/qa-audit";
 import { clearFraudFlag, retryAudit } from "./actions";

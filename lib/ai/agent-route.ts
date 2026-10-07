@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import type { ZodType } from "zod";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 
 export const noStore = { "Cache-Control": "private, no-store" };

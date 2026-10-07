@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { draftProductUpdate } from "@/app/admin/growth/actions";
 import { reviewUrl } from "@/lib/growth/approval";
 import { loadGrowthConfig } from "@/lib/growth/config";

@@ -1,6 +1,6 @@
 import { CampaignStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { PublicLanding } from "@/components/public-landing";
 import { prisma } from "@/lib/prisma";
 import { landingViewHref, resolveLandingView } from "@/lib/landing-views";
@@ -24,10 +24,10 @@ async function getOptionalViewer() {
   }
 }
 
-export default async function Home({ searchParams }: { searchParams?: Promise<{ view?: string }> } = {}) {
-  const params = await searchParams;
-  if (params?.view) {
-    const destination = landingViewHref(resolveLandingView(params.view));
+export default async function Home({ searchParams }: PageProps<"/">) {
+  const { view } = await searchParams;
+  if (typeof view === "string" && view) {
+    const destination = landingViewHref(resolveLandingView(view));
     redirect(destination.startsWith("#") ? `/${destination}` : destination);
   }
   const [directory, viewer] = await Promise.all([

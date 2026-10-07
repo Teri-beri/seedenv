@@ -35,7 +35,7 @@ test("Account profile avoids unmigrated invoice columns and unrelated analytics"
   const Empty = () => null;
   const modules = [
     mock.module("next-auth", { namedExports: { getServerSession: async () => ({ user: { id: "owner" } }) } }),
-    mock.module("../app/api/auth/[...nextauth]/route.ts", { namedExports: { authOptions: {} } }),
+    mock.module("../lib/auth-options.ts", { namedExports: { authOptions: {} } }),
     mock.module("next/navigation", { namedExports: { redirect: (path: string) => { throw new Error(`Unexpected redirect: ${path}`); } } }),
     mock.module("next/image", { defaultExport: Empty }),
     mock.module("next/link", { defaultExport: Empty }),

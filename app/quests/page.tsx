@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { MemberShell } from "@/components/member-shell";
 import { QuestCenter } from "@/components/quest-center";
 import { requireMember } from "@/lib/member";

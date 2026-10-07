@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { notFound, redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { MemberShell } from "@/components/member-shell";
 import { ClipperRoom } from "@/components/clipper-room";
 import { clipMember, clippersEnabled } from "@/lib/clippers";

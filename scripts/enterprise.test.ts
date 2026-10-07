@@ -37,7 +37,7 @@ test("invoice route rejects anonymous, foreign, pending, and inconsistent paymen
   let amount = 10500;
   const queries: Array<Record<string, unknown>> = [];
   const modules = [
-    mock.module("../app/api/auth/[...nextauth]/route.ts", { namedExports: { authOptions: {} } }),
+    mock.module("../lib/auth-options.ts", { namedExports: { authOptions: {} } }),
     mock.module("next-auth", { namedExports: { getServerSession: async () => signedIn ? { user: { id: "owner" } } : null } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: { walletTransaction: { findFirst: async ({ where }: { where: Record<string, unknown> }) => {
       queries.push(where);

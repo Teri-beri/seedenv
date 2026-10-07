@@ -148,7 +148,7 @@ test("public landing survives unavailable cohort and optional account lookups wi
   const log = mock.method(console, "error", (message: string) => { loggedErrors.push(message); });
   const modules = [
     mock.module("next/navigation", { namedExports: { redirect: (path: string) => { throw new Error(`Redirect:${path}`); } } }),
-    mock.module("../app/api/auth/[...nextauth]/route.ts", { namedExports: { authOptions: {} } }),
+    mock.module("../lib/auth-options.ts", { namedExports: { authOptions: {} } }),
     mock.module("next-auth", { namedExports: { getServerSession: async () => signedIn ? { user: { id: "landing-viewer" } } : null } }),
     mock.module("../components/public-landing.tsx", { namedExports: { PublicLanding: () => null } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: {
@@ -158,14 +158,14 @@ test("public landing survives unavailable cohort and optional account lookups wi
   ];
   try {
     const { default: Home } = await import(`../app/page.tsx?landing=${randomUUID()}`);
-    await assert.rejects(Home({ searchParams: Promise.resolve({ view: "developers" }) }), /Redirect:\/#engine/);
-    await assert.rejects(Home({ searchParams: Promise.resolve({ view: "circle" }) }), /Redirect:\/community/);
-    const guest = await Home();
+    await assert.rejects(Home({ params: Promise.resolve({}), searchParams: Promise.resolve({ view: "developers" }) }), /Redirect:\/#engine/);
+    await assert.rejects(Home({ params: Promise.resolve({}), searchParams: Promise.resolve({ view: "circle" }) }), /Redirect:\/community/);
+    const guest = await Home({ params: Promise.resolve({}), searchParams: Promise.resolve({}) });
     assert.deepEqual(guest.props.missions, []);
     assert.equal(guest.props.viewer, null);
     assert.equal(guest.props.directoryUnavailable, true);
     signedIn = true;
-    const expiredViewer = await Home();
+    const expiredViewer = await Home({ params: Promise.resolve({}), searchParams: Promise.resolve({}) });
     assert.equal(expiredViewer.props.viewer, null);
     assert.equal(expiredViewer.props.directoryUnavailable, true);
     assert.ok(loggedErrors.some((message) => message.includes("public cohort lookup")));
@@ -193,7 +193,7 @@ test("launch journeys use real rollback-only database records and mocked provide
     if (role && member.role !== role && member.role !== "ADMIN") throw new Error("Wrong workspace.");
     return member;
   } } }));
-  modules.push(mock.module("../app/api/auth/[...nextauth]/route.ts", { namedExports: { authOptions: {} } }));
+  modules.push(mock.module("../lib/auth-options.ts", { namedExports: { authOptions: {} } }));
   modules.push(mock.module("next-auth", { namedExports: { getServerSession: async () => signedIn ? { user: { id: member.id } } : null } }));
   modules.push(mock.module("../lib/storage.ts", { namedExports: { uploadProofImage: async () => { uploads++; return "proof:mock-replacement"; }, getProofImageUrl: async () => "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/a9sAAAAASUVORK5CYII=" } }));
   modules.push(mock.module("../lib/stripe.ts", { namedExports: { getStripe: () => ({ checkout: { sessions: { retrieve: async () => session } } }) } }));

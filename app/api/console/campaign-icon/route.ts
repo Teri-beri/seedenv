@@ -1,7 +1,7 @@
 import { UserRole } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { uploadAvatarImage } from "@/lib/storage";
 
 const maxIconBytes = 2 * 1024 * 1024;

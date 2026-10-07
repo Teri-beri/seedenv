@@ -106,7 +106,7 @@ test("support chat limits bursts per member and visitor and enforces the daily c
 test("support chat route is unavailable without a Gemini key and rejects non-JSON posts", async () => {
   const key = process.env.GEMINI_API_KEY;
   const modules = [
-    mock.module("../app/api/auth/[...nextauth]/route.ts", { namedExports: { authOptions: {} } }),
+    mock.module("../lib/auth-options.ts", { namedExports: { authOptions: {} } }),
     mock.module("next-auth", { namedExports: { getServerSession: async () => null } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: {} } }),
   ];

@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { GridBackground } from "@/components/grid-background";
 import { prisma } from "@/lib/prisma";

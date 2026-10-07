@@ -3,7 +3,7 @@
 import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/auth-options";
 import { auditSubmission } from "@/lib/ai/qa-audit";
 import { prisma } from "@/lib/prisma";
 
