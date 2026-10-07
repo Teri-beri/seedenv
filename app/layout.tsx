@@ -20,6 +20,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   ...siteMetadata,
   manifest: "/manifest.json",
+  verification: {
+    other: { "msvalidate.01": "6424EAA9B2B14ACA2821B39003908FF0" },
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
