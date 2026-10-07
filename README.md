@@ -155,7 +155,36 @@ Render does not receive local `.env` values. Set these in the Render dashboard b
 - `CRON_SECRET`
 - `NEXT_PUBLIC_TERIMUS_URL` — the exact TERIMUS LLC landing-page URL used by the public footer.
 - `SEEDENV_ANALYTICS_OWNER_EMAIL` — the exact owner email allowed to view site analytics in the developer console. Analytics is hidden when this is unset.
+- Optional growth engine: `GROWTH_ENABLED`, `GROWTH_APPROVAL_SECRET`, a notification webhook and provider keys (see [Growth engine](#growth-engine) and `.env.example`).
 
 If `NEXTAUTH_SECRET` is missing, NextAuth will return `NO_SECRET` and protected routes will fail in production.
 
 Check `/api/system/email-health` after deployment to verify auth email configuration without exposing secret values.
+
+## Growth engine
+
+An approval-gated marketing pipeline: weekly SEO article + social drafts, and an ad-spend kill-switch every 6 hours. Nothing is published, posted or paused without either a human approval or an explicit opt-in flag.
+
+```
+lib/growth/
+  config.ts          env contract (Zod); adapters are live with credentials, mock in dev, disabled in production
+  schemas.ts         Zod output contracts: research brief, blog post, per-platform social pack, ad metrics/decisions
+  llm.ts             Gemini structured output (JSON schema + Zod repair loop) and function-calling loop
+  retry.ts, log.ts   full-jitter backoff honouring Retry-After; JSON logs with secret redaction
+  store.ts           Prisma store (content_drops, social_queue, ad_audits) and an in-memory store for dry runs/tests
+  tools/             fetch_keyword_metrics (DataForSEO), stage_cms_post, queue_social_post (Ayrshare),
+                     check_ad_performance_and_killswitch (Meta Marketing API)
+  agents/            research (tool calling), copywriter + social, ads (deterministic, no LLM)
+  approval.ts        HMAC review links (14 days) and the approve/reject state machine
+  notify.ts          Slack / Discord / Telegram review cards and alerts
+  pipeline.ts        runContentPipeline, runAdHealthCheck, runGrowthJob (isolated jobs + failure alerts)
+app/api/cron/growth/[job]   CRON_SECRET-protected trigger (content | ads | all)
+app/api/growth/review       confirmation page (GET, no side effects) + decision (POST)
+app/(public)/blog           renders PUBLISHED drops only
+scripts/growth-runner.ts    npm run growth -- <content|ads|all> [--dry-run] [--mock] [--force]
+.github/workflows/growth-*.yml   weekly content (Mon 13:00 UTC), ads every 6h
+```
+
+Flow: research picks a keyword using real DataForSEO numbers -> article is validated and stored as `DRAFTED` -> three social variants are stored as `PENDING_APPROVAL` -> a review card goes to Slack/Discord/Telegram. Approving the article publishes it to `/blog/<slug>` (or the optional CMS webhook). Social posts can only be approved after the article is live; approval schedules them in Ayrshare with the link appended. Rejected or failed drafts free their keyword.
+
+Setup: set `GROWTH_APPROVAL_SECRET`, `GEMINI_API_KEY` and at least one notification channel, try `npm run growth -- all --dry-run` locally (memory store, nothing sent), then set `GROWTH_ENABLED=true` on Render. Add `DATAFORSEO_*`, `AYRSHARE_API_KEY` and `META_*` as you adopt each channel; leave `AD_KILLSWITCH_ENFORCE=false` until alerts look right. The workflows reuse the `SEEDENV_CRON_SECRET` repository secret. Tests: `npm run test:growth`.

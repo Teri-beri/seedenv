@@ -1,0 +1,24 @@
+name: "Growth engine: ad health check"
+
+# Calls the protected SeedEnv endpoint; the job is a no-op until GROWTH_ENABLED=true on the server.
+on:
+  schedule:
+    - cron: "15 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: growth-ads
+  cancel-in-progress: false
+
+jobs:
+  growth-ads:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Call protected SeedEnv cron endpoint
+        run: |
+          curl --fail-with-body --show-error --silent --max-time 120 \
+            --retry 2 --retry-delay 30 --retry-all-errors \
+            --request POST \
+            --header "Authorization: Bearer ${{ secrets.SEEDENV_CRON_SECRET }}" \
+            "https://seedenv.com/api/cron/growth/ads"

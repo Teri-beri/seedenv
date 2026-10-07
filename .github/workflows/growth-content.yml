@@ -1,0 +1,23 @@
+name: "Growth engine: weekly SEO + social drafts"
+
+# Calls the protected SeedEnv endpoint; the job is a no-op until GROWTH_ENABLED=true on the server.
+on:
+  schedule:
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: growth-content
+  cancel-in-progress: false
+
+jobs:
+  growth-content:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Call protected SeedEnv cron endpoint
+        run: |
+          curl --fail-with-body --show-error --silent --max-time 600 \
+            --request POST \
+            --header "Authorization: Bearer ${{ secrets.SEEDENV_CRON_SECRET }}" \
+            "https://seedenv.com/api/cron/growth/content"

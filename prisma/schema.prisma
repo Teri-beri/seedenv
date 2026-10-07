@@ -649,3 +649,92 @@ model AnalyticsEvent {
   @@index([path, createdAt])
   @@index([createdAt])
 }
+
+// Growth engine (lib/growth). Everything generated starts in a review state; nothing publishes without a human approval.
+enum ContentDropStatus {
+  RESEARCHING
+  DRAFTED
+  APPROVED
+  PUBLISHED
+  REJECTED
+}
+
+enum SocialPlatform {
+  TWITTER
+  LINKEDIN
+  INSTAGRAM
+}
+
+enum SocialQueueStatus {
+  PENDING_APPROVAL
+  QUEUED
+  PUBLISHED
+  REJECTED
+  FAILED
+}
+
+enum AdAuditAction {
+  MAINTAINED
+  ALERTED
+  PAUSED
+}
+
+model ContentDrop {
+  id             String            @id @default(cuid())
+  title          String            @db.VarChar(200)
+  targetKeyword  String            @map("target_keyword") @db.VarChar(200)
+  slug           String            @unique @db.VarChar(120)
+  status         ContentDropStatus @default(RESEARCHING)
+  markdownBody   String?           @map("markdown_body")
+  metadata       Json?
+  research       Json?
+  reviewNote     String?           @map("review_note") @db.VarChar(1000)
+  externalUrl    String?           @map("external_url") @db.VarChar(1000)
+  approvedAt     DateTime?         @map("approved_at")
+  publishedAt    DateTime?         @map("published_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  socialPosts    SocialQueue[]
+
+  @@index([status, createdAt])
+  @@index([targetKeyword])
+  @@map("content_drops")
+}
+
+model SocialQueue {
+  id              String            @id @default(cuid())
+  contentDropId   String?           @map("content_drop_id")
+  contentDrop     ContentDrop?      @relation(fields: [contentDropId], references: [id], onDelete: SetNull)
+  platform        SocialPlatform
+  postText        String            @map("post_text") @db.VarChar(3000)
+  mediaUrls       String[]          @default([]) @map("media_urls")
+  scheduledTime   DateTime          @map("scheduled_time")
+  status          SocialQueueStatus @default(PENDING_APPROVAL)
+  externalId      String?           @map("external_id") @db.VarChar(200)
+  lastError       String?           @map("last_error") @db.VarChar(1000)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@index([status, scheduledTime])
+  @@index([contentDropId])
+  @@map("social_queue")
+}
+
+model AdAudit {
+  id            String        @id @default(cuid())
+  provider      String        @db.VarChar(40)
+  campaignId    String        @map("campaign_id") @db.VarChar(120)
+  campaignName  String        @map("campaign_name") @db.VarChar(300)
+  spend         Decimal       @db.Decimal(12, 2)
+  impressions   Int
+  conversions   Int
+  cpa           Decimal?      @db.Decimal(12, 2)
+  thresholdCpa  Decimal       @map("threshold_cpa") @db.Decimal(12, 2)
+  actionTaken   AdAuditAction @map("action_taken")
+  reason        String        @db.VarChar(500)
+  timestamp     DateTime      @default(now())
+
+  @@index([campaignId, timestamp])
+  @@index([actionTaken, timestamp])
+  @@map("ad_audits")
+}

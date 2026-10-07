@@ -3,6 +3,7 @@ import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isPublicHandle, publicProfilePath, SEED_ACCOUNT_EMAIL_SUFFIX } from "@/lib/public-profile";
 import { SITE_URL } from "@/lib/seo";
+import { listPublishedPosts } from "@/lib/growth/blog";
 
 export const revalidate = 3600;
 
@@ -31,6 +32,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/pricing`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/validators/join`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/community`, changeFrequency: "daily", priority: 0.7 },
+    { url: `${SITE_URL}/blog`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE_URL}/faq`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/about`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/docs`, changeFrequency: "monthly", priority: 0.6 },
@@ -40,6 +42,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/security`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.3 },
+    ...(await listPublishedPosts()).map((post) => ({ url: `${SITE_URL}/blog/${post.slug}`, lastModified: post.updatedAt, changeFrequency: "monthly" as const, priority: 0.6 })),
     ...(await developerProfiles()),
   ];
 }
