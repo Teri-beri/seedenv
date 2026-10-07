@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { useState } from "react";
-import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, cardProcessingFeeCents, isBundleType, projectPerTesterCharges, quoteCampaignFunding, type CohortTypeKey } from "@/lib/pricing";
+import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, projectPerTesterCharges, quoteCampaignFunding, type CohortTypeKey } from "@/lib/pricing";
 import { formatCents } from "@/lib/utils";
 
 const tabs: Array<{ type: CohortTypeKey; label: string; price: string }> = [
@@ -81,10 +81,8 @@ export function PricingCalculator({ href }: { href: string }) {
             <dd className="text-right font-mono text-zinc-400">{formatCents(perTester.stipendCents)}</dd>
             <dt className="text-zinc-500">· {floorApplied ? `Platform fee ($${minFeeUsd} minimum)` : `Platform fee (${feePercent}%)`}</dt>
             <dd className="text-right font-mono text-zinc-400">{formatCents(perTester.platformFeeCents)}</dd>
-            <dt className="text-zinc-500">· Card processing (2.9% + 30¢, once per top-up)</dt>
-            <dd className="text-right font-mono text-zinc-400">{formatCents(cardProcessingFeeCents(perTester.maxTotalCents))}</dd>
             <dt className="border-t border-zinc-800 pt-3 font-medium text-zinc-100">Maximum if every place fills</dt>
-            <dd className="border-t border-zinc-800 pt-3 text-right font-mono font-medium text-zinc-100">{formatCents(perTester.maxTotalCents + cardProcessingFeeCents(perTester.maxTotalCents))}</dd>
+            <dd className="border-t border-zinc-800 pt-3 text-right font-mono font-medium text-zinc-100">{formatCents(perTester.maxTotalCents)}</dd>
           </dl>
         )}
         <div className="mt-3 text-xs leading-5 text-zinc-500">
@@ -92,7 +90,7 @@ export function PricingCalculator({ href }: { href: string }) {
             ? "SeedEnv cannot guarantee Google's production-access decision; the refund covers tester retention only."
             : bundle
               ? "The live session time is agreed in your cohort brief. Testers join from their own devices and networks."
-              : `Top up a prepaid balance (from $10) and launch. Each tester you accept draws their reward plus fee from it, so you only pay for testers who join; the $${minFeeUsd} minimum fee is taken with the first one. Unused places return to your balance, which is refundable any time (card processing excepted). Shown with one full top-up; smaller top-ups add 30¢ each.`}
+              : `Top up a prepaid balance (from $10) and launch. Each tester you accept draws their reward plus fee from it, so you only pay for testers who join; the $${minFeeUsd} minimum fee is taken with the first one. Unused places return to your balance, which is refundable in full any time. No card processing or top-up fees.`}
         </div>
         <Link className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 text-sm font-semibold text-zinc-950 transition-colors hover:bg-white" href={cohortLaunchHref(href, type)}>
           {bundle ? `Start ${bundle.shortName}` : "Deploy a Cohort"} <ArrowRight className="size-4" />

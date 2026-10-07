@@ -94,8 +94,7 @@ export async function createTopUpCheckout(user: TopUpMember, creditCents: number
       expires_at: Math.floor(Date.now() / 1000) + CHECKOUT_EXPIRY_SECONDS,
       payment_method_types: ["card"],
       line_items: [
-        { quantity: 1, price_data: { currency: "usd", unit_amount: quote.creditCents, product_data: { name: "SeedEnv prepaid balance", description: "Used for tester rewards and platform fees as you accept testers. Unused balance is refundable." } } },
-        { quantity: 1, price_data: { currency: "usd", unit_amount: quote.processingFeeCents, product_data: { name: "Card processing", description: "Stripe 2.9% + 30¢, charged once per top-up. Non-refundable." } } },
+        { quantity: 1, price_data: { currency: "usd", unit_amount: quote.creditCents, product_data: { name: "SeedEnv prepaid balance", description: "Used for tester rewards and platform fees as you accept testers. Unused balance is refundable to your card at any time." } } },
       ],
       payment_intent_data: { setup_future_usage: "off_session", description: "SeedEnv prepaid balance top-up", metadata: { type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id } },
       success_url: `${base}${options.successPath}`,
@@ -192,7 +191,7 @@ export async function autoReloadBalance(userId: string, shortfallCents: number, 
 }
 
 // Refunds the whole available balance to the cards that funded it, newest top-up first.
-// Card processing on each top-up is not returned. Anything Stripe refuses stays in the balance.
+// Anything Stripe refuses stays in the balance.
 export async function withdrawBalance(userId: string) {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error("Payments are not configured yet. Please try again later.");
   const reserved = await serializable(async (tx) => {

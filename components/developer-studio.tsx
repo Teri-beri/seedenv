@@ -565,10 +565,10 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                           </label>
                         ))}
                       </div>
-                      {chosenTopUp ? <p className="mt-3 font-mono text-[11px] text-zinc-500">{usd(chosenTopUp.quote.creditCents)} credit + {usd(chosenTopUp.quote.processingFeeCents)} card processing (Stripe 2.9% + 30¢, once per top-up) = <span className="text-zinc-200">{usd(chosenTopUp.quote.totalCents)}</span></p> : null}
+                      {chosenTopUp ? <p className="mt-3 font-mono text-[11px] text-zinc-500">Card charged <span className="text-zinc-200">{usd(chosenTopUp.quote.totalCents)}</span>, all added to your balance. No processing or top-up fees.</p> : null}
                     </fieldset>
                   ) : null}
-                  <p className="text-xs leading-5 text-white/50">You only pay for testers who actually join: each accepted tester draws their reward plus the platform fee from your prepaid balance. Places freed by withdrawn or rejected testers are reused first. Ending the cohort, or 30 days passing, returns unused places to your balance, and you can refund your balance to your card any time (card processing is non-refundable).</p>
+                  <p className="text-xs leading-5 text-white/50">You only pay for testers who actually join: each accepted tester draws their reward plus the platform fee from your prepaid balance. Places freed by withdrawn or rejected testers are reused first. Ending the cohort, or 30 days passing, returns unused places to your balance, and you can refund your balance in full to your card any time.</p>
                   <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending}>
                     <BadgeDollarSign className="size-5" /> {needsTopUp && chosenTopUp ? `Add ${usd(chosenTopUp.creditCents)} & Launch` : "Launch Cohort"}
                   </Button>

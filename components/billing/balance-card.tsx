@@ -54,7 +54,7 @@ export function BalanceCard({ balanceCents, autoReloadCents, pendingTopUps, with
               </label>
             </div>
             {quote ? (
-              <p className="mt-2 font-mono text-[11px] text-zinc-500">{formatCents(quote.creditCents)} credit + {formatCents(quote.processingFeeCents)} card processing = <span className="text-zinc-200">{formatCents(quote.totalCents)}</span></p>
+              <p className="mt-2 font-mono text-[11px] text-zinc-500">Card charged <span className="text-zinc-200">{formatCents(quote.totalCents)}</span>, all added to your balance. No processing or top-up fees.</p>
             ) : <p className="mt-2 font-mono text-[11px] text-amber-400">Enter {formatCents(MIN_TOP_UP_CENTS)}–{formatCents(MAX_TOP_UP_CENTS)}.</p>}
             <button type="button" disabled={pending || !quote} onClick={() => run(() => startBalanceTopUp(creditCents))} className="mt-2 inline-flex h-8 items-center rounded-lg bg-white px-3.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-zinc-200 disabled:opacity-50">{pending ? "Working…" : quote ? `Add ${formatCents(quote.creditCents)}` : "Add funds"}</button>
           </fieldset>
@@ -77,7 +77,7 @@ export function BalanceCard({ balanceCents, autoReloadCents, pendingTopUps, with
       <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-zinc-800 pt-4">
         {confirmRefund ? (
           <>
-            <span className="text-xs text-zinc-300">Refund {formatCents(balanceCents)} to your card? Card processing from past top-ups isn&apos;t refundable.</span>
+            <span className="text-xs text-zinc-300">Refund {formatCents(balanceCents)} to your card? It goes back to the cards you topped up with, newest first.</span>
             <button type="button" disabled={pending} onClick={() => run(refundBalanceToCard)} className="h-8 rounded-lg border border-red-500/40 px-3 text-xs font-medium text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-50">{pending ? "Refunding…" : "Confirm refund"}</button>
             <button type="button" disabled={pending} onClick={() => setConfirmRefund(false)} className="h-8 px-2 text-xs text-zinc-500 hover:text-zinc-200">Cancel</button>
           </>

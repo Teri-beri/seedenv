@@ -31,14 +31,12 @@ test("full-cohort projection matches the advertised 25 × $4 example", () => {
   assert.equal(projection.firstCharge?.totalCents, 1900);
   assert.equal(projection.typicalCharge?.totalCents, 480);
   assert.equal(projection.maxTotalCents, 12000);
-  // One full top-up costs $3.90 in processing, versus $11.39 when every tester was a separate card charge.
-  assert.equal(cardProcessingFeeCents(projection.maxTotalCents), 390);
   assert.equal(projectPerTesterCharges(0, 400).maxTotalCents, 0);
   assert.equal(projectPerTesterCharges(5, -1).firstCharge, null);
 });
 
-test("top-ups are bounded and pass processing through once", () => {
-  assert.deepEqual(quoteTopUp(5000), { creditCents: 5000, processingFeeCents: cardProcessingFeeCents(5000), totalCents: 5000 + cardProcessingFeeCents(5000) });
+test("top-ups are bounded and charge exactly the credit (no card surcharge)", () => {
+  assert.deepEqual(quoteTopUp(5000), { creditCents: 5000, processingFeeCents: 0, totalCents: 5000 });
   assert.throws(() => quoteTopUp(999), /between/);
   assert.throws(() => quoteTopUp(500001), /between/);
   assert.equal(topUpForShortfall(1), 1000);
@@ -258,7 +256,7 @@ test("ending a cohort credits unused places back to the balance, newest first, w
   assert.equal(harness.state.campaign.refundedCents, 2300);
 });
 
-test("refunding the balance returns it to the newest top-ups first and keeps processing", async () => {
+test("refunding the balance returns it to the newest top-ups first", async () => {
   const topUps = [
     { id: "old", userId: "dev", status: "SUCCEEDED", creditCents: 2000, refundedCents: 0, stripePaymentIntentId: "pi_old", createdAt: new Date("2026-10-01") },
     { id: "new", userId: "dev", status: "SUCCEEDED", creditCents: 2000, refundedCents: 500, stripePaymentIntentId: "pi_new", createdAt: new Date("2026-10-05") },

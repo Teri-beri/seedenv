@@ -116,7 +116,7 @@ export function calculateCohortEscrow(validatorCount: number, stipendPerValidato
   };
 }
 
-// Card processing passed through on balance top-ups, grossed up so the fee itself is covered.
+// Stripe's card cost grossed up to a base amount. Used for estimates; SeedEnv absorbs processing rather than surcharging it.
 export function cardProcessingFeeCents(baseCents: number) {
   if (!Number.isSafeInteger(baseCents) || baseCents <= 0) return 0;
   const totalCents = Math.ceil((baseCents + STRIPE_CARD_FIXED_CENTS) / (1 - STRIPE_CARD_RATE));
@@ -157,13 +157,12 @@ export const AUTO_RELOAD_OPTIONS_CENTS = [2500, 5000, 10000, 25000] as const;
 
 export type TopUpQuote = { creditCents: number; processingFeeCents: number; totalCents: number };
 
-// Card processing is charged once per top-up, on top of the credit added to the balance.
+// SeedEnv absorbs card processing (no surcharge), so the card is charged exactly the credit added.
 export function quoteTopUp(creditCents: number): TopUpQuote {
   if (!Number.isSafeInteger(creditCents) || creditCents < MIN_TOP_UP_CENTS || creditCents > MAX_TOP_UP_CENTS) {
     throw new Error(`Top-ups must be between $${MIN_TOP_UP_CENTS / 100} and $${(MAX_TOP_UP_CENTS / 100).toLocaleString("en-US")}.`);
   }
-  const processingFeeCents = cardProcessingFeeCents(creditCents);
-  return { creditCents, processingFeeCents, totalCents: creditCents + processingFeeCents };
+  return { creditCents, processingFeeCents: 0, totalCents: creditCents };
 }
 
 // Smallest valid top-up that covers a shortfall, rounded up to a whole dollar.

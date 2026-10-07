@@ -165,7 +165,7 @@ test("custom drops without enough balance wait for one top-up checkout, with no 
   assert.equal(seen.deposits, 0);
   assert.equal(seen.topUps[0].creditCents, 5000);
   assert.equal(seen.topUps[0].campaignId, "cohort-test");
-  assert.deepEqual(seen.checkout?.line_items.map((item) => item.price_data.unit_amount), [5000, 181]);
+  assert.deepEqual(seen.checkout?.line_items.map((item) => item.price_data.unit_amount), [5000]);
   assert.equal(seen.checkout?.metadata.type, "SEEDENV_BALANCE_TOPUP");
   // A tiny requested top-up is raised to cover the first tester's shortfall.
   const small = await launchCustom(500, 100);

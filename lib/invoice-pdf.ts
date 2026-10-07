@@ -57,7 +57,7 @@ export async function generateInvoicePdf(input: { id: string; date: Date; amount
   if (kind === "TOP_UP") {
     line("Prepaid balance top-up", 14);
     line(`Balance credit: ${money(input.snapshot.rewardPoolCents)}`);
-    line(`Card processing (Stripe 2.9% + 30¢): ${money(input.snapshot.processingFeeCents ?? 0)}`);
+    if (input.snapshot.processingFeeCents) line(`Card processing (Stripe 2.9% + 30¢): ${money(input.snapshot.processingFeeCents)}`);
   } else {
     line(`Cohort: ${input.snapshot.cohortTitle}`, 14);
     line(`Cohort ID: ${input.snapshot.cohortId}`);
