@@ -15,6 +15,7 @@ import { availableSlots, discoverMissions, type MissionFilter } from "@/lib/test
 import { formatCents } from "@/lib/utils";
 import { landingViews, landingViewHref } from "@/lib/landing-views";
 import TelemetryGridCanvas from "@/components/TelemetryGridCanvas";
+import { SandboxBadge, ScenarioCard, ScenarioDrawer, sandboxScenarios, useScenarioInspector, type SandboxScenario } from "@/components/telemetry-sandbox";
 
 type Mission = {
   id: string;
@@ -45,20 +46,18 @@ const surfaceTint = "bg-[#12161F]/20";
 const labelClass = "font-mono text-xs uppercase text-zinc-400";
 const platformLabels = { TESTFLIGHT: "iOS / TestFlight", PLAY_STORE: "Android / Play Console", WEB_STAGING: "Web / PWA" };
 
-const exampleCohorts = [
-  { title: "iOS 18 TestFlight", scope: "Auth flow stress test & deep-link telemetry", platform: "iOS", stipend: "$15.00", slots: "18 / 25", progress: 72 },
-  { title: "Next.js PWA", scope: "Stripe checkout edge cases on Safari", platform: "Web", stipend: "$10.00", slots: "12 / 20", progress: 60 },
-];
-
-const reportPreview = JSON.stringify({
-  device: "iPhone 15 Pro",
-  os: "iOS 18.0",
-  build: "1.4.0 (42)",
-  scenario: "Session recovery after a deep link",
-  steps: ["Open invitation link", "Complete sign-in", "Return to the invitation"],
-  expected: "Invitation remains available",
-  observed: "Redirect returns to the home screen",
-  attachments: ["reproduction.mp4", "network.har", "crash.log"],
+const reportPreview = (scenario: SandboxScenario) => JSON.stringify({
+  device: scenario.device,
+  os: scenario.os,
+  build: scenario.build,
+  network: scenario.network,
+  scenario: scenario.title,
+  severity: scenario.severity,
+  steps: scenario.steps,
+  expected: scenario.expected,
+  observed: scenario.actual,
+  reproduced: scenario.reproRate,
+  attachments: scenario.attachments,
 }, null, 2);
 
 export function PublicLanding({ missions, viewer, directoryUnavailable = false }: { missions: Mission[]; viewer: Viewer; directoryUnavailable?: boolean }) {
@@ -174,7 +173,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8" aria-label="Live validation showcase"><LiveShowcase /></section>
+        <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8" aria-label="Live validation showcase"><LiveShowcase onStartCohort={() => requestAccess({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Launch your first cohort" })} /></section>
         <section id="engine" className={`${sectionShell} ${surfaceTint}`}>
           <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />
           <div className={sectionClass}>
@@ -267,30 +266,26 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
   );
 }
 
-function LiveShowcase() {
+function LiveShowcase({ onStartCohort }: { onStartCohort: () => void }) {
   const [tab, setTab] = useState<"cohorts" | "report">("cohorts");
+  const inspector = useScenarioInspector();
+  const featured = sandboxScenarios[0];
   return (
     <div className="min-w-0 overflow-hidden rounded-lg border border-white/10 bg-[#171923]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4"><span className={`${labelClass} flex items-center gap-2`}><Terminal className="size-4 text-emerald-400" /> Live Telemetry &amp; Cohort Feed</span><span className="font-mono text-[11px] text-zinc-500">EXAMPLE DATA</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-4"><span className={`${labelClass} flex items-center gap-2`}><Terminal className="size-4 text-emerald-400" /> Live Telemetry &amp; Cohort Feed</span><SandboxBadge /></div>
       <div className="grid grid-cols-2 border-b border-white/10" role="tablist" aria-label="Validation showcase">
         {([['cohorts', 'Live Cohorts Preview'], ['report', 'Telemetry & Report Preview']] as const).map(([value, title]) => (
           <button type="button" key={value} id={`showcase-tab-${value}`} role="tab" aria-selected={tab === value} aria-controls={`showcase-panel-${value}`} onClick={() => setTab(value)} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowRight") { event.preventDefault(); const nextTab = tab === "cohorts" ? "report" : "cohorts"; setTab(nextTab); document.getElementById(`showcase-tab-${nextTab}`)?.focus(); } }} tabIndex={tab === value ? 0 : -1} className={`min-h-14 px-3 py-3 text-xs font-medium leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${tab === value ? "border-b-2 border-emerald-400 bg-[#0F1117] text-white" : "text-zinc-400 hover:text-white"}`}>{title}</button>
         ))}
       </div>
-      <div className="h-[360px] overflow-auto max-[359px]:h-[420px] md:h-[260px]">
+      <div className="h-[520px] overflow-auto md:h-[300px]">
         {tab === "cohorts" ? (
           <div id="showcase-panel-cohorts" role="tabpanel" aria-labelledby="showcase-tab-cohorts" className="grid gap-3 p-3 pb-5 sm:gap-4 sm:p-4 sm:pb-6 md:grid-cols-2">
-            {exampleCohorts.map((cohort) => (
-              <div key={cohort.title} className="min-w-0 rounded-lg border border-white/10 bg-[#0F1117] p-4 sm:p-5">
-                <div className="flex items-start justify-between gap-4"><p className="text-sm font-semibold text-white">{cohort.title}</p><span className="border border-white/10 px-2 py-1 font-mono text-[11px] text-emerald-300">{cohort.platform}</span></div>
-                <p className="mt-2 max-w-md text-sm leading-6 text-zinc-400">{cohort.scope}</p>
-                <div className="mt-4 flex items-center justify-between gap-3 font-mono text-xs"><span className="text-amber-300">{cohort.stipend} / validator</span><span className="text-zinc-400">{cohort.slots} slots filled</span></div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-sm bg-zinc-800" role="progressbar" aria-label={`${cohort.title} example slots filled`} aria-valuenow={cohort.progress} aria-valuemin={0} aria-valuemax={100}><div className="h-full bg-emerald-500" style={{ width: `${cohort.progress}%` }} /></div>
-              </div>
-            ))}
+            {sandboxScenarios.map((scenario) => <ScenarioCard key={scenario.id} scenario={scenario} onInspect={() => inspector.inspect(scenario)} />)}
           </div>
-        ) : <div id="showcase-panel-report" role="tabpanel" aria-labelledby="showcase-tab-report" className="p-5"><div className="mb-4 flex items-center justify-between gap-3 font-mono text-xs"><span className="text-zinc-400">report.json</span><span className="text-emerald-400">Reproducible evidence</span></div><pre className="max-h-[255px] overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-6 text-zinc-300"><code>{reportPreview}</code></pre></div>}
+        ) : <div id="showcase-panel-report" role="tabpanel" aria-labelledby="showcase-tab-report" className="p-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-3 font-mono text-xs"><span className="text-zinc-400">report.json</span><button type="button" onClick={() => inspector.inspect(featured)} aria-haspopup="dialog" className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-emerald-300 hover:text-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">Inspect Scenario <ArrowRight className="size-3.5" aria-hidden="true" /></button></div><pre className="max-h-[400px] overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-6 text-zinc-300 md:max-h-[200px]"><code>{reportPreview(featured)}</code></pre></div>}
       </div>
+      <ScenarioDrawer scenario={inspector.active} onOpenChange={inspector.onOpenChange} onStartCohort={() => { inspector.onOpenChange(false); onStartCohort(); }} />
     </div>
   );
 }
