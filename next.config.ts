@@ -20,10 +20,14 @@ const nextConfig: NextConfig = {
     return [{ source: "/@:username", destination: "/u/:username" }];
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }, ...["dashboard", "api", "settings", "auth", "account", "console", "admin", "onboarding", "community", "clippers", "quests", "applications"].map((path) => ({
-      source: `/${path}/:path*`,
-      headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
-    }))];
+    const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      ...["dashboard", "api", "settings", "account", "console", "admin", "onboarding", "clippers", "quests", "applications"].map((path) => ({ source: `/${path}/:path*`, headers: noindex })),
+      // /auth/signin is the public sign-in page and stays indexable; other auth screens do not.
+      { source: "/auth", headers: noindex },
+      { source: "/auth/:path((?!signin$).*)", headers: noindex },
+    ];
   },
   images: {
     remotePatterns: [
