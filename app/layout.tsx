@@ -56,7 +56,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(siteStructuredData).replace(/</g, "\\u003c") }}
         />
-        <AuthProvider>{children}<SupportModal /></AuthProvider>
+        <AuthProvider>{children}<SupportModal aiEnabled={Boolean(process.env.GEMINI_API_KEY)} /></AuthProvider>
       </body>
     </html>
   );

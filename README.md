@@ -55,6 +55,8 @@ On Android:
 - `STRIPE_SECRET_KEY`: Stripe secret key for escrow checkout.
 - `STRIPE_WEBHOOK_SECRET`: Stripe webhook signing secret for `/api/stripe/webhook`.
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROOF_BUCKET`: proof screenshot storage.
+- `GEMINI_API_KEY` (optional): enables the "Ask AI" tab in the help drawer (`?`). Use a Google AI Studio key from a project with billing enabled (paid tier) so chat content is not used for training. Without it, only the human support form is shown. The assistant answers from the FAQ and pricing constants and has read-only, session-scoped tools for the member's account, cohorts, testing work and payments; it cannot change data and hands off to the ticket form.
+- `GEMINI_SUPPORT_MODEL` (optional, default `gemini-3.1-flash-lite`) and `SUPPORT_AI_DAILY_LIMIT` (optional, default `1500` assistant requests per day per server instance).
 
 ## Production Security Operations
 

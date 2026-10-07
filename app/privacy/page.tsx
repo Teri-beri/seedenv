@@ -38,6 +38,7 @@ const sections = [
       { label: "Cloud Storage", text: "Secure hosting for uploaded tester proof files, screenshots, and campaign assets." },
       { label: "Authentication & Email", text: "Providers delivering transactional emails and secure magic-link sign-ins." },
       { label: "Payment & Escrow Processors", text: "Stripe for processing developer campaign deposits and tester reward payouts." },
+      { label: "AI Support Assistant", text: "When you use \"Ask AI\" in the help panel, your messages, the page you are on and, if you are signed in, the account details the assistant looks up to answer (such as balance, cohort or payout status) are sent to Google's Gemini API to generate a reply. We use Google's paid service, under which Google does not use this content to train its models. Chats are not stored by SeedEnv unless you send them to our team as a support ticket." },
       { label: "Hosting & Analytics", text: "Cloud infrastructure hosts and monitoring services." },
       { label: "Legal Requirements", text: "We may disclose information if required by law, regulation, subpoena, or legal process, or to protect the vital interests, safety, and integrity of SeedEnv and its users." },
     ],
