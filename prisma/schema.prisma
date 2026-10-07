@@ -227,6 +227,7 @@ model AppCampaign {
   applications     MissionApplication[]
   transactions     WalletTransaction[]
   slotCharges      SlotCharge[]
+  synthesis        CampaignSynthesis?
 
   @@index([developerId, status])
   @@index([status, expiresAt])
@@ -413,6 +414,7 @@ model Submission {
   isLowPowerMode      Boolean?
   hardwareFlags       String[]          @default([])
   githubIssueUrl      String?
+  audit               SubmissionAudit?
   status              SubmissionStatus  @default(PENDING)
   rejectionReason     String?
   revisionRequestedAt DateTime?
@@ -682,21 +684,21 @@ enum AdAuditAction {
 }
 
 model ContentDrop {
-  id             String            @id @default(cuid())
-  title          String            @db.VarChar(200)
-  targetKeyword  String            @map("target_keyword") @db.VarChar(200)
-  slug           String            @unique @db.VarChar(120)
-  status         ContentDropStatus @default(RESEARCHING)
-  markdownBody   String?           @map("markdown_body")
-  metadata       Json?
-  research       Json?
-  reviewNote     String?           @map("review_note") @db.VarChar(1000)
-  externalUrl    String?           @map("external_url") @db.VarChar(1000)
-  approvedAt     DateTime?         @map("approved_at")
-  publishedAt    DateTime?         @map("published_at")
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
-  socialPosts    SocialQueue[]
+  id            String            @id @default(cuid())
+  title         String            @db.VarChar(200)
+  targetKeyword String            @map("target_keyword") @db.VarChar(200)
+  slug          String            @unique @db.VarChar(120)
+  status        ContentDropStatus @default(RESEARCHING)
+  markdownBody  String?           @map("markdown_body")
+  metadata      Json?
+  research      Json?
+  reviewNote    String?           @map("review_note") @db.VarChar(1000)
+  externalUrl   String?           @map("external_url") @db.VarChar(1000)
+  approvedAt    DateTime?         @map("approved_at")
+  publishedAt   DateTime?         @map("published_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  socialPosts   SocialQueue[]
 
   @@index([status, createdAt])
   @@index([targetKeyword])
@@ -704,20 +706,20 @@ model ContentDrop {
 }
 
 model SocialQueue {
-  id              String            @id @default(cuid())
-  contentDropId   String?           @map("content_drop_id")
-  contentDrop     ContentDrop?      @relation(fields: [contentDropId], references: [id], onDelete: SetNull)
-  platform        SocialPlatform
-  postText        String            @map("post_text") @db.VarChar(3000)
-  mediaUrls       String[]          @default([]) @map("media_urls")
-  linkUrl         String?           @map("link_url") @db.VarChar(500)
-  videoScript     Json?             @map("video_script")
-  scheduledTime   DateTime          @map("scheduled_time")
-  status          SocialQueueStatus @default(PENDING_APPROVAL)
-  externalId      String?           @map("external_id") @db.VarChar(200)
-  lastError       String?           @map("last_error") @db.VarChar(1000)
-  createdAt       DateTime          @default(now()) @map("created_at")
-  updatedAt       DateTime          @updatedAt @map("updated_at")
+  id            String            @id @default(cuid())
+  contentDropId String?           @map("content_drop_id")
+  contentDrop   ContentDrop?      @relation(fields: [contentDropId], references: [id], onDelete: SetNull)
+  platform      SocialPlatform
+  postText      String            @map("post_text") @db.VarChar(3000)
+  mediaUrls     String[]          @default([]) @map("media_urls")
+  linkUrl       String?           @map("link_url") @db.VarChar(500)
+  videoScript   Json?             @map("video_script")
+  scheduledTime DateTime          @map("scheduled_time")
+  status        SocialQueueStatus @default(PENDING_APPROVAL)
+  externalId    String?           @map("external_id") @db.VarChar(200)
+  lastError     String?           @map("last_error") @db.VarChar(1000)
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
 
   @@index([status, scheduledTime])
   @@index([contentDropId])
@@ -725,20 +727,80 @@ model SocialQueue {
 }
 
 model AdAudit {
-  id            String        @id @default(cuid())
-  provider      String        @db.VarChar(40)
-  campaignId    String        @map("campaign_id") @db.VarChar(120)
-  campaignName  String        @map("campaign_name") @db.VarChar(300)
-  spend         Decimal       @db.Decimal(12, 2)
-  impressions   Int
-  conversions   Int
-  cpa           Decimal?      @db.Decimal(12, 2)
-  thresholdCpa  Decimal       @map("threshold_cpa") @db.Decimal(12, 2)
-  actionTaken   AdAuditAction @map("action_taken")
-  reason        String        @db.VarChar(500)
-  timestamp     DateTime      @default(now())
+  id           String        @id @default(cuid())
+  provider     String        @db.VarChar(40)
+  campaignId   String        @map("campaign_id") @db.VarChar(120)
+  campaignName String        @map("campaign_name") @db.VarChar(300)
+  spend        Decimal       @db.Decimal(12, 2)
+  impressions  Int
+  conversions  Int
+  cpa          Decimal?      @db.Decimal(12, 2)
+  thresholdCpa Decimal       @map("threshold_cpa") @db.Decimal(12, 2)
+  actionTaken  AdAuditAction @map("action_taken")
+  reason       String        @db.VarChar(500)
+  timestamp    DateTime      @default(now())
 
   @@index([campaignId, timestamp])
   @@index([actionTaken, timestamp])
   @@map("ad_audits")
+}
+
+enum SubmissionAuditStatus {
+  PENDING
+  APPROVED
+  NEEDS_CLARIFICATION
+  FLAGGED_FRAUD
+  REJECTED
+}
+
+enum DropSpecStatus {
+  DRAFT
+  GENERATING
+  READY
+}
+
+// AI review of a tester's proof. Advisory: APPROVED/REJECTED are recommendations for the developer, never payout decisions.
+// PENDING means the AI has not produced a verdict yet (not run, or Gemini failed and it is queued for retry/manual review).
+model SubmissionAudit {
+  id                String                @id @default(cuid())
+  submissionId      String                @unique
+  submission        Submission            @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  qualityScore      Int                   @default(0)
+  status            SubmissionAuditStatus @default(PENDING)
+  reproductionValid Boolean               @default(false)
+  isDuplicate       Boolean               @default(false)
+  duplicateRefId    String?
+  missingFields     String[]              @default([])
+  feedbackToTester  String?               @db.Text
+  fraudRiskScore    Int                   @default(0)
+  fraudFlags        String[]              @default([])
+  fraudExplanation  String?               @db.Text
+  mediaChecked      Boolean               @default(false)
+  model             String?               @db.VarChar(80)
+  attempts          Int                   @default(0)
+  lastError         String?               @db.VarChar(1000)
+  autoClarifiedAt   DateTime?
+  humanClearedAt    DateTime?
+  humanClearedById  String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([status, updatedAt])
+}
+
+model CampaignSynthesis {
+  id                   String      @id @default(cuid())
+  campaignId           String      @unique
+  campaign             AppCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  totalSubmissions     Int
+  validBugsCount       Int
+  p0Count              Int
+  p1Count              Int
+  p2Count              Int
+  executiveSummary     String      @db.Text
+  clusteredThemesJson  Json
+  githubMarkdownExport String      @db.Text
+  model                String?     @db.VarChar(80)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
 }

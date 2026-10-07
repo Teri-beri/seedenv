@@ -205,7 +205,11 @@ export async function reconcileCampaignFunding(campaignId: string, now = new Dat
   }
   const inProgress = await prisma.submission.count({ where: { campaignId, status: "PENDING" } });
   const finalized = inProgress === 0 && campaign.status !== CampaignStatus.COMPLETED && campaign.status !== CampaignStatus.DRAFT;
-  if (finalized) await prisma.appCampaign.updateMany({ where: { id: campaignId, status: { in: [CampaignStatus.ACTIVE, CampaignStatus.PAUSED, CampaignStatus.ESCROW_PENDING] } }, data: { status: CampaignStatus.COMPLETED } });
+  if (finalized) {
+    const completed = await prisma.appCampaign.updateMany({ where: { id: campaignId, status: { in: [CampaignStatus.ACTIVE, CampaignStatus.PAUSED, CampaignStatus.ESCROW_PENDING] } }, data: { status: CampaignStatus.COMPLETED } });
+    // The AI release report is best-effort and must never delay or fail settlement.
+    if (completed.count === 1) void import("@/lib/ai/campaign-synthesis").then(({ synthesizeCampaign }) => synthesizeCampaign(campaignId)).catch(() => undefined);
+  }
   return { refundedCents, finalized };
 }
 

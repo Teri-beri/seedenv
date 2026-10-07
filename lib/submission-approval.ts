@@ -7,14 +7,14 @@ import { getStripe } from "@/lib/stripe";
 import { formatCents } from "@/lib/utils";
 import { AUTO_APPROVE_AFTER_MS, isAutoApprovalDue } from "@/lib/auto-approval-window";
 
-export { AUTO_APPROVE_AFTER_MS, isAutoApprovalDue, autoApproveDeadlineFrom as autoApproveDeadline } from "@/lib/auto-approval-window";
+export { AUTO_APPROVE_AFTER_MS, isAutoApprovalDue, isFraudHeld, autoApproveDeadlineFrom as autoApproveDeadline } from "@/lib/auto-approval-window";
 
 export type ApprovalActor = { kind: "reviewer"; id: string; admin: boolean } | { kind: "auto"; now: Date };
 
 export type ApprovalResult = { payoutCents: number; xpGain: number; testerId: string; payoutTransactionId: string; campaignTitle: string };
 
 export async function approvePendingSubmission(tx: Prisma.TransactionClient, submissionId: string, actor: ApprovalActor): Promise<ApprovalResult> {
-  const submission = await tx.submission.findUnique({ where: { id: submissionId }, include: { campaign: true, tester: true } });
+  const submission = await tx.submission.findUnique({ where: { id: submissionId }, include: { campaign: true, tester: true, audit: { select: { status: true, humanClearedAt: true } } } });
   if (!submission || submission.status !== SubmissionStatus.PENDING) throw new Error("Pending submission not found.");
   if (actor.kind === "reviewer") {
     if (submission.campaign.developerId !== actor.id && !actor.admin) throw new Error("You cannot review this submission.");
@@ -126,6 +126,7 @@ export function autoApproveOverdueSubmissions(now = new Date(), limit = 25) {
         revisionRequestedAt: null,
         submittedAt: { lte: new Date(now.getTime() - AUTO_APPROVE_AFTER_MS) },
         OR: [{ feedbackText: { not: null } }, { proofImageUrl: { not: null } }],
+        NOT: { audit: { is: { status: "FLAGGED_FRAUD", humanClearedAt: null } } },
       },
       orderBy: { submittedAt: "asc" },
       take: limit,

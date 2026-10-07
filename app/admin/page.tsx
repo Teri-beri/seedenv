@@ -43,6 +43,7 @@ export default async function AdminPage() {
           <nav aria-label="Administrator queues" className="mt-6">
             <Link href="/clippers" className="inline-flex min-h-11 items-center rounded-xl border border-violet-500/30 px-4 py-3 text-sm text-violet-200">Clippers disputes & payment reconciliation</Link>
             <Link href="/admin/growth" className="ml-3 inline-flex min-h-11 items-center rounded-xl border border-emerald-500/30 px-4 py-3 text-sm text-emerald-200">Growth engine & social posts</Link>
+            <Link href="/admin/qa" className="ml-3 inline-flex min-h-11 items-center rounded-xl border border-amber-500/30 px-4 py-3 text-sm text-amber-200">QA assistant: flagged proofs</Link>
           </nav>
 
           <section className="mt-14 max-w-4xl">

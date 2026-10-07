@@ -4,6 +4,7 @@ import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } 
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { headers } from "next/headers";
 import { classifyHardwareSignals } from "@/lib/hardware-integrity";
 import { getCurrentUser } from "@/lib/auth";
@@ -17,6 +18,7 @@ import { approvePendingSubmission, settleApprovedPayout, transferTesterPayout } 
 import { requireMember } from "@/lib/member";
 import { serializable } from "@/lib/quest-ledger";
 import { startAcceptedApplication } from "@/lib/mission-applications";
+import { auditSubmission } from "@/lib/ai/qa-audit";
 import { assertProofEditable, rejectProof, requestProofRevision, startProofRevision } from "@/lib/submission-lifecycle";
 
 const proofSchema = z.object({
@@ -191,6 +193,8 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
   });
   revalidatePath("/dashboard");
   revalidatePath("/console");
+  // Advisory AI audit runs after the response is sent; it records its own failures and never blocks the tester.
+  after(() => auditSubmission(savedSubmission.id).then(() => undefined));
 
   const developer = await prisma.user.findUnique({
     where: { id: submission.campaign.developerId },

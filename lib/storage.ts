@@ -40,6 +40,44 @@ export async function getProofImageUrl(value: string | null) {
   return data.signedUrl;
 }
 
+// Returns null (rather than throwing) when the object is missing, unsupported or larger than maxBytes.
+export async function downloadProofObject(value: string | null, maxBytes: number): Promise<{ buffer: Buffer; mimeType: string } | null> {
+  if (!value) return null;
+  if (value.startsWith("data:")) {
+    const match = /^data:([\w.+/-]+);base64,([\s\S]*)$/.exec(value);
+    if (!match) return null;
+    const buffer = Buffer.from(match[2], "base64");
+    return buffer.length <= maxBytes ? { buffer, mimeType: match[1] } : null;
+  }
+  const path = proofPath(value);
+  const supabase = getSupabase();
+  if (!path || !supabase) return null;
+  const { data, error } = await supabase.storage.from(process.env.SUPABASE_PROOF_BUCKET || "proof-screenshots").createSignedUrl(path, 120);
+  if (error || !data?.signedUrl) return null;
+  const response = await fetch(data.signedUrl, { signal: AbortSignal.timeout(30_000) });
+  if (!response.ok || !response.body) return null;
+  const declared = Number(response.headers.get("content-length") || 0);
+  if (declared > maxBytes) {
+    await response.body.cancel();
+    return null;
+  }
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  const reader = response.body.getReader();
+  for (;;) {
+    const { done, value: chunk } = await reader.read();
+    if (done) break;
+    size += chunk.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(chunk);
+  }
+  const mimeType = (response.headers.get("content-type") || "application/octet-stream").split(";")[0].trim();
+  return { buffer: Buffer.concat(chunks), mimeType };
+}
+
 export async function uploadProofImage(input: {
   buffer: Buffer;
   contentType: string;

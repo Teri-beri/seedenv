@@ -11,6 +11,9 @@ import { approveSubmission, rejectSubmission, requestSubmissionRevision } from "
 import { createCampaignWithEscrow, saveTestCampaignDraft, type CampaignInput } from "@/app/actions/campaignActions";
 import { Button } from "@/components/ui/button";
 import { DeveloperInsights, type InsightSubmission } from "@/components/developer-insights";
+import { AiSpecDrafter } from "@/components/ai-spec-drafter";
+import { AiAuditBadge, AiAuditCard, type AiAuditView } from "@/components/ai-audit-card";
+import type { SpecBlueprint } from "@/lib/ai/agents/spec-architect.agent";
 import { formatCents } from "@/lib/utils";
 import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templates";
 import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, projectPerTesterCharges, quoteCampaignFunding, quoteTopUp, topUpForShortfall, type CohortTypeKey } from "@/lib/pricing";
@@ -18,6 +21,8 @@ import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
   autoApproveHoursLeft?: number | null;
+  aiHold?: boolean;
+  audit?: AiAuditView | null;
   rejectionReason?: string | null;
   id: string;
   proofImageUrl: string | null;
@@ -209,6 +214,27 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     });
   }
 
+  function applyBlueprint(blueprint: SpecBlueprint) {
+    setErrors({});
+    setForm((current) => ({
+      ...current,
+      title: blueprint.suggestedTitle.slice(0, 90),
+      description: blueprint.description.slice(0, 1400),
+      estimatedMinutes: blueprint.estimatedMinutes,
+      instructions: blueprint.taskPresets.slice(0, 12).map((task) => ({
+        instructionTitle: task.title.slice(0, 90),
+        instructionDetail: task.instructionDetail.slice(0, 900),
+        proofType: TaskProofType[task.proofType],
+        minimumRep: resolveTaskMinimumRep({ instructionTitle: task.title, minimumRep: 0 }),
+      })),
+      // Bundles have fixed pricing; only custom drops take the suggested size and reward.
+      ...(isBundleType(current.cohortType) ? {} : {
+        totalSlots: Math.min(500, Math.max(5, Math.round(blueprint.recommendedTesters))),
+        bountyPerTaskUsd: Math.min(100, Math.max(1, Math.round(blueprint.recommendedBountyPerTester * 100) / 100)),
+      }),
+    }));
+  }
+
   function continueWizard() {
     if (isUploadingIcon) return;
     if (!validateStep(step)) return;
@@ -385,6 +411,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                 </div>
                 {activeBundle ? <p className="mt-2 text-xs leading-5 text-zinc-500">{activeBundle.summary}</p> : null}
               </fieldset>
+              <AiSpecDrafter onApply={applyBlueprint} platform={form.platform === PlatformType.WEB_STAGING ? "WEB" : form.platform === PlatformType.PLAY_STORE ? "ANDROID" : "IOS"} />
               <Field error={errors.title} label="App title" maxLength={90} required value={form.title} onChange={(value) => updateFormField("title", value)} />
               <label className="space-y-2 text-sm font-semibold text-white/72">
                 Platform
@@ -730,7 +757,8 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                   <span className="block truncate text-sm font-semibold text-white">{submission.campaign.title}</span>
                   <span className="mt-1 block truncate text-xs text-neutral-500">{submission.tester.username} · {submission.id.slice(-8)}</span>
                   <span className="mt-2 block font-mono text-xs text-emerald-400">{formatCents(submission.payoutCents)}</span>
-                  {submission.revisionRequestedAt ? <span className="mt-2 block text-xs text-violet-300">Awaiting tester revision</span> : typeof submission.autoApproveHoursLeft === "number" ? <span className="mt-2 block font-mono text-[11px] text-amber-300/90">Auto-approves in {submission.autoApproveHoursLeft <= 1 ? "<1h" : `${submission.autoApproveHoursLeft}h`}</span> : null}
+                  <AiAuditBadge audit={submission.audit} />
+                  {submission.revisionRequestedAt ? <span className="mt-2 block text-xs text-violet-300">Awaiting tester revision</span> : submission.aiHold ? <span className="mt-2 block text-[11px] text-rose-300">Auto-approval paused for review</span> : typeof submission.autoApproveHoursLeft === "number" ? <span className="mt-2 block font-mono text-[11px] text-amber-300/90">Auto-approves in {submission.autoApproveHoursLeft <= 1 ? "<1h" : `${submission.autoApproveHoursLeft}h`}</span> : null}
                 </button>
               ))}
             </div>
@@ -771,6 +799,7 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                   {active.proofImageUrl ? <Image alt={`Proof submitted for ${active.campaign.title}`} className="object-contain" fill sizes="(min-width: 1536px) 40vw, (min-width: 1280px) 50vw, 100vw" src={active.proofImageUrl} unoptimized /> : active.recordingUrl ? <video className="max-h-80 w-full" controls src={active.recordingUrl} /> : <div className="p-8 text-center"><ImageIcon className="mx-auto size-10 text-neutral-600" /><p className="mt-3 text-sm text-neutral-500">Feedback-only submission</p></div>}
                 </div>
                 {active.recordingUrl && active.proofImageUrl ? <a className="inline-flex text-xs font-semibold text-emerald-400 hover:text-emerald-300" href={active.recordingUrl} target="_blank" rel="noreferrer">Open tester recording</a> : null}
+                <AiAuditCard key={`audit-${active.id}`} audit={active.audit} submissionId={active.id} />
 
                 {decision ? (
                   <div className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">

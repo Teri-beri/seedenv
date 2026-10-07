@@ -57,6 +57,12 @@ On Android:
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_PROOF_BUCKET`: proof screenshot storage.
 - `GEMINI_API_KEY` (optional): enables the "Ask AI" tab in the help drawer (`?`). Use a Google AI Studio key from a project with billing enabled (paid tier) so chat content is not used for training. Without it, only the human support form is shown. The assistant answers from the FAQ and pricing constants and has read-only, session-scoped tools for the member's account, cohorts, testing work and payments; it cannot change data and hands off to the ticket form.
 - `GEMINI_SUPPORT_MODEL` (optional, default `gemini-3.1-flash-lite`) and `SUPPORT_AI_DAILY_LIMIT` (optional, default `1500` assistant requests per day per server instance).
+- QA assistant (uses `GEMINI_API_KEY`; optional `GEMINI_QA_TEXT_MODEL`, `GEMINI_QA_VISION_MODEL`, `QA_AI_DAILY_LIMIT`, `SEEDENV_DISABLE_QA_AI=1`). Four agents in `lib/ai/agents/`, all advisory:
+  - **Intake auditor**: runs after every proof submission (`after()` in `submitTaskProof`). It scores the report from 1 to 10, lists missing details and flags likely duplicates. For clearly incomplete reports (score ≤4) it sends the tester **one** automatic revision request.
+  - **Fraud watchdog**: checks the screenshot, and any stored recording up to 18 MB, against the report with Gemini vision. Copied text and emulator signals also count. A risk score of 70 or more pauses the 48-hour auto-approval until an admin clears it at `/admin/qa` or the developer decides.
+  - **Spec architect**: powers "Draft this cohort with AI" in step 1 of the new-cohort wizard (`POST /api/agent/generate-spec`).
+  - **Release synthesis**: groups the approved reports for a cohort into P0/P1/P2 issues when the cohort ends. Developers see these as Release reports in the console overview, with copyable GitHub markdown (`POST /api/agent/synthesize-campaign`).
+  - **Failures**: if Gemini fails, the audit is saved as `PENDING` and an alert goes to the Slack, Discord or Telegram webhooks. The audit is retried every 10 minutes (up to 5 attempts) and appears in `/admin/qa`. Re-run a single audit with `POST /api/agent/audit-submission` (as the developer or an admin, or with `Authorization: Bearer $CRON_SECRET`). Tests: `scripts/qa-agents.test.ts`.
 
 ## Production Security Operations
 

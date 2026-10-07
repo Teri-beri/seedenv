@@ -18,6 +18,16 @@ export async function requestProofRevision(tx: Prisma.TransactionClient, reviewe
   return tx.submission.update({ where: { id }, data: { rejectionReason: `Revision requested: ${text}`, revisionRequestedAt: new Date(), revisionStartedAt: null }, select: { id: true, rejectionReason: true } });
 }
 
+// Used only by the AI intake auditor, at most once per submission; a human review always follows.
+export async function requestAutomatedRevision(tx: Prisma.TransactionClient, id: string, note: string) {
+  const text = z.string().trim().min(8).max(300).parse(note);
+  const changed = await tx.submission.updateMany({
+    where: { id, status: "PENDING", revisionRequestedAt: null, OR: [{ feedbackText: { not: null } }, { proofImageUrl: { not: null } }] },
+    data: { rejectionReason: `Revision requested: ${text}`, revisionRequestedAt: new Date(), revisionStartedAt: null },
+  });
+  return changed.count === 1;
+}
+
 export async function startProofRevision(tx: Prisma.TransactionClient, testerId: string, id: string) {
   const item = await tx.submission.findUnique({ where: { id } });
   if (!item || item.testerId !== testerId || item.status !== "PENDING" || !needsRevision(item)) throw new Error("A pending revision request for your submission is required.");

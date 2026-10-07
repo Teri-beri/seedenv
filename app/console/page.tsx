@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { autoApproveDeadline, sweepOverdueSubmissionsLazily } from "@/lib/submission-approval";
+import { autoApproveDeadline, isFraudHeld, sweepOverdueSubmissionsLazily } from "@/lib/submission-approval";
 import { recordingHref } from "@/lib/recording";
 import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
 import { Plus } from "lucide-react";
@@ -14,6 +14,7 @@ import { InvoiceTable } from "@/components/billing/invoice-table";
 import { DeveloperStudio } from "@/components/developer-studio";
 import { ConsoleHeader } from "@/components/console-header";
 import { ActiveCohorts, ConsoleMetricStrip } from "@/components/console-overview";
+import { ReleaseReports } from "@/components/release-reports";
 import { DeveloperBottomNav } from "@/components/navigation";
 import { getBillingOverview } from "@/lib/billing-data";
 import { ensurePreviewData } from "@/lib/preview-data";
@@ -70,7 +71,11 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   const [pendingSubmissions, approvedAssets, campaigns, completedEscrow, auditReports, billing] = await Promise.all([
     prisma.submission.findMany({
       where: pendingReviewWhere,
-      include: { tester: { select: { username: true, avatarUrl: true } }, campaign: { select: { id: true, title: true, syncGitHubRepo: true, instructions: { orderBy: { stepNumber: "asc" } } } } },
+      include: {
+        tester: { select: { username: true, avatarUrl: true } },
+        campaign: { select: { id: true, title: true, syncGitHubRepo: true, instructions: { orderBy: { stepNumber: "asc" } } } },
+        audit: { select: { status: true, qualityScore: true, reproductionValid: true, missingFields: true, isDuplicate: true, duplicateRefId: true, feedbackToTester: true, fraudRiskScore: true, fraudFlags: true, fraudExplanation: true, mediaChecked: true, autoClarifiedAt: true, humanClearedAt: true } },
+      },
       skip: (reviewPage - 1) * reviewPageSize,
       take: reviewPageSize,
       orderBy: { createdAt: "asc" },
@@ -139,6 +144,20 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
         include: { instructions: { orderBy: { stepNumber: "asc" } } },
       })
     : null;
+  const endedCohorts = overview
+    ? await prisma.appCampaign.findMany({
+        where: { ...campaignScope, OR: [{ status: CampaignStatus.COMPLETED }, { cancelledAt: { not: null } }], submissions: { some: { status: SubmissionStatus.APPROVED } } },
+        orderBy: { expiresAt: "desc" },
+        take: 6,
+        select: {
+          id: true,
+          title: true,
+          _count: { select: { submissions: { where: { status: SubmissionStatus.APPROVED } } } },
+          synthesis: { select: { totalSubmissions: true, validBugsCount: true, p0Count: true, p1Count: true, p2Count: true, executiveSummary: true, clusteredThemesJson: true, githubMarkdownExport: true, updatedAt: true } },
+        },
+      })
+    : [];
+  const releaseReports = endedCohorts.map((cohort) => ({ campaignId: cohort.id, title: cohort.title, approvedCount: cohort._count.submissions, synthesis: cohort.synthesis }));
   const renderedAt = new Date().getTime();
   const [pendingPreviews, approvedPreviews, auditPreviews] = await Promise.all([
     Promise.all(pendingSubmissions.map(async (submission) => {
@@ -147,7 +166,8 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
         ...submission,
         proofImageUrl: await getProofImageUrl(submission.proofImageUrl),
         recordingUrl: recordingHref(submission.id, submission.recordingUrl),
-        autoApproveHoursLeft: deadline && !submission.revisionRequestedAt ? Math.max(0, Math.ceil((deadline.getTime() - renderedAt) / 3_600_000)) : null,
+        aiHold: isFraudHeld(submission.audit),
+        autoApproveHoursLeft: deadline && !submission.revisionRequestedAt && !isFraudHeld(submission.audit) ? Math.max(0, Math.ceil((deadline.getTime() - renderedAt) / 3_600_000)) : null,
       };
     })),
     Promise.all(approvedAssets.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl), recordingUrl: recordingHref(submission.id, submission.recordingUrl) }))),
@@ -170,6 +190,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
           {params.launched ? <p className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">{launchedCampaign?.status === CampaignStatus.ESCROW_PENDING ? `${launchedCampaign.title} goes live as soon as Stripe confirms your top-up, usually within a few seconds. Refresh shortly.` : "Cohort launched. Each tester you accept in Applications draws their reward and the platform fee from your prepaid balance."}</p> : null}
           <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: COHORT_PLATFORM_FEE_RATE, balanceCents: security?.fundingBalanceCents ?? 0 }} />
           <ActiveCohorts cohorts={cohortRows} total={activeCohortCount} />
+          <ReleaseReports rows={releaseReports} />
         </> : null}
         {activeView !== "billing" ? <DeveloperStudio key={launchDraft?.id || "new-drop"} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} /> : null}
 

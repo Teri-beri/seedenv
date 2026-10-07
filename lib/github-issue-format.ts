@@ -31,11 +31,11 @@ const hardwareLabels: Record<string, string> = {
 };
 
 // Tester text must not ping arbitrary GitHub users or teams from the developer's repo.
-function neutralizeMentions(value: string) {
+export function neutralizeMentions(value: string) {
   return value.replace(/@(?=[A-Za-z0-9])/g, "@\u200b");
 }
 
-function cell(value: string | null | undefined) {
+export function markdownCell(value: string | null | undefined) {
   return value ? neutralizeMentions(value).replace(/\|/g, "\\|").replace(/\r?\n/g, " ").slice(0, 200) : "—";
 }
 
@@ -63,7 +63,7 @@ export function buildGitHubIssue(submission: IssueSubmission, origin: string) {
     ? `${origin.replace(/\/$/, "")}/api/submissions/${encodeURIComponent(submission.id)}/recording (SeedEnv sign-in required)`
     : safeHttpUrl(submission.recordingUrl);
   const lines = [
-    `Exported from SeedEnv cohort **${cell(submission.campaign.title)}** · tester \`${submission.tester.username}\` · ${submission.createdAt.toISOString().slice(0, 10)}`,
+    `Exported from SeedEnv cohort **${markdownCell(submission.campaign.title)}** · tester \`${submission.tester.username}\` · ${submission.createdAt.toISOString().slice(0, 10)}`,
     "",
     "### Tester report",
     "",
@@ -73,14 +73,14 @@ export function buildGitHubIssue(submission: IssueSubmission, origin: string) {
     "",
     "| Field | Value |",
     "| --- | --- |",
-    `| Device | ${cell(submission.deviceModel)} |`,
-    `| OS / build | ${cell(submission.osBuild)} |`,
-    `| App build | ${cell(submission.appBuildVersion)} |`,
-    `| Screen | ${cell(submission.screenResolution)} |`,
-    `| Network | ${cell(submission.networkType)} |`,
-    `| Platform | ${cell(submission.campaign.platform)} |`,
-    `| Hardware signals | ${hardwareLabels[submission.hardwareStatus] || submission.hardwareStatus}${submission.hardwareFlags.length ? ` (${cell(submission.hardwareFlags.join(", "))})` : ""} |`,
-    `| GPU renderer | ${cell(submission.gpuRenderer)} |`,
+    `| Device | ${markdownCell(submission.deviceModel)} |`,
+    `| OS / build | ${markdownCell(submission.osBuild)} |`,
+    `| App build | ${markdownCell(submission.appBuildVersion)} |`,
+    `| Screen | ${markdownCell(submission.screenResolution)} |`,
+    `| Network | ${markdownCell(submission.networkType)} |`,
+    `| Platform | ${markdownCell(submission.campaign.platform)} |`,
+    `| Hardware signals | ${hardwareLabels[submission.hardwareStatus] || submission.hardwareStatus}${submission.hardwareFlags.length ? ` (${markdownCell(submission.hardwareFlags.join(", "))})` : ""} |`,
+    `| GPU renderer | ${markdownCell(submission.gpuRenderer)} |`,
     `| Battery | ${submission.batteryLevel === null ? "—" : `${Math.round(submission.batteryLevel * 100)}%`} |`,
     "",
     "### Evidence",
