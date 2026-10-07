@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 
 export type ContentStatus = "RESEARCHING" | "DRAFTED" | "APPROVED" | "PUBLISHED" | "REJECTED";
-export type SocialStatus = "PENDING_APPROVAL" | "QUEUED" | "PUBLISHED" | "REJECTED" | "FAILED";
-export type Platform = "TWITTER" | "LINKEDIN" | "INSTAGRAM";
+export type SocialStatus = "PENDING_APPROVAL" | "MANUAL" | "QUEUED" | "PUBLISHED" | "REJECTED" | "FAILED";
+export type Platform = "TWITTER" | "LINKEDIN" | "INSTAGRAM" | "TIKTOK";
 export type AdAction = "MAINTAINED" | "ALERTED" | "PAUSED";
 
 export type ContentDropRecord = { id: string; title: string; targetKeyword: string; slug: string; status: ContentStatus; markdownBody: string | null; metadata: unknown; research: unknown; reviewNote: string | null; externalUrl: string | null; approvedAt: Date | null; publishedAt: Date | null; createdAt: Date };
-export type SocialRecord = { id: string; contentDropId: string | null; platform: Platform; postText: string; mediaUrls: string[]; scheduledTime: Date; status: SocialStatus; externalId: string | null; lastError: string | null };
+export type SocialRecord = { id: string; contentDropId: string | null; platform: Platform; postText: string; mediaUrls: string[]; linkUrl: string | null; videoScript: unknown; scheduledTime: Date; status: SocialStatus; externalId: string | null; lastError: string | null };
 export type AdAuditRecord = { provider: string; campaignId: string; campaignName: string; spend: number; impressions: number; conversions: number; cpa: number | null; thresholdCpa: number; actionTaken: AdAction; reason: string; timestamp?: Date };
 
 export interface GrowthStore {
@@ -43,11 +43,11 @@ export function prismaGrowthStore(prisma: PrismaClient): GrowthStore {
     },
     getContentDrop: (id) => prisma.contentDrop.findUnique({ where: { id } }) as Promise<ContentDropRecord | null>,
     async createSocialPosts(rows) {
-      return prisma.$transaction(rows.map((data) => prisma.socialQueue.create({ data }))) as Promise<SocialRecord[]>;
+      return prisma.$transaction(rows.map((data) => prisma.socialQueue.create({ data: { ...data, videoScript: (data.videoScript ?? undefined) as object | undefined } }))) as Promise<SocialRecord[]>;
     },
     getSocialPost: (id) => prisma.socialQueue.findUnique({ where: { id } }) as Promise<SocialRecord | null>,
     async updateSocialPost(id, patch, expectedStatus) {
-      const { count } = await prisma.socialQueue.updateMany({ where: { id, ...(expectedStatus ? { status: expectedStatus } : {}) }, data: patch });
+      const { count } = await prisma.socialQueue.updateMany({ where: { id, ...(expectedStatus ? { status: expectedStatus } : {}) }, data: { ...patch, videoScript: patch.videoScript as object | undefined } });
       return guarded(() => prisma.socialQueue.findUnique({ where: { id } }) as Promise<SocialRecord | null>, count);
     },
     async createAdAudit(row) {

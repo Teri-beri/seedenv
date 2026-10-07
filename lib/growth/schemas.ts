@@ -61,13 +61,32 @@ export const socialPackSchema = z.object({
     hashtags: z.array(hashtag).max(15),
     imageAltText: z.string().min(10).max(200),
   }),
+  tiktok: z.object({
+    caption: z.string().min(50).max(1500).describe("TikTok caption; no URLs. Say 'link in bio' if pointing to the site."),
+    hashtags: z.array(hashtag).max(5),
+    hook: z.string().min(10).max(150).describe("The spoken/on-screen line for the first 2-3 seconds that stops the scroll."),
+    beats: z.array(z.object({
+      visual: z.string().min(5).max(300).describe("What is on screen: screen recording, face to camera, b-roll."),
+      voiceover: z.string().min(5).max(400).describe("What is said during this beat."),
+      onScreenText: z.string().max(80).describe("Short caption overlay, may be empty."),
+    })).min(3).max(8),
+    durationSeconds: z.number().int().min(15).max(90),
+  }).describe("A short vertical video the founder can film on a phone, typically a screen recording with voiceover."),
 }).superRefine((pack, ctx) => {
   const withTags = (text: string, tags: string[]) => [text, tags.join(" ")].filter(Boolean).join("\n\n");
   if (withTags(pack.twitter.text, pack.twitter.hashtags).length > 280 - TWITTER_URL_LENGTH - 1) ctx.addIssue({ code: "custom", path: ["twitter"], message: "Text plus hashtags must fit in 256 characters." });
+  if (/https?:\/\//i.test(pack.tiktok.caption)) ctx.addIssue({ code: "custom", path: ["tiktok", "caption"], message: "TikTok captions must not contain URLs." });
   if (/https?:\/\//i.test(pack.instagram.caption)) ctx.addIssue({ code: "custom", path: ["instagram", "caption"], message: "Instagram captions must not contain URLs." });
   for (const key of ["twitter", "linkedin"] as const) if (/https?:\/\//i.test(pack[key].text)) ctx.addIssue({ code: "custom", path: [key, "text"], message: "Leave the link out; it is appended automatically." });
 });
 export type SocialPack = z.infer<typeof socialPackSchema>;
+export type TikTokScript = Pick<SocialPack["tiktok"], "hook" | "beats" | "durationSeconds">;
+
+export const productUpdateInputSchema = z.object({
+  details: z.string().trim().min(20, "Describe the update in at least 20 characters.").max(4000),
+  linkUrl: z.string().trim().url("Link must be a full URL").refine((url) => url.startsWith("https://"), "Link must use https").optional(),
+});
+export type ProductUpdateInput = z.infer<typeof productUpdateInputSchema>;
 
 export const adCampaignMetricsSchema = z.object({
   provider: z.string().min(1).max(40),

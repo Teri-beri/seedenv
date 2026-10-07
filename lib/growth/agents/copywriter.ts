@@ -34,18 +34,36 @@ export async function writeBlogPost({ llm, brief, metrics, siteUrl }: { llm: Gro
   });
 }
 
-// Social distribution agent: platform-specific variants validated against each network's limits.
-export async function writeSocialPack({ llm, post }: { llm: GrowthLlm; post: BlogPost }): Promise<SocialPack> {
+export type SocialSource = { kind: "article"; post: BlogPost } | { kind: "update"; details: string };
+
+// Social distribution agent: platform-specific variants validated against each network's limits, from either a blog article or a product update.
+export async function writeSocialPack({ llm, source }: { llm: GrowthLlm; source: SocialSource }): Promise<SocialPack> {
+  const brief = source.kind === "article"
+    ? `Promote this new article so developers want to read it.\nArticle title: ${source.post.title}\nExcerpt: ${source.post.excerpt}\nKey points:\n${source.post.markdownBody.match(/^##\s.+$/gm)?.slice(0, 8).join("\n") ?? ""}\nTarget keyword: ${source.post.targetKeyword}`
+    : `Announce this SeedEnv product update. Use only the facts given here and in the product context; do not invent features, numbers or dates.\nUpdate from the founder:\n"""\n${source.details}\n"""`;
+  const title = source.kind === "article" ? source.post.title : "SeedEnv product update";
+  const summary = source.kind === "article" ? source.post.excerpt : source.details.replace(/\s+/g, " ").slice(0, 200);
   return llm.generateStructured({
-    agent: "social",
-    system: `You are SeedEnv's social media editor.\n${PRODUCT_CONTEXT}\nWrite native posts per platform that make developers want to read the article. No engagement bait, no emojis walls, no fake urgency, no invented numbers. Do not include links; they are added automatically.`,
-    prompt: `Article title: ${post.title}\nExcerpt: ${post.excerpt}\nKey points:\n${post.markdownBody.match(/^##\s.+$/gm)?.slice(0, 8).join("\n") ?? ""}\nTarget keyword: ${post.targetKeyword}`,
+    agent: source.kind === "article" ? "social" : "social-update",
+    system: `You are SeedEnv's social media director.\n${PRODUCT_CONTEXT}\nWrite native posts per platform for an audience of indie and small-team app developers. No engagement bait, no emoji walls, no fake urgency, no invented numbers or testimonials. Do not include links; they are added automatically. The TikTok entry is a script the founder films on a phone (usually a screen recording of SeedEnv with voiceover): open with a strong hook, keep beats concrete and filmable, end with a soft call to action ("link in bio").`,
+    prompt: brief,
     schema: socialPackSchema,
     temperature: 0.8,
     mock: () => ({
-      twitter: { text: `New guide: ${post.title}. What it takes, what it costs and the mistakes to avoid before launch.`.slice(0, 230), hashtags: ["#indiedev"] },
-      linkedin: { text: `${post.title}\n\n${post.excerpt}\n\nWe wrote this for small teams shipping their first TestFlight or Google Play build: what to plan for, how long it takes and where projects usually stall. This is mock-mode copy used to exercise the growth pipeline end to end without calling a model.`, hashtags: ["#mobiledev", "#betatesting"] },
-      instagram: { caption: `${post.title}\n\n${post.excerpt}\n\nFull guide at the link in bio. (Mock-mode caption for pipeline testing.)`, hashtags: ["#appdev", "#betatesting", "#indiedev"], imageAltText: `Title card for the article ${post.title}` },
+      twitter: { text: `${title}: what changed, who it helps and how to try it.`.slice(0, 230), hashtags: ["#indiedev"] },
+      linkedin: { text: `${title}\n\n${summary}\n\nWe build SeedEnv for small teams shipping their first TestFlight or Google Play build. This is mock-mode copy used to exercise the growth pipeline end to end without calling a model, so it is intentionally generic and long enough to pass validation.`, hashtags: ["#mobiledev", "#betatesting"] },
+      instagram: { caption: `${title}\n\n${summary}\n\nDetails at the link in bio. (Mock-mode caption for pipeline testing.)`, hashtags: ["#appdev", "#betatesting", "#indiedev"], imageAltText: `Title card for ${title}` },
+      tiktok: {
+        caption: `${title}. Here's how it works in under a minute. Link in bio. (Mock caption)`,
+        hashtags: ["#indiedev", "#appdev"],
+        hook: "Your beta testers ghosting you? Watch this.",
+        beats: [
+          { visual: "Face to camera, phone in hand", voiceover: "Most beta tests die because nobody actually opens the build.", onScreenText: "Beta tests that actually run" },
+          { visual: "Screen recording of the SeedEnv console", voiceover: `Here's what's new: ${summary.slice(0, 120)}`, onScreenText: "What's new" },
+          { visual: "Screen recording of a tester submission", voiceover: "Testers record proof, you approve, they get paid.", onScreenText: "Pay only for approved work" },
+        ],
+        durationSeconds: 30,
+      },
     }),
   });
 }

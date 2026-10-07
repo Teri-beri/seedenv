@@ -182,9 +182,15 @@ app/api/cron/growth/[job]   CRON_SECRET-protected trigger (content | ads | all)
 app/api/growth/review       confirmation page (GET, no side effects) + decision (POST)
 app/(public)/blog           renders PUBLISHED drops only
 scripts/growth-runner.ts    npm run growth -- <content|ads|all> [--dry-run] [--mock] [--force]
+                            npm run growth -- update "what shipped" [--link https://...] [--dry-run] [--mock]
+app/admin/growth/           admin form to draft product-update posts + list of recent posts with review links
 .github/workflows/growth-*.yml   weekly content (Mon 13:00 UTC), ads every 6h
 ```
 
-Flow: research picks a keyword using real DataForSEO numbers -> article is validated and stored as `DRAFTED` -> three social variants are stored as `PENDING_APPROVAL` -> a review card goes to Slack/Discord/Telegram. Approving the article publishes it to `/blog/<slug>` (or the optional CMS webhook). Social posts can only be approved after the article is live; approval schedules them in Ayrshare with the link appended. Rejected or failed drafts free their keyword.
+Flow: research picks a keyword using real DataForSEO numbers -> article is validated and stored as `DRAFTED` -> X, LinkedIn, Instagram and a TikTok video script (hook, shot-by-shot beats, caption) are stored as `PENDING_APPROVAL` -> a review card goes to Slack/Discord/Telegram. Approving the article publishes it to `/blog/<slug>` (or the optional CMS webhook). Social posts can only be approved after the article is live; approval schedules them in Ayrshare with the link appended. Rejected or failed drafts free their keyword.
+
+Product updates: describe a release at `/admin/growth` (or with the `update` CLI job) to get the same four drafts without an article, linking to the URL you give (homepage by default). These work even when `GROWTH_ENABLED` is false.
+
+Manual posting: TikTok always needs a filmed video, so approving it moves it to `MANUAL`, and so does approving any post while `AYRSHARE_API_KEY` is unset. The review page then shows copy-ready text (and the script for TikTok) with a **Mark as posted** button.
 
 Setup: set `GROWTH_APPROVAL_SECRET`, `GEMINI_API_KEY` and at least one notification channel, try `npm run growth -- all --dry-run` locally (memory store, nothing sent), then set `GROWTH_ENABLED=true` on Render. Add `DATAFORSEO_*`, `AYRSHARE_API_KEY` and `META_*` as you adopt each channel; leave `AD_KILLSWITCH_ENFORCE=false` until alerts look right. The workflows reuse the `SEEDENV_CRON_SECRET` repository secret. Tests: `npm run test:growth`.

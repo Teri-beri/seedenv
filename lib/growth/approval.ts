@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { GrowthLogger } from "@/lib/growth/log";
 import type { createCmsTool } from "@/lib/growth/tools/cms";
 import type { createSocialTool } from "@/lib/growth/tools/social";
-import type { GrowthStore } from "@/lib/growth/store";
+import type { GrowthStore, SocialRecord } from "@/lib/growth/store";
 
 const REVIEW_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const tokenSchema = z.object({ kind: z.enum(["content", "social"]), id: z.string().min(1).max(100), exp: z.number().int() });
@@ -39,14 +39,17 @@ export function articleUrl(siteUrl: string, drop: { slug: string; externalUrl: s
   return drop.externalUrl ?? `${siteUrl}/blog/${drop.slug}`;
 }
 
-type ReviewDeps = { store: GrowthStore; cms: ReturnType<typeof createCmsTool>; social: ReturnType<typeof createSocialTool>; siteUrl: string; logger: GrowthLogger };
+type ReviewDeps = { store: GrowthStore; cms: ReturnType<typeof createCmsTool>; social: Pick<ReturnType<typeof createSocialTool>, "mode" | "queueSocialPost">; siteUrl: string; logger: GrowthLogger };
 export type ReviewOutcome = { ok: boolean; message: string };
 
-export async function applyReview(deps: ReviewDeps, target: ReviewTarget, decision: "approve" | "reject", note?: string): Promise<ReviewOutcome> {
+export type ReviewDecision = "approve" | "reject" | "posted";
+
+export async function applyReview(deps: ReviewDeps, target: ReviewTarget, decision: ReviewDecision, note?: string): Promise<ReviewOutcome> {
   const reviewNote = note?.trim().slice(0, 1000) || null;
   if (target.kind === "content") {
     const drop = await deps.store.getContentDrop(target.id);
     if (!drop) return { ok: false, message: "This article no longer exists." };
+    if (decision === "posted") return { ok: false, message: "Articles publish on approval; there is nothing to mark." };
     if (decision === "reject") {
       const updated = await deps.store.updateContentDrop(drop.id, { status: "REJECTED", reviewNote }, "DRAFTED");
       return updated ? { ok: true, message: "Article rejected. Its keyword is freed for a future run." } : { ok: false, message: `Article is already ${drop.status.toLowerCase()}.` };
@@ -59,17 +62,30 @@ export async function applyReview(deps: ReviewDeps, target: ReviewTarget, decisi
 
   const post = await deps.store.getSocialPost(target.id);
   if (!post) return { ok: false, message: "This social post no longer exists." };
-  if (decision === "reject") {
-    const updated = await deps.store.updateSocialPost(post.id, { status: "REJECTED" }, post.status === "FAILED" ? "FAILED" : "PENDING_APPROVAL");
-    return updated ? { ok: true, message: "Social post rejected." } : { ok: false, message: `Post is already ${post.status.toLowerCase().replace("_", " ")}.` };
+  const label = post.status.toLowerCase().replace("_", " ");
+  if (decision === "posted") {
+    const updated = await deps.store.updateSocialPost(post.id, { status: "PUBLISHED" }, "MANUAL");
+    return updated ? { ok: true, message: "Marked as posted." } : { ok: false, message: `Post is ${label}, not waiting to be posted manually.` };
   }
-  if (post.status !== "PENDING_APPROVAL" && post.status !== "FAILED") return { ok: false, message: `Post is already ${post.status.toLowerCase().replace("_", " ")}.` };
+  if (decision === "reject") {
+    const from = post.status === "FAILED" || post.status === "MANUAL" ? post.status : "PENDING_APPROVAL";
+    const updated = await deps.store.updateSocialPost(post.id, { status: "REJECTED" }, from);
+    return updated ? { ok: true, message: "Social post rejected." } : { ok: false, message: `Post is already ${label}.` };
+  }
+  if (post.status !== "PENDING_APPROVAL" && post.status !== "FAILED") return { ok: false, message: `Post is already ${label}.` };
   const drop = post.contentDropId ? await deps.store.getContentDrop(post.contentDropId) : null;
   if (post.contentDropId && drop?.status !== "PUBLISHED") return { ok: false, message: "Approve and publish the article first so the link in this post works." };
+  const text = finalPostText(post, drop ? articleUrl(deps.siteUrl, drop) : null);
+
+  // TikTok needs a filmed video, and without Ayrshare nothing can be auto-scheduled: approve into a manual hand-off instead of failing.
+  const manualReason = post.platform === "TIKTOK" ? "Film the script, then post it on TikTok with the caption below." : deps.social.mode === "disabled" ? "Ayrshare isn't connected, so copy the text below and post it yourself." : null;
+  if (manualReason) {
+    const claimed = await deps.store.updateSocialPost(post.id, { status: "MANUAL", postText: text, lastError: null }, post.status);
+    return claimed ? { ok: true, message: `Approved for manual posting. ${manualReason} Use "Mark as posted" when it's live.` } : { ok: false, message: "This post was just reviewed by someone else." };
+  }
+
   const claimed = await deps.store.updateSocialPost(post.id, { status: "QUEUED", lastError: null }, post.status);
   if (!claimed) return { ok: false, message: "This post was just reviewed by someone else." };
-  const link = drop ? articleUrl(deps.siteUrl, drop) : null;
-  const text = link && post.platform !== "INSTAGRAM" ? `${post.postText}\n\n${link}` : post.postText;
   try {
     const result = await deps.social.queueSocialPost(post.platform.toLowerCase(), text, post.mediaUrls[0], post.scheduledTime);
     await deps.store.updateSocialPost(post.id, { externalId: result.externalId, scheduledTime: result.scheduledTime });
@@ -80,6 +96,12 @@ export async function applyReview(deps: ReviewDeps, target: ReviewTarget, decisi
     await deps.store.updateSocialPost(post.id, { status: "FAILED", lastError: message.slice(0, 1000) });
     return { ok: false, message: `Scheduling failed: ${message.slice(0, 200)}. You can approve again to retry.` };
   }
+}
+
+// Link-bearing platforms get the destination URL appended; Instagram and TikTok links aren't clickable, so they say "link in bio" instead.
+export function finalPostText(post: Pick<SocialRecord, "platform" | "postText" | "linkUrl">, articleLink: string | null) {
+  const link = post.linkUrl ?? articleLink;
+  return link && (post.platform === "TWITTER" || post.platform === "LINKEDIN") ? `${post.postText}\n\n${link}` : post.postText;
 }
 
 async function retryPublish(deps: ReviewDeps, id: string): Promise<ReviewOutcome> {

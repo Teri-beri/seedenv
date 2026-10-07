@@ -4,7 +4,7 @@ import { applyReview, createReviewToken, verifyReviewToken } from "@/lib/growth/
 import { loadGrowthConfig } from "@/lib/growth/config";
 import { createLlm } from "@/lib/growth/llm";
 import { createLogger } from "@/lib/growth/log";
-import { createGrowthContext, reviewDecision, runContentPipeline, runGrowthJob } from "@/lib/growth/pipeline";
+import { createGrowthContext, reviewDecision, runContentPipeline, runGrowthJob, runProductUpdate } from "@/lib/growth/pipeline";
 import { HttpError, withRetry } from "@/lib/growth/retry";
 import { blogPostSchema, socialPackSchema, toGeminiSchema } from "@/lib/growth/schemas";
 import { memoryGrowthStore } from "@/lib/growth/store";
@@ -46,7 +46,7 @@ describe("growth schemas", () => {
   });
 
   it("enforces per-platform social limits and keeps links out of generated copy", () => {
-    const pack = { twitter: { text: "A".repeat(60), hashtags: ["#indiedev"] }, linkedin: { text: "B".repeat(400), hashtags: [] }, instagram: { caption: "C".repeat(120), hashtags: [], imageAltText: "Title card image" } };
+    const pack = { twitter: { text: "A".repeat(60), hashtags: ["#indiedev"] }, linkedin: { text: "B".repeat(400), hashtags: [] }, instagram: { caption: "C".repeat(120), hashtags: [], imageAltText: "Title card image" }, tiktok: { caption: "D".repeat(80), hashtags: ["#buildinpublic"], hook: "Your beta testers are lying to you", beats: [1, 2, 3].map((n) => ({ visual: `Shot ${n}`, voiceover: `Line ${n}`, onScreenText: "" })), durationSeconds: 30 } };
     assert.equal(socialPackSchema.safeParse(pack).success, true);
     assert.equal(socialPackSchema.safeParse({ ...pack, twitter: { text: "A".repeat(250), hashtags: ["#indiedev", "#buildinpublic"] } }).success, false);
     assert.equal(socialPackSchema.safeParse({ ...pack, instagram: { ...pack.instagram, caption: `${"C".repeat(120)} https://seedenv.com` } }).success, false);
@@ -152,7 +152,7 @@ describe("ad kill-switch", () => {
 });
 
 describe("content pipeline and review gates", () => {
-  it("drafts an article plus three social posts, all awaiting approval", async () => {
+  it("drafts an article plus four social posts, all awaiting approval", async () => {
     const { ctx, store } = mockContext();
     const result = await runContentPipeline(ctx);
     assert.equal(result.status, "drafted");
@@ -160,8 +160,10 @@ describe("content pipeline and review gates", () => {
     assert.equal(drop.status, "DRAFTED");
     assert.ok(drop.markdownBody && drop.markdownBody.length >= 2500);
     const social = [...store.social.values()];
-    assert.deepEqual(social.map((row) => row.platform).sort(), ["INSTAGRAM", "LINKEDIN", "TWITTER"]);
+    assert.deepEqual(social.map((row) => row.platform).sort(), ["INSTAGRAM", "LINKEDIN", "TIKTOK", "TWITTER"]);
     assert.ok(social.every((row) => row.status === "PENDING_APPROVAL"));
+    const tiktok = social.find((row) => row.platform === "TIKTOK")!;
+    assert.ok((tiktok.videoScript as { beats: unknown[] }).beats.length >= 3);
     assert.equal((await runContentPipeline(ctx)).status, "skipped");
   });
 
@@ -214,6 +216,56 @@ describe("content pipeline and review gates", () => {
     assert.equal(outcome.ok, false);
     assert.equal(store.social.get(post.id)!.status, "FAILED");
     assert.equal((await reviewDecision(ctx, { kind: "social", id: post.id, exp: 0 }, "reject")).ok, true);
+  });
+
+  it("hands TikTok off for manual posting and lets it be marked as posted", async () => {
+    const { ctx, store } = mockContext();
+    const result = await runContentPipeline(ctx);
+    if (result.status !== "drafted") assert.fail("expected draft");
+    await reviewDecision(ctx, { kind: "content", id: result.contentDropId, exp: 0 }, "approve");
+    const tiktok = [...store.social.values()].find((row) => row.platform === "TIKTOK")!;
+    const queued: string[] = [];
+    const social = { mode: "live" as const, queueSocialPost: async (_p: string, text: string) => { queued.push(text); return { externalId: "x", scheduledTime: new Date(), mode: "live" as const }; } };
+    const deps = { store: ctx.store, cms: ctx.cms, social, siteUrl: ctx.config.siteUrl, logger };
+    assert.equal((await applyReview(deps, { kind: "social", id: tiktok.id, exp: 0 }, "posted")).ok, false);
+    const approved = await applyReview(deps, { kind: "social", id: tiktok.id, exp: 0 }, "approve");
+    assert.equal(approved.ok, true, approved.message);
+    assert.equal(queued.length, 0);
+    assert.equal(store.social.get(tiktok.id)!.status, "MANUAL");
+    assert.doesNotMatch(store.social.get(tiktok.id)!.postText, /https?:/);
+    assert.equal((await applyReview(deps, { kind: "social", id: tiktok.id, exp: 0 }, "approve")).ok, false);
+    assert.equal((await applyReview(deps, { kind: "social", id: tiktok.id, exp: 0 }, "posted")).ok, true);
+    assert.equal(store.social.get(tiktok.id)!.status, "PUBLISHED");
+  });
+
+  it("falls back to manual posting when no scheduler is connected", async () => {
+    const { ctx, store } = mockContext();
+    const result = await runContentPipeline(ctx);
+    if (result.status !== "drafted") assert.fail("expected draft");
+    await reviewDecision(ctx, { kind: "content", id: result.contentDropId, exp: 0 }, "approve");
+    const linkedin = [...store.social.values()].find((row) => row.platform === "LINKEDIN")!;
+    const disabled = { mode: "disabled" as const, queueSocialPost: async () => assert.fail("must not call the scheduler") };
+    const outcome = await applyReview({ store: ctx.store, cms: ctx.cms, social: disabled, siteUrl: ctx.config.siteUrl, logger }, { kind: "social", id: linkedin.id, exp: 0 }, "approve");
+    assert.equal(outcome.ok, true, outcome.message);
+    assert.equal(store.social.get(linkedin.id)!.status, "MANUAL");
+    assert.match(store.social.get(linkedin.id)!.postText, new RegExp(`/blog/${result.slug}$`));
+  });
+
+  it("drafts product-update posts without an article and links them to the given URL", async () => {
+    const { ctx, store } = mockContext();
+    await assert.rejects(runProductUpdate(ctx, { details: "too short" }));
+    await assert.rejects(runProductUpdate(ctx, { details: "Testers now get paid within 24 hours of approval.", linkUrl: "http://insecure.example" }));
+    const result = await runProductUpdate(ctx, { details: "Testers now get paid within 24 hours of an approved report.", linkUrl: "https://seedenv.com/pricing" });
+    assert.equal(result.socialPostIds.length, 4);
+    const rows = [...store.social.values()];
+    assert.ok(rows.every((row) => row.contentDropId === null && row.linkUrl === "https://seedenv.com/pricing" && row.status === "PENDING_APPROVAL"));
+    assert.equal(store.drops.size, 0);
+    const twitter = rows.find((row) => row.platform === "TWITTER")!;
+    const queued: string[] = [];
+    const social = { mode: "mock" as const, queueSocialPost: async (_p: string, text: string) => { queued.push(text); return { externalId: "x", scheduledTime: new Date(), mode: "mock" as const }; } };
+    const outcome = await applyReview({ store: ctx.store, cms: ctx.cms, social, siteUrl: ctx.config.siteUrl, logger }, { kind: "social", id: twitter.id, exp: 0 }, "approve");
+    assert.equal(outcome.ok, true, outcome.message);
+    assert.match(queued[0], /https:\/\/seedenv\.com\/pricing$/);
   });
 
   it("isolates job failures and still runs the ad check", async () => {

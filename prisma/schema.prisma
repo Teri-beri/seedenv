@@ -663,10 +663,12 @@ enum SocialPlatform {
   TWITTER
   LINKEDIN
   INSTAGRAM
+  TIKTOK
 }
 
 enum SocialQueueStatus {
   PENDING_APPROVAL
+  MANUAL
   QUEUED
   PUBLISHED
   REJECTED
@@ -708,6 +710,8 @@ model SocialQueue {
   platform        SocialPlatform
   postText        String            @map("post_text") @db.VarChar(3000)
   mediaUrls       String[]          @default([]) @map("media_urls")
+  linkUrl         String?           @map("link_url") @db.VarChar(500)
+  videoScript     Json?             @map("video_script")
   scheduledTime   DateTime          @map("scheduled_time")
   status          SocialQueueStatus @default(PENDING_APPROVAL)
   externalId      String?           @map("external_id") @db.VarChar(200)
