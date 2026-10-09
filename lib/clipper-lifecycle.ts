@@ -26,7 +26,8 @@ export async function applyClip(tx: Prisma.TransactionClient, creatorId: string,
   if (creator.xpPoints < campaign.minimumRep) throw new Error(`This campaign requires ${campaign.minimumRep} REP. Discovery Passes do not apply to creator contracts.`);
   if (previous) throw new Error("You already applied. Use the existing agreement or contact the developer.");
   if (await tx.clipEngagement.count({ where: { creatorId, createdAt: { gte: new Date(Date.now() - 86400000) } } }) >= 10) throw new Error("You can apply to up to ten Clippers campaigns per day.");
-  return tx.clipEngagement.create({ data: { campaignId, creatorId, note: text, feeCents: campaign.feeCents, chargeCents: clipChargeCents(campaign.feeCents), termsVersion: clipTermsVersion, termsAcceptedAt: new Date() } });
+  const developer = await tx.user.findUniqueOrThrow({ where: { id: campaign.developerId }, select: { platformFeeWaived: true } });
+  return tx.clipEngagement.create({ data: { campaignId, creatorId, note: text, feeCents: campaign.feeCents, chargeCents: clipChargeCents(campaign.feeCents, developer.platformFeeWaived), termsVersion: clipTermsVersion, termsAcceptedAt: new Date() } });
 }
 
 export async function reviewClipApplication(tx: Prisma.TransactionClient, developerId: string, id: string, accept: boolean) {

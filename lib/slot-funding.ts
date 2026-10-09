@@ -41,7 +41,7 @@ export type SlotChargePreview = { credit: boolean; quote: SlotChargeQuote | null
 export async function previewNextSlotCharges(campaignIds: string[]) {
   const previews = new Map<string, SlotChargePreview>();
   if (!campaignIds.length) return previews;
-  const campaigns = await prisma.appCampaign.findMany({ where: { id: { in: campaignIds }, fundingModel: "PAY_PER_TESTER" }, select: { id: true, bountyPerTaskUsd: true, claimedSlots: true } });
+  const campaigns = await prisma.appCampaign.findMany({ where: { id: { in: campaignIds }, fundingModel: "PAY_PER_TESTER" }, select: { id: true, bountyPerTaskUsd: true, claimedSlots: true, developer: { select: { platformFeeWaived: true } } } });
   await Promise.all(campaigns.map(async (campaign) => {
     const [holds, paid] = await Promise.all([
       prisma.missionApplication.count({ where: { campaignId: campaign.id, status: "ACCEPTED", startBy: { gt: new Date() } } }),
@@ -53,7 +53,7 @@ export async function previewNextSlotCharges(campaignIds: string[]) {
     }
     previews.set(campaign.id, {
       credit: false,
-      quote: quoteSlotCharge(usdToCents(campaign.bountyPerTaskUsd), paid.reduce((sum, charge) => sum + charge.stipendCents, 0), paid.reduce((sum, charge) => sum + charge.platformFeeCents, 0)),
+      quote: quoteSlotCharge(usdToCents(campaign.bountyPerTaskUsd), paid.reduce((sum, charge) => sum + charge.stipendCents, 0), paid.reduce((sum, charge) => sum + charge.platformFeeCents, 0), campaign.developer.platformFeeWaived),
     });
   }));
   return previews;
@@ -87,10 +87,12 @@ function acceptFromBalance(developerId: string, applicationId: string) {
       return { kind: "credit" };
     }
 
+    const feePolicy = await tx.user.findUniqueOrThrow({ where: { id: developerId }, select: { platformFeeWaived: true } });
     const quote = quoteSlotCharge(
       usdToCents(campaign.bountyPerTaskUsd),
       paid.reduce((sum, charge) => sum + charge.stipendCents, 0),
       paid.reduce((sum, charge) => sum + charge.platformFeeCents, 0),
+      feePolicy.platformFeeWaived,
     );
     const funding = await escrowMissionCredits(tx, developerId, quote.totalCents, campaign.id);
     const developer = await tx.user.findUnique({ where: { id: developerId }, select: { fundingBalanceCents: true } });

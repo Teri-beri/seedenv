@@ -94,7 +94,7 @@ const optionStyle = { backgroundColor: "#0E1017", color: "#F8FAFC" };
 
 export type DeveloperStudioView = "overview" | "new-drop" | "review-deck" | "asset-vault";
 
-export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0 }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number }) {
+export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0, platformFeeWaived = false }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number; platformFeeWaived?: boolean }) {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [highestStep, setHighestStep] = useState(1);
@@ -148,7 +148,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const [isPending, startTransition] = useTransition();
 
   const payoutPool = useMemo(() => form.totalSlots * form.bountyPerTaskUsd, [form.totalSlots, form.bountyPerTaskUsd]);
-  const fundingQuote = useMemo(() => quoteCampaignFunding(payoutPool, form.cohortType), [payoutPool, form.cohortType]);
+  const fundingQuote = useMemo(() => quoteCampaignFunding(payoutPool, form.cohortType, platformFeeWaived), [payoutPool, form.cohortType, platformFeeWaived]);
   const activeBundle = isBundleType(form.cohortType) ? COHORT_BUNDLES[form.cohortType] : null;
   const totalEscrow = fundingQuote.totalBudgetUsd;
   const platformFee = fundingQuote.platformFeeUsd;
@@ -156,13 +156,13 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const topUpOptions = useMemo(() => {
     const stipendCents = Math.round(form.bountyPerTaskUsd * 100);
     return [...new Set([1, 5, 10, form.totalSlots].filter((count) => count <= form.totalSlots))].map((count) => {
-      const needed = projectPerTesterCharges(count, stipendCents).maxTotalCents - balanceCents;
+      const needed = projectPerTesterCharges(count, stipendCents, platformFeeWaived).maxTotalCents - balanceCents;
       const creditCents = topUpForShortfall(needed);
       return { count, creditCents, quote: quoteTopUp(creditCents) };
     });
-  }, [form.totalSlots, form.bountyPerTaskUsd, balanceCents]);
+  }, [form.totalSlots, form.bountyPerTaskUsd, balanceCents, platformFeeWaived]);
   const chosenTopUp = topUpOptions.find((option) => option.count === topUpTesters) || topUpOptions[0];
-  const perTester = useMemo(() => projectPerTesterCharges(form.totalSlots, Math.round(form.bountyPerTaskUsd * 100)), [form.totalSlots, form.bountyPerTaskUsd]);
+  const perTester = useMemo(() => projectPerTesterCharges(form.totalSlots, Math.round(form.bountyPerTaskUsd * 100), platformFeeWaived), [form.totalSlots, form.bountyPerTaskUsd, platformFeeWaived]);
   const needsTopUp = !activeBundle && (perTester.firstCharge?.totalCents ?? 0) > balanceCents;
   const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
   const testerFundingShare = totalEscrow > 0 ? (fundingQuote.payoutPoolUsd / totalEscrow * 100).toFixed(2) : "0.00";
@@ -402,7 +402,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               <fieldset className="md:col-span-2">
                 <legend className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Cohort type</legend>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                  {([["STANDARD_QA", "Custom Drop", `${COHORT_PLATFORM_FEE_RATE * 100}% fee · $${COHORT_MIN_PLATFORM_FEE_CENTS / 100} min`], ["GOOGLE_PLAY_14_DAY", COHORT_BUNDLES.GOOGLE_PLAY_14_DAY.shortName, "$199 flat · 20 testers"], ["LIVE_STRESS_DROP", COHORT_BUNDLES.LIVE_STRESS_DROP.shortName, "$349 flat · 35 testers"]] as const).map(([type, label, detail]) => (
+                  {([["STANDARD_QA", "Custom Drop", platformFeeWaived ? "Platform fee waived" : `${COHORT_PLATFORM_FEE_RATE * 100}% fee · $${COHORT_MIN_PLATFORM_FEE_CENTS / 100} min`], ["GOOGLE_PLAY_14_DAY", COHORT_BUNDLES.GOOGLE_PLAY_14_DAY.shortName, platformFeeWaived ? "$80 · 20 testers · fee waived" : "$199 flat · 20 testers"], ["LIVE_STRESS_DROP", COHORT_BUNDLES.LIVE_STRESS_DROP.shortName, platformFeeWaived ? "$175 · 35 testers · fee waived" : "$349 flat · 35 testers"]] as const).map(([type, label, detail]) => (
                     <button aria-pressed={form.cohortType === type} className={`rounded-lg border p-3 text-left transition-colors ${form.cohortType === type ? "border-emerald-500/50 bg-emerald-500/[0.06]" : "border-zinc-800 bg-zinc-950/40 hover:border-zinc-700"}`} key={type} onClick={() => selectCohortType(type)} type="button">
                       <span className="block text-sm font-semibold text-zinc-100">{label}</span>
                       <span className="mt-1 block font-mono text-[11px] text-zinc-500">{detail}</span>
@@ -541,7 +541,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
             <div className="mt-6 space-y-5">
               {activeBundle ? (
                 <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
-                  <p className="font-mono text-[11px] uppercase tracking-wider text-emerald-400">{activeBundle.name} · flat ${(activeBundle.totalCents / 100).toFixed(0)}</p>
+                  <p className="font-mono text-[11px] uppercase tracking-wider text-emerald-400">{activeBundle.name} · flat ${totalEscrow.toFixed(0)}</p>
                   <ul className="mt-3 space-y-1.5 text-sm text-zinc-300">{activeBundle.features.map((feature) => <li key={feature}>· {feature}</li>)}</ul>
                 </div>
               ) : (
@@ -554,7 +554,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                 <>
                   <div className="grid gap-3 md:grid-cols-3">
                     <Metric label={`Tester payout escrow (${testerFundingShare}%)`} value={`$${payoutPool.toFixed(2)}`} />
-                    <Metric label="Flat platform fee" value={`$${platformFee.toFixed(2)}`} />
+                    <Metric label={platformFeeWaived ? "Platform fee waived" : "Flat platform fee"} value={`$${platformFee.toFixed(2)}`} />
                     <Metric label="Total escrow" value={`$${totalEscrow.toFixed(2)}`} gold />
                   </div>
                   <p className="text-xs leading-5 text-white/50">Bundle pricing is fixed, paid up front, and verified again at checkout. Unused tester stipends are refunded automatically if the cohort ends early.</p>
@@ -573,7 +573,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                     <p className="mb-2 text-[11px] uppercase tracking-wider text-zinc-500">Full cohort breakdown</p>
                     <dl className="space-y-1.5">
                       <div className="flex justify-between"><dt>Tester rewards ({form.totalSlots} × ${form.bountyPerTaskUsd.toFixed(2)})</dt><dd className="text-zinc-200">{usd(perTester.stipendCents)}</dd></div>
-                      <div className="flex justify-between"><dt>Platform fee ({COHORT_PLATFORM_FEE_RATE * 100}%, ${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum)</dt><dd className="text-zinc-200">{usd(perTester.platformFeeCents)}</dd></div>
+                      <div className="flex justify-between"><dt>{platformFeeWaived ? "Platform fee (waived for your account)" : `Platform fee (${COHORT_PLATFORM_FEE_RATE * 100}%, $${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum)`}</dt><dd className="text-zinc-200">{usd(perTester.platformFeeCents)}</dd></div>
                       <div className="flex justify-between border-t border-zinc-800 pt-1.5"><dt className="text-zinc-300">Maximum drawn from balance</dt><dd className="text-emerald-400">{usd(perTester.maxTotalCents)}</dd></div>
                     </dl>
                     {perTester.firstCharge && perTester.typicalCharge && perTester.firstCharge.totalCents !== perTester.typicalCharge.totalCents ? (

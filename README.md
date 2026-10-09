@@ -95,6 +95,12 @@ There is no automatic “assume not sent” admin/CLI command. A successful empt
 
 ## Production Security Operations
 
+### Developer platform fee waivers
+
+`User.platformFeeWaived` is a server-managed, persistent account entitlement (default `false`). The `20261015_owner_platform_fee_waiver` migration grants it once to the verified owner account by immutable user ID and checks the email before granting; changing an email or sending a client flag cannot acquire a waiver. Do not expose this field in profile/settings actions.
+
+Waived accounts pay only tester rewards on future custom slot reservations and new bundle checkouts, and only creator rewards on new Clippers agreements. Quotes, launch thresholds, escrow records, Checkout descriptions, and invoice snapshots use the same zero-fee policy. Public prices and other accounts are unchanged. Previously funded slots, paid bundles, and existing creator agreements keep their original terms; no historical fees or balances are rewritten. Stripe processing costs remain borne by SeedEnv, and tax gates are unchanged.
+
 ### SeedEnv stored-value and Florida service tax policy
 
 Apply `20261014_tax_audit` after the pending billing-security migrations. This extends the existing authoritative `User.fundingBalanceCents`, `User.walletBalanceCents`, and `WalletTransaction` ledger; it does not create a competing Wallet table or rewrite historical balances. Nullable tax fields distinguish historical/unassessed entries from explicitly assessed zero-tax entries.

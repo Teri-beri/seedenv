@@ -38,7 +38,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
 
   const security = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { passwordHash: true, role: true, username: true, email: true, avatarUrl: true, stripeCustomerId: true, fundingBalanceCents: true, companyName: true, billingProfile: { select: { companyName: true } }, _count: { select: { accounts: true } } },
+    select: { passwordHash: true, role: true, username: true, email: true, avatarUrl: true, stripeCustomerId: true, fundingBalanceCents: true, platformFeeWaived: true, companyName: true, billingProfile: { select: { companyName: true } }, _count: { select: { accounts: true } } },
   });
   if (security && !security.passwordHash && security._count.accounts === 0) redirect("/onboarding/setup?next=/console");
   const ownerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();
@@ -185,14 +185,15 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     <AuthCheck role="DEVELOPER">
     <main className="mobile-app-shell min-h-screen bg-[#0A0D12] pb-16 text-white" id="console-top">
       <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} />
+      {security?.platformFeeWaived ? <p role="status" className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-300">Platform fees are permanently waived for your developer account. Tester rewards remain fully funded. Existing charges are unchanged.</p> : null}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {overview ? <>
           {params.launched ? <p className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">{launchedCampaign?.status === CampaignStatus.ESCROW_PENDING ? `${launchedCampaign.title} goes live as soon as Stripe confirms your top-up, usually within a few seconds. Refresh shortly.` : "Cohort launched. Each tester you accept in Applications draws their reward and the platform fee from your prepaid balance."}</p> : null}
-          <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: COHORT_PLATFORM_FEE_RATE, balanceCents: security?.fundingBalanceCents ?? 0 }} />
+          <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: security?.platformFeeWaived ? 0 : COHORT_PLATFORM_FEE_RATE, balanceCents: security?.fundingBalanceCents ?? 0 }} />
           <ActiveCohorts cohorts={cohortRows} total={activeCohortCount} />
           <ReleaseReports rows={releaseReports} />
         </> : null}
-        {activeView !== "billing" ? <DeveloperStudio key={launchDraft?.id || "new-drop"} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} /> : null}
+        {activeView !== "billing" ? <DeveloperStudio key={launchDraft?.id || "new-drop"} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
 
         {billing ? <section className="space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-4">

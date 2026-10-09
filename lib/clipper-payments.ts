@@ -31,7 +31,7 @@ export async function fundClipAgreement(id: string, developerId: string) {
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
     payment_method_types: ["card"],
-    line_items: [{ quantity: 1, price_data: { currency: "usd", unit_amount: item.chargeCents, product_data: { name: `Clippers: ${item.campaign.title}`, description: `Creator fee $${(item.feeCents / 100).toFixed(2)} plus platform fee. Creator-owned; 90-day organic repost license after payment.` } } }],
+    line_items: [{ quantity: 1, price_data: { currency: "usd", unit_amount: item.chargeCents, product_data: { name: `Clippers: ${item.campaign.title}`, description: `Creator fee $${(item.feeCents / 100).toFixed(2)}; platform fee $${((item.chargeCents - item.feeCents) / 100).toFixed(2)}. Creator-owned; 90-day organic repost license after payment.` } } }],
     payment_intent_data: { transfer_group: `clip_${id}`, metadata: { type: "SEEDENV_CLIPPER", engagementId: id } },
     metadata: { type: "SEEDENV_CLIPPER", engagementId: id, fundingAttempt: String(fundingAttempt) },
     success_url: `${origin}/clippers/${item.campaignId}?funding=processing`,

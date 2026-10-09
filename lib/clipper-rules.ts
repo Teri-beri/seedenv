@@ -33,9 +33,9 @@ export const clipProfileSchema = z.object({
 });
 export type ClipProfileInput = z.infer<typeof clipProfileSchema>;
 
-export function clipChargeCents(feeCents: number) {
+export function clipChargeCents(feeCents: number, platformFeeWaived = false) {
   if (!Number.isSafeInteger(feeCents) || feeCents < 1000 || feeCents > 100000) throw new Error("Creator fees must be between $10 and $1,000.");
-  return quoteClipperFunding(feeCents / 100);
+  return quoteClipperFunding(feeCents / 100, platformFeeWaived);
 }
 
 export function publicationIdentity(value: string, platform: string) {

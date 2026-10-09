@@ -122,6 +122,7 @@ model User {
   stripeCustomerId          String?
   fundingBalanceCents       Int                  @default(0) @map("funding_balance_cents")
   autoReloadCents           Int                  @default(0) @map("auto_reload_cents")
+  platformFeeWaived         Boolean              @default(false) @map("platform_fee_waived")
   balanceTopUps             BalanceTopUp[]
   stripeConnectAccountId    String?
   questXp                   Int                  @default(0)

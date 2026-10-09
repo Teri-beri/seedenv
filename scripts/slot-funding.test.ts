@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cardProcessingFeeCents, projectPerTesterCharges, quoteSlotCharge, quoteTopUp, topUpForShortfall } from "../lib/pricing";
+import { cardProcessingFeeCents, COHORT_BUNDLES, projectPerTesterCharges, quoteCampaignFunding, quoteClipperFunding, quoteSlotCharge, quoteTopUp, topUpForShortfall } from "../lib/pricing";
 import { campaignHasEnded, prepaidRefundTargetCents, unusedPaidSlots } from "../lib/slot-funding";
 
 test("processing gross-up leaves the platform whole after Stripe's 2.9% + 30¢", () => {
@@ -35,6 +35,26 @@ test("full-cohort projection matches the advertised 25 × $4 example", () => {
   assert.equal(projectPerTesterCharges(5, -1).firstCharge, null);
 });
 
+test("account fee waiver removes the floor and percentage without reducing rewards", () => {
+  assert.deepEqual(quoteSlotCharge(400, 0, 0, true), { stipendCents: 400, platformFeeCents: 0, totalCents: 400 });
+  assert.equal(quoteSlotCharge(400, 8000, 1600, true).totalCents, 400);
+  const projection = projectPerTesterCharges(25, 400, true);
+  assert.equal(projection.platformFeeCents, 0);
+  assert.equal(projection.maxTotalCents, 10000);
+  assert.equal(projection.firstCharge?.totalCents, 400);
+  assert.equal(projection.typicalCharge?.totalCents, 400);
+  assert.equal(quoteCampaignFunding(100, "STANDARD_QA", true).escrowTotalCents, 10000);
+  for (const bundle of Object.values(COHORT_BUNDLES)) {
+    const quote = quoteCampaignFunding(9999, bundle.type, true);
+    assert.equal(quote.platformFeeUsd, 0);
+    assert.equal(quote.escrowTotalCents, bundle.slots * bundle.bountyCents);
+    assert.equal(quote.payoutPoolUsd, bundle.slots * bundle.bountyCents / 100);
+  }
+  assert.equal(quoteClipperFunding(50, true), 5000);
+  assert.throws(() => quoteSlotCharge(-1, 0, 0, true));
+  assert.throws(() => quoteCampaignFunding(NaN, "STANDARD_QA", true));
+});
+
 test("top-ups are bounded and charge exactly the credit (no card surcharge)", () => {
   assert.deepEqual(quoteTopUp(5000), { creditCents: 5000, processingFeeCents: 0, totalCents: 5000 });
   assert.throws(() => quoteTopUp(999), /between/);
@@ -58,9 +78,9 @@ test("refund gates only return money nobody is using", () => {
 
 type Row = Record<string, unknown>;
 
-function fundingHarness(options: { balance: number; autoReload?: number; paid?: number; card?: "succeeded" | "declined" | "network"; refundFails?: boolean; topUps?: Row[]; campaign?: Partial<Row>; taxAddress?: { country: string; region: string } }) {
+function fundingHarness(options: { balance: number; platformFeeWaived?: boolean; autoReload?: number; paid?: number; card?: "succeeded" | "declined" | "network"; refundFails?: boolean; topUps?: Row[]; campaign?: Partial<Row>; taxAddress?: { country: string; region: string } }) {
   const state = {
-    user: { id: "dev", fundingBalanceCents: options.balance, autoReloadCents: options.autoReload ?? 0, stripeCustomerId: "cus_1" },
+    user: { id: "dev", platformFeeWaived: options.platformFeeWaived ?? false, fundingBalanceCents: options.balance, autoReloadCents: options.autoReload ?? 0, stripeCustomerId: "cus_1" },
     application: { id: "app-1", status: "PENDING", campaignId: "c-1", startBy: null as Date | null },
     campaign: { id: "c-1", title: "Cohort", developerId: "dev", status: "ACTIVE", fundingModel: "PAY_PER_TESTER", cancelledAt: null as Date | null, expiresAt: new Date(Date.now() + 86400000), claimedSlots: 0, totalSlots: 3, bountyPerTaskUsd: 4, refundedCents: 0, ...options.campaign },
     charges: Array.from({ length: options.paid ?? 0 }, (_, index) => ({ id: `paid-${index}`, campaignId: "c-1", status: "SUCCEEDED", stipendCents: 400, platformFeeCents: index === 0 ? 1500 : 0, stripePaymentIntentId: null, applicationId: null as string | null, createdAt: new Date(Date.now() - (10 - index) * 1000) })) as Row[],
@@ -212,6 +232,23 @@ async function withMocks<T>(harness: ReturnType<typeof fundingHarness>, work: (m
 }
 
 const accept = (harness: ReturnType<typeof fundingHarness>) => withMocks(harness, ({ slot }) => slot.acceptApplicationWithFunding("dev", "app-1").then((value) => ({ value, error: null as Error | null }), (error: Error) => ({ value: null, error })));
+
+test("waived developer reserves the full tester reward with a zero-fee invoice", async () => {
+  const harness = fundingHarness({ balance: 400, platformFeeWaived: true });
+  const { value, error } = await accept(harness);
+  assert.equal(error, null);
+  assert.equal(value?.accepted, true);
+  assert.equal(harness.state.user.fundingBalanceCents, 0);
+  assert.equal(harness.state.intents, 0);
+  assert.equal(harness.state.charges[0].stipendCents, 400);
+  assert.equal(harness.state.charges[0].platformFeeCents, 0);
+  assert.equal(harness.state.charges[0].totalCents, 400);
+  assert.equal(harness.state.transactions[0].platformFeeCents, 0);
+  assert.equal(harness.state.transactions[0].amountCents, 400);
+  const snapshot = harness.state.transactions[0].invoiceSnapshot as { rewardPoolCents: number; platformFeeCents: number };
+  assert.equal(snapshot.rewardPoolCents, 400);
+  assert.equal(snapshot.platformFeeCents, 0);
+});
 
 test("accepting the first tester draws reward + floor fee from the balance with no card charge", async () => {
   const harness = fundingHarness({ balance: 5000 });

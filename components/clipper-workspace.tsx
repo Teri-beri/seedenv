@@ -10,8 +10,8 @@ import { formatCents } from "@/lib/utils";
 import { CLIPPER_PLATFORM_FEE_PERCENT } from "@/lib/pricing";
 
 type CampaignCard = { id: string; title: string; brief: string; platform: string; feeCents: number; minimumRep: number; open: boolean; revisionLimit: number; developer: { username: string } };
-export function ClipperWorkspace({ developer, profile, campaigns, agreements, socialName, tikTokEnabled, socialStatus }: {
-  developer: boolean; profile: ClipProfileInput | null; campaigns: CampaignCard[]; agreements: Array<{ id: string; status: string; feeCents: number; campaign: { id: string; title: string } }>; socialName: string | null; tikTokEnabled: boolean; socialStatus?: string;
+export function ClipperWorkspace({ developer, profile, campaigns, agreements, socialName, tikTokEnabled, socialStatus, platformFeeWaived = false }: {
+  developer: boolean; profile: ClipProfileInput | null; campaigns: CampaignCard[]; agreements: Array<{ id: string; status: string; feeCents: number; campaign: { id: string; title: string } }>; socialName: string | null; tikTokEnabled: boolean; socialStatus?: string; platformFeeWaived?: boolean;
 }) {
   const router = useRouter();
   return <div className="space-y-7">
@@ -34,7 +34,7 @@ export function ClipperWorkspace({ developer, profile, campaigns, agreements, so
           <label className="block text-sm">Draft due after funding (days)<input required type="number" name="deliveryDays" min={3} max={30} defaultValue={7} className={clipInputClass} /></label>
           <label className="block text-sm">Post must stay public (days)<input required type="number" name="liveDays" min={7} max={90} defaultValue={30} className={clipInputClass} /></label>
         </div>
-        <p className="text-sm leading-6 text-neutral-400">Terms are fixed once created. You fund each accepted creator separately, adding a {CLIPPER_PLATFORM_FEE_PERCENT * 100}% platform fee on the agreed creator reward. Developer review / release is due within 72 hours of submission, revisions within three days, and publication within seven days of approval. Deadlines and live-post retention are contractual requirements, not automatic refunds or retroactive payout clawbacks.</p>
+        <p className="text-sm leading-6 text-neutral-400">Terms are fixed once created. You fund each accepted creator separately. {platformFeeWaived ? "Platform fees are waived for new agreements on your account; creator rewards are unchanged." : `A ${CLIPPER_PLATFORM_FEE_PERCENT * 100}% platform fee is added to the agreed creator reward.`} Developer review / release is due within 72 hours of submission, revisions within three days, and publication within seven days of approval. Deadlines and live-post retention are contractual requirements, not automatic refunds or retroactive payout clawbacks.</p>
         <p className="text-xs leading-6 text-neutral-500">{clipTerms}</p>
       </ClipperForm> : <div className="space-y-6"><ClipperForm label="Save creator profile" action={async (data) => saveClipProfile({ bio: String(data.get("bio")), portfolioUrl: String(data.get("portfolioUrl")), socialUrl: String(data.get("socialUrl")), specialties: String(data.get("specialties")) })}>
         <label className="block text-sm">Creator introduction<textarea required name="bio" minLength={20} maxLength={1000} rows={4} defaultValue={profile?.bio} className={clipInputClass} /></label>

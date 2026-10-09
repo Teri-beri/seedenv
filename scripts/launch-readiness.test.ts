@@ -83,6 +83,7 @@ test("proof editing requires an explicit revision start and a live editing windo
 test("missing Stripe configuration or funding method saves a draft without creating payment records", async () => {
   const previousStripeKey = process.env.STRIPE_SECRET_KEY;
   const previousNodeEnv = process.env.NODE_ENV;
+  let platformFeeWaived = false;
   const created: Array<{ status: string; totalBudgetUsd: number; platformFeeUsd: number }> = [];
   const updated: Array<{ status: string }> = [];
   const transaction = {
@@ -93,7 +94,8 @@ test("missing Stripe configuration or funding method saves a draft without creat
     } },
   };
   const modules = [
-    mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "payment-test-developer", role: "DEVELOPER", stripeCustomerId: null }) } }),
+    mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "payment-test-developer", role: "DEVELOPER", stripeCustomerId: null, platformFeeWaived, fundingBalanceCents: 400 }) } }),
+    mock.module("next/cache", { namedExports: { revalidatePath: () => {} } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: {
       appCampaign: {
         create: async ({ data }: { data: { status: string; totalBudgetUsd: number; platformFeeUsd: number } }) => {
@@ -133,6 +135,15 @@ test("missing Stripe configuration or funding method saves a draft without creat
     assert.deepEqual(await createCampaignWithEscrow({ ...input, cohortType: "GOOGLE_PLAY_14_DAY" }), { campaignId: "payment-draft-2", checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true });
     assert.equal(created[1].status, "DRAFT");
     assert.equal(created.length, 2);
+    platformFeeWaived = true;
+    await createCampaignWithEscrow({ ...input, cohortType: "GOOGLE_PLAY_14_DAY" });
+    assert.equal(created[2].totalBudgetUsd, 80);
+    assert.equal(created[2].platformFeeUsd, 0);
+    const launched = await createCampaignWithEscrow(input);
+    assert.equal(launched.launched, true, "A waived account only needs the $4 first reward, not the $15 fee floor.");
+    assert.equal(created[3].status, "ACTIVE");
+    assert.equal(created[3].totalBudgetUsd, 100);
+    assert.equal(created[3].platformFeeUsd, 0);
   } finally {
     for (const item of modules.reverse()) item.restore();
     if (previousStripeKey === undefined) delete process.env.STRIPE_SECRET_KEY;

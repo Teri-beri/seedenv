@@ -65,7 +65,8 @@ function resolveCohortTerms(input: CampaignInput) {
   };
 }
 
-function checkoutDescription(input: CampaignInput, terms: ReturnType<typeof resolveCohortTerms>) {
+function checkoutDescription(input: CampaignInput, terms: ReturnType<typeof resolveCohortTerms>, platformFeeWaived: boolean) {
+  if (platformFeeWaived) return `${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)}; platform fee waived`;
   if (isBundleType(input.cohortType)) {
     const bundle = COHORT_BUNDLES[input.cohortType];
     return `${bundle.name}: ${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)} plus a flat $${(bundle.platformFeeCents / 100).toFixed(2)} platform fee`;
@@ -73,10 +74,10 @@ function checkoutDescription(input: CampaignInput, terms: ReturnType<typeof reso
   return `${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)} plus a ${COHORT_PLATFORM_FEE_RATE * 100}% platform fee on the tester reward pool (minimum $${(COHORT_MIN_PLATFORM_FEE_CENTS / 100).toFixed(2)})`;
 }
 
-function buildCampaignData(input: CampaignInput, developerId: string, status: CampaignStatus) {
+function buildCampaignData(input: CampaignInput, developerId: string, status: CampaignStatus, platformFeeWaived: boolean) {
   const terms = resolveCohortTerms(input);
   const testerPayoutPoolUsd = terms.totalSlots * terms.bountyPerTaskUsd;
-  const { totalBudgetUsd, platformFeeUsd, escrowTotalCents } = quoteCampaignFunding(testerPayoutPoolUsd, input.cohortType);
+  const { totalBudgetUsd, platformFeeUsd, escrowTotalCents } = quoteCampaignFunding(testerPayoutPoolUsd, input.cohortType, platformFeeWaived);
 
   return {
     escrowTotalCents,
@@ -124,8 +125,8 @@ async function requireDeveloper() {
   return developer;
 }
 
-async function saveCampaignDraft(developerId: string, input: CampaignInput, draftId?: string) {
-  const { data: draftData } = buildCampaignData(input, developerId, CampaignStatus.DRAFT);
+async function saveCampaignDraft(developerId: string, input: CampaignInput, platformFeeWaived: boolean, draftId?: string) {
+  const { data: draftData } = buildCampaignData(input, developerId, CampaignStatus.DRAFT, platformFeeWaived);
   if (!draftId) return prisma.appCampaign.create({ data: draftData });
 
   const ownedDraft = await prisma.appCampaign.findFirst({
@@ -148,7 +149,7 @@ export async function saveTestCampaignDraft(data: CampaignInput) {
     throw new Error("Test drafts are only available to the SeedEnv owner account.");
   }
 
-  const { data: campaignData } = buildCampaignData(input, developer.id, CampaignStatus.DRAFT);
+  const { data: campaignData } = buildCampaignData(input, developer.id, CampaignStatus.DRAFT, developer.platformFeeWaived);
   const campaign = await prisma.appCampaign.create({ data: campaignData });
   return { campaignId: campaign.id, title: campaign.title, status: campaign.status, chargedCents: 0 };
 }
@@ -157,15 +158,15 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
   const input = campaignSchema.parse(data);
   const developer = await requireDeveloper();
   if (!process.env.STRIPE_SECRET_KEY) {
-    const draft = await saveCampaignDraft(developer.id, input, draftId);
+    const draft = await saveCampaignDraft(developer.id, input, developer.platformFeeWaived, draftId);
     return { campaignId: draft.id, checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true };
   }
   const tax = stripeTaxEnabled() ? await prisma.$transaction((tx) => serviceTaxAudit(tx, developer.id)) : null;
 
   if (!isBundleType(input.cohortType)) {
-    const firstTester = quoteSlotCharge(Math.round(input.bountyPerTaskUsd * 100), 0, 0);
+    const firstTester = quoteSlotCharge(Math.round(input.bountyPerTaskUsd * 100), 0, 0, developer.platformFeeWaived);
     const funded = developer.fundingBalanceCents >= firstTester.totalCents;
-    const { data: liveData } = buildCampaignData(input, developer.id, funded ? CampaignStatus.ACTIVE : CampaignStatus.ESCROW_PENDING);
+    const { data: liveData } = buildCampaignData(input, developer.id, funded ? CampaignStatus.ACTIVE : CampaignStatus.ESCROW_PENDING, developer.platformFeeWaived);
     const payPerTester = { ...liveData, fundingModel: CohortFundingModel.PAY_PER_TESTER, ...(tax ? { taxSnapshot: tax } : {}) };
     let live;
     if (draftId) {
@@ -210,14 +211,14 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
       }
     }
     if (!hasSavedPaymentMethod) {
-      const draft = await saveCampaignDraft(developer.id, input, draftId);
+      const draft = await saveCampaignDraft(developer.id, input, developer.platformFeeWaived, draftId);
       return { campaignId: draft.id, checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true };
     }
   }
 
   const profile = await prisma.billingProfile.findUnique({ where: { userId: developer.id } });
   const company = profile ? billingDetailsSchema.parse({ ...profile, taxId: profile.taxId || "", billingEmail: profile.billingEmail || "", addressLine2: profile.addressLine2 || "", region: profile.region || "" }) : null;
-  const { data: baseCampaignData, escrowTotalCents, terms } = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING);
+  const { data: baseCampaignData, escrowTotalCents, terms } = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING, developer.platformFeeWaived);
   const campaignData = { ...baseCampaignData, ...(tax ? { taxSnapshot: tax } : {}) };
   let campaign;
   if (draftId) {
@@ -274,7 +275,7 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
             product_data: {
               tax_code: QA_SERVICE_TAX_CODE,
               name: `SeedEnv escrow: ${campaign.title}`,
-              description: checkoutDescription(input, terms),
+              description: checkoutDescription(input, terms, developer.platformFeeWaived),
             },
           },
         },

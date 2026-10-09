@@ -69,17 +69,18 @@ export function standardPlatformFeeCents(payoutPoolCents: number) {
   return Math.max(Math.round(payoutPoolCents * COHORT_PLATFORM_FEE_RATE), COHORT_MIN_PLATFORM_FEE_CENTS);
 }
 
-export function quoteCampaignFunding(payoutPoolUsd: number, cohortType: CohortTypeKey = "STANDARD_QA") {
+export function quoteCampaignFunding(payoutPoolUsd: number, cohortType: CohortTypeKey = "STANDARD_QA", platformFeeWaived = false) {
   if (isBundleType(cohortType)) {
     const bundle = COHORT_BUNDLES[cohortType];
     const poolCents = bundle.slots * bundle.bountyCents;
-    return { payoutPoolUsd: poolCents / 100, platformFeeUsd: bundle.platformFeeCents / 100, totalBudgetUsd: bundle.totalCents / 100, escrowTotalCents: bundle.totalCents };
+    const feeCents = platformFeeWaived ? 0 : bundle.platformFeeCents;
+    return { payoutPoolUsd: poolCents / 100, platformFeeUsd: feeCents / 100, totalBudgetUsd: (poolCents + feeCents) / 100, escrowTotalCents: poolCents + feeCents };
   }
   const payoutPoolCents = Math.round(payoutPoolUsd * 100);
   if (!Number.isSafeInteger(payoutPoolCents) || payoutPoolCents < 0) {
     throw new Error("The reward pool must be a finite, non-negative USD amount.");
   }
-  const platformFeeCents = standardPlatformFeeCents(payoutPoolCents);
+  const platformFeeCents = platformFeeWaived ? 0 : standardPlatformFeeCents(payoutPoolCents);
   const escrowTotalCents = payoutPoolCents + platformFeeCents;
   return {
     payoutPoolUsd: payoutPoolCents / 100,
@@ -89,10 +90,10 @@ export function quoteCampaignFunding(payoutPoolUsd: number, cohortType: CohortTy
   };
 }
 
-export function quoteClipperFunding(feeUsd: number) {
+export function quoteClipperFunding(feeUsd: number, platformFeeWaived = false) {
   const feeCents = Math.round(feeUsd * 100);
   if (!Number.isSafeInteger(feeCents) || feeCents < 0) throw new Error("The creator fee must be a finite, non-negative USD amount.");
-  return feeCents + Math.round(feeCents * CLIPPER_PLATFORM_FEE_PERCENT);
+  return feeCents + (platformFeeWaived ? 0 : Math.round(feeCents * CLIPPER_PLATFORM_FEE_PERCENT));
 }
 
 export type EscrowBreakdown = {
@@ -127,21 +128,21 @@ export type SlotChargeQuote = { stipendCents: number; platformFeeCents: number; 
 
 // The platform fee is cumulative: 20% of all funded stipends with a $15 cohort floor, minus fees already collected.
 // Slots are paid from the developer's prepaid balance, so no card processing applies per tester.
-export function quoteSlotCharge(stipendCents: number, retainedStipendCents: number, retainedPlatformFeeCents: number): SlotChargeQuote {
+export function quoteSlotCharge(stipendCents: number, retainedStipendCents: number, retainedPlatformFeeCents: number, platformFeeWaived = false): SlotChargeQuote {
   if (!Number.isSafeInteger(stipendCents) || stipendCents <= 0) throw new Error("The tester stipend must be a positive amount.");
   const owed = standardPlatformFeeCents(Math.max(0, retainedStipendCents) + stipendCents);
-  const platformFeeCents = Math.max(0, owed - Math.max(0, retainedPlatformFeeCents));
+  const platformFeeCents = platformFeeWaived ? 0 : Math.max(0, owed - Math.max(0, retainedPlatformFeeCents));
   return { stipendCents, platformFeeCents, totalCents: stipendCents + platformFeeCents };
 }
 
 export type PerTesterProjection = { firstCharge: SlotChargeQuote | null; typicalCharge: SlotChargeQuote | null; stipendCents: number; platformFeeCents: number; maxTotalCents: number };
 
 // Maximum spend if every slot is filled, drawn from the balance one accepted tester at a time.
-export function projectPerTesterCharges(slots: number, stipendCents: number): PerTesterProjection {
+export function projectPerTesterCharges(slots: number, stipendCents: number, platformFeeWaived = false): PerTesterProjection {
   const projection: PerTesterProjection = { firstCharge: null, typicalCharge: null, stipendCents: 0, platformFeeCents: 0, maxTotalCents: 0 };
   if (!Number.isSafeInteger(slots) || slots <= 0 || !Number.isSafeInteger(stipendCents) || stipendCents <= 0) return projection;
   for (let index = 0; index < slots; index += 1) {
-    const charge = quoteSlotCharge(stipendCents, projection.stipendCents, projection.platformFeeCents);
+    const charge = quoteSlotCharge(stipendCents, projection.stipendCents, projection.platformFeeCents, platformFeeWaived);
     if (index === 0) projection.firstCharge = charge;
     projection.typicalCharge = charge;
     projection.stipendCents += charge.stipendCents;
