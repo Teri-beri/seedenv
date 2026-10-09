@@ -2,7 +2,7 @@
 
 import { PlatformType, TaskProofType } from "@prisma/client";
 import { motion } from "framer-motion";
-import { ArrowDown, ArrowUp, BadgeDollarSign, Boxes, CheckCircle2, Download, ExternalLink, ImageIcon, ImagePlus, LoaderCircle, Plus, Trash2, XCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, BadgeDollarSign, Boxes, CheckCircle2, Clock3, Download, ExternalLink, ImageIcon, ImagePlus, ListChecks, LoaderCircle, Monitor, Plus, Smartphone, Trash2, XCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -618,13 +618,15 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   );
 }
 
-function LaunchPreview({ form }: { form: CampaignInput }) {
+export function LaunchPreview({ form }: { form: CampaignInput }) {
   const [failedIconUrl, setFailedIconUrl] = useState("");
   const platformLabel = form.platform === PlatformType.TESTFLIGHT
     ? "TestFlight"
     : form.platform === PlatformType.WEB_STAGING
       ? "Web"
       : "Play Store";
+  const deviceLabel = form.platform === PlatformType.TESTFLIGHT ? "iOS" : form.platform === PlatformType.WEB_STAGING ? "Browser" : "Android";
+  const tasks = form.instructions.filter((task) => task.instructionTitle.trim());
   let previewIconUrl = "";
   try {
     const parsedIconUrl = new URL(form.iconUrl || "");
@@ -634,39 +636,62 @@ function LaunchPreview({ form }: { form: CampaignInput }) {
   }
 
   return (
-    <aside className="xl:sticky xl:top-28">
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5">
+    <aside aria-label="Draft mission preview" className="xl:sticky xl:top-28">
+      <div className="rounded-2xl border border-zinc-800/80 bg-[#0D1015] p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Live Preview</p>
-            <h3 className="mt-1 text-lg font-semibold tracking-tight text-white">Tester HUD</h3>
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-500">Live preview</p>
+            <h3 className="mt-1 text-base font-semibold tracking-tight text-white">Your mission, at a glance</h3>
           </div>
-          <span className="rounded-full border border-emerald-500/25 bg-emerald-950/35 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">Beta drop</span>
+          <span className="shrink-0 rounded-md border border-zinc-700/70 bg-zinc-800/40 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-zinc-400">Draft</span>
         </div>
 
-        <article className="mt-5 overflow-hidden rounded-xl border border-white/10 bg-[#090A0F]/90">
-          <div className="h-1 bg-gradient-to-r from-amber-500 via-orange-400 to-emerald-400" />
-          <div className="p-4">
+        <article className="mt-4 overflow-hidden rounded-xl border border-white/[0.08] bg-[radial-gradient(ellipse_at_top_right,rgba(16,185,129,0.07),transparent_55%),linear-gradient(180deg,#12161D,#0A0D12)] shadow-xl shadow-black/20">
+          <div className="p-4 sm:p-5">
             <div className="flex items-start gap-3">
-              <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-[#141720]">
-                <Boxes className="size-6 text-amber-400" />
+              <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/10 bg-[#191D25] shadow-inner shadow-white/[0.03]">
+                <Boxes className="size-6 text-emerald-400/80" />
                 {previewIconUrl && failedIconUrl !== previewIconUrl ? <Image alt="Campaign icon preview" className="object-cover" fill onError={() => setFailedIconUrl(previewIconUrl)} sizes="56px" src={previewIconUrl} unoptimized /> : null}
               </div>
               <div className="min-w-0 flex-1">
-                <h4 className="truncate font-bold text-white">{form.title.trim() || "Your app title"}</h4>
-                <p className="mt-1 text-xs text-neutral-500">{form.targetVibe || "Choose a target audience"}</p>
+                <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-emerald-400/80">Beta test mission</p>
+                <h4 className={`mt-1 break-words text-lg font-semibold leading-tight tracking-tight ${form.title.trim() ? "text-white" : "text-zinc-500"}`}>{form.title.trim() || "Your next great release"}</h4>
+                <p className="mt-1.5 text-xs text-zinc-500">{form.targetVibe || "Audience not selected"}</p>
               </div>
             </div>
-            <span className="mt-4 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs font-medium text-neutral-300">{platformLabel}</span>
-            <p className="mt-4 min-h-16 text-sm leading-6 text-neutral-400">{form.description.trim() || "Your mission brief will show testers what to explore and what feedback you need."}</p>
-            <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-xs">
-              <span className="text-neutral-500">Tester reward</span>
-              <span className="font-mono font-bold text-amber-300">${form.bountyPerTaskUsd.toFixed(2)}</span>
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1">
+                {form.platform === PlatformType.WEB_STAGING ? <Monitor className="size-3" /> : <Smartphone className="size-3" />}
+                {deviceLabel} <span className="text-zinc-600">/</span> {platformLabel}
+              </span>
+              {form.estimatedMinutes ? <span className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1"><Clock3 className="size-3" />{form.estimatedMinutes} min</span> : null}
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1"><ListChecks className="size-3" />{tasks.length} {tasks.length === 1 ? "task" : "tasks"}</span>
             </div>
-            <button className="mt-4 w-full rounded-lg bg-amber-500 px-3 py-2.5 text-sm font-bold text-neutral-950" disabled type="button">View seed mission</button>
+            <div className="mt-5 rounded-lg border border-white/[0.05] bg-black/15 p-3.5">
+              <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-zinc-500">Mission brief</p>
+              <p className={`mt-2 whitespace-pre-wrap break-words text-sm leading-6 ${form.description.trim() ? "text-zinc-300" : "text-zinc-500"}`}>{form.description.trim() || "What should testers explore? Add a brief above to give this mission its focus."}</p>
+            </div>
+            <div className="mt-4">
+              <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-zinc-500">Test plan</p>
+              {tasks.length ? <ol className="mt-2 space-y-2">{tasks.slice(0, 3).map((task, index) => (
+                <li className="flex items-start gap-2.5 text-xs leading-5 text-zinc-400" key={`${index}-${task.instructionTitle}`}>
+                  <span className="mt-0.5 grid size-4 shrink-0 place-items-center rounded border border-emerald-500/15 bg-emerald-500/[0.05] font-mono text-[9px] text-emerald-400">{index + 1}</span>
+                  <span className="min-w-0 break-words">{task.instructionTitle}</span>
+                </li>
+              ))}</ol> : <p className="mt-2 text-xs leading-5 text-zinc-600">Your task checklist will appear here.</p>}
+              {tasks.length > 3 ? <p className="mt-2 pl-6 text-[11px] text-zinc-500">+{tasks.length - 3} more {tasks.length - 3 === 1 ? "task" : "tasks"}</p> : null}
+            </div>
+            {form.testerPerk?.trim() ? <p className="mt-4 break-words rounded-md border border-emerald-500/10 bg-emerald-500/[0.04] px-3 py-2 text-xs leading-5 text-emerald-300/80">Tester perk: {form.testerPerk}</p> : null}
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.07] pt-4">
+              <div>
+                <p className="text-[10px] text-zinc-500">Reward per approved tester</p>
+                <p className="mt-1 font-mono text-xl font-semibold tracking-tight text-amber-300">${form.bountyPerTaskUsd.toFixed(2)} <span className="text-[10px] font-normal text-zinc-600">USD</span></p>
+              </div>
+              <span className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-xs text-zinc-500">Mission preview</span>
+            </div>
           </div>
         </article>
-        <p className="mt-3 text-xs leading-5 text-neutral-500">Preview updates as you edit the title, platform, icon, and mission brief.</p>
+        <p className="mt-3 text-[11px] leading-5 text-zinc-600">Draft only · Updates as you edit. Nothing is published yet.</p>
       </div>
     </aside>
   );

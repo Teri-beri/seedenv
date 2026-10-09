@@ -64,6 +64,18 @@ On Android:
   - **Release synthesis**: groups the approved reports for a cohort into P0/P1/P2 issues when the cohort ends. Developers see these as Release reports in the console overview, with copyable GitHub markdown (`POST /api/agent/synthesize-campaign`).
   - **Failures**: if Gemini fails, the audit is saved as `PENDING` and an alert goes to the Slack, Discord or Telegram webhooks. The audit is retried every 10 minutes (up to 5 attempts) and appears in `/admin/qa`. Re-run a single audit with `POST /api/agent/audit-submission` (as the developer or an admin, or with `Authorization: Bearer $CRON_SECRET`). Tests: `scripts/qa-agents.test.ts`.
 
+## Google sign-in setup
+
+1. In Google Cloud Console, select the SeedEnv project and open **Google Auth Platform**.
+2. Complete **Branding**: app name SeedEnv, a monitored support email, homepage `https://seedenv.com`, privacy policy `https://seedenv.com/privacy`, and terms `https://seedenv.com/terms`. Add `seedenv.com` as an authorized domain and complete any domain/brand verification Google requests.
+3. Select an **External** audience for public sign-in. While in Testing, add your Google account as a test user. Configure only basic identity scopes (`openid`, email, profile), not Gmail or Drive access.
+4. Under **Clients**, create an OAuth client with application type **Web application**. Authorized JavaScript origin: `https://seedenv.com`. Authorized redirect URI: `https://seedenv.com/api/auth/callback/google` (exactly; no trailing slash).
+5. Put the client ID and secret in the Render web service's `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` environment variables. Keep the secret server-only; do not prefix it with `NEXT_PUBLIC_`, commit it, or paste it into chat. Confirm `NEXTAUTH_URL=https://seedenv.com` and a stable `NEXTAUTH_SECRET` are configured, then redeploy.
+6. Check `/api/auth/providers` includes `google` and test the Google button at `/auth/signin` in a private browser window. The same button creates new accounts and signs in existing ones. For a public launch, publish the External audience to Production and complete any required Google verification.
+7. Optional local development: use a separate development client, with origin `http://localhost:3000` and redirect `http://localhost:3000/api/auth/callback/google` (adjust both if using another port).
+
+`redirect_uri_mismatch` means the registered URI differs from the callback sent by the app; compare protocol, hostname, port, path, and trailing slash. Testing-access errors require adding the account as a test user or publishing the app. The Gemini API key is not an OAuth client credential.
+
 ## Production Security Operations
 
 - After deploying the private-proof storage code, set the `proof-screenshots` bucket to **private** in Supabase Storage. Uploads now store object paths, and the authenticated developer console and asset export issue five-minute signed links for new and existing Supabase proof records. Test preview and ZIP download before accepting more submissions. Existing public links cannot be revoked by code alone while the bucket stays public. Keep the service-role key server-only, and rotate it if it has ever been exposed.
