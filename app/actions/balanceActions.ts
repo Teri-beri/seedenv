@@ -7,6 +7,7 @@ import { createTopUpCheckout, withdrawBalance } from "@/lib/funding-balance";
 import { AUTO_RELOAD_OPTIONS_CENTS, MAX_TOP_UP_CENTS, MIN_TOP_UP_CENTS } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
 import { formatCents } from "@/lib/utils";
+import { replaceCampaignFunding } from "@/lib/funding-reversals";
 
 export type BalanceActionResult = { ok: true; message?: string; url?: string } | { ok: false; message: string };
 
@@ -53,5 +54,18 @@ export async function refundBalanceToCard(): Promise<BalanceActionResult> {
   } catch (error) {
     console.error("SeedEnv balance withdrawal failed:", error);
     return { ok: false, message: error instanceof Error ? error.message : "Could not refund your balance." };
+  }
+
+}
+
+export async function replaceReversedCampaignFunding(campaignId: string): Promise<BalanceActionResult> {
+  try {
+    const user = await requireBalanceOwner();
+    const amount = await replaceCampaignFunding(user.id, campaignId);
+    revalidatePath("/console");
+    revalidatePath("/dashboard");
+    return { ok: true, message: `${formatCents(amount)} of missing escrow was replaced from your prepaid balance. Payouts can resume.` };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Could not replace reversed funding." };
   }
 }

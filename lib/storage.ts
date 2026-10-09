@@ -10,6 +10,14 @@ function getSupabase() {
 
 const proofPrefix = "proof:";
 
+async function privateProofBucket(supabase: NonNullable<ReturnType<typeof getSupabase>>) {
+  const name = process.env.SUPABASE_PROOF_BUCKET || "proof-screenshots";
+  const { data, error } = await supabase.storage.getBucket(name);
+  if (error || !data) throw new Error("Private proof storage is unavailable. Check the Supabase bucket configuration.");
+  if (data.public) throw new Error("Proof storage must be private. Disable public access in Supabase before uploading or viewing evidence.");
+  return supabase.storage.from(name);
+}
+
 function proofPath(value: string) {
   if (value.startsWith(proofPrefix)) return value.slice(proofPrefix.length);
   const url = process.env.SUPABASE_URL;
@@ -33,9 +41,8 @@ export async function getProofImageUrl(value: string | null) {
   if (!path) return value.startsWith("data:") || value.startsWith("https://images.unsplash.com/") ? value : null;
   const supabase = getSupabase();
   if (!supabase) return null;
-  const { data, error } = await supabase.storage
-    .from(process.env.SUPABASE_PROOF_BUCKET || "proof-screenshots")
-    .createSignedUrl(path, 300);
+  const bucket = await privateProofBucket(supabase);
+  const { data, error } = await bucket.createSignedUrl(path, 300);
   if (error) throw new Error(error.message);
   return data.signedUrl;
 }
@@ -52,7 +59,8 @@ export async function downloadProofObject(value: string | null, maxBytes: number
   const path = proofPath(value);
   const supabase = getSupabase();
   if (!path || !supabase) return null;
-  const { data, error } = await supabase.storage.from(process.env.SUPABASE_PROOF_BUCKET || "proof-screenshots").createSignedUrl(path, 120);
+  const bucket = await privateProofBucket(supabase);
+  const { data, error } = await bucket.createSignedUrl(path, 120);
   if (error || !data?.signedUrl) return null;
   const response = await fetch(data.signedUrl, { signal: AbortSignal.timeout(30_000) });
   if (!response.ok || !response.body) return null;
@@ -83,7 +91,6 @@ export async function uploadProofImage(input: {
   contentType: string;
   path: string;
 }) {
-  const bucket = process.env.SUPABASE_PROOF_BUCKET || "proof-screenshots";
   const supabase = getSupabase();
   if (!supabase) {
     if (process.env.NODE_ENV === "production") {
@@ -92,7 +99,8 @@ export async function uploadProofImage(input: {
     return `data:${input.contentType};base64,${input.buffer.toString("base64")}`;
   }
 
-  const { error } = await supabase.storage.from(bucket).upload(input.path, input.buffer, {
+  const bucket = await privateProofBucket(supabase);
+  const { error } = await bucket.upload(input.path, input.buffer, {
     contentType: input.contentType,
     upsert: false,
   });
@@ -108,7 +116,8 @@ export function proofStorageConfigured() {
 export async function uploadProofRecording(input: { buffer: Buffer; contentType: string; path: string }) {
   const supabase = getSupabase();
   if (!supabase) throw new Error("Recording storage is not configured.");
-  const { error } = await supabase.storage.from(process.env.SUPABASE_PROOF_BUCKET || "proof-screenshots").upload(input.path, input.buffer, {
+  const bucket = await privateProofBucket(supabase);
+  const { error } = await bucket.upload(input.path, input.buffer, {
     contentType: input.contentType,
     upsert: false,
   });
@@ -129,6 +138,9 @@ export async function uploadAvatarImage(input: {
   userId: string;
 }) {
   const bucket = process.env.SUPABASE_AVATAR_BUCKET || "seedenv-avatars";
+  if ([process.env.SUPABASE_PROOF_BUCKET || "proof-screenshots", process.env.SUPABASE_CLIPPERS_BUCKET || "seedenv-clippers"].includes(bucket)) {
+    throw new Error("Avatar storage must use a separate bucket from private evidence.");
+  }
   const supabase = getSupabase();
   if (!supabase) throw new Error("Supabase storage is not configured for avatar uploads.");
 

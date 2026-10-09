@@ -2,9 +2,11 @@ import { CampaignStatus, Prisma, TransactionStatus, TransactionType } from "@pri
 import { billingDetailsSchema } from "@/lib/enterprise-rules";
 import { quoteTopUp, topUpForShortfall, type TopUpQuote } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
-import { serializable } from "@/lib/quest-ledger";
+import { billingTransaction as serializable } from "@/lib/billing-transaction";
 import { getStripe } from "@/lib/stripe";
 import { ensureStripeCustomer } from "@/lib/stripe-customer";
+import { reconcileFundingPayment } from "@/lib/funding-reversals";
+import { cancelFailedRefund, operationRefund, reserveBillingOperation } from "@/lib/billing-operations";
 
 export const STALE_TOP_UP_MS = 15 * 60 * 1000;
 const CHECKOUT_EXPIRY_SECONDS = 60 * 60;
@@ -51,7 +53,11 @@ async function activateFundedCohort(tx: Prisma.TransactionClient, userId: string
 export async function creditTopUp(tx: Prisma.TransactionClient, topUpId: string, paymentIntentId: string) {
   const topUp = await tx.balanceTopUp.findUnique({ where: { id: topUpId } });
   if (!topUp) throw new Error("Balance top-up record is missing.");
-  if (topUp.status === "SUCCEEDED" || topUp.status === "REFUNDED") return { credited: false, activated: false, topUp };
+  if (topUp.stripePaymentIntentId && topUp.stripePaymentIntentId !== paymentIntentId) throw new Error("Top-up funding payment does not match its ledger.");
+  if (topUp.status === "SUCCEEDED" || topUp.status === "REFUNDED") {
+    await reconcileFundingPayment(tx, paymentIntentId);
+    return { credited: false, activated: false, topUp };
+  }
   const transaction = await tx.walletTransaction.create({
     data: {
       userId: topUp.userId,
@@ -76,6 +82,7 @@ export async function creditTopUp(tx: Prisma.TransactionClient, topUpId: string,
   });
   await tx.balanceTopUp.update({ where: { id: topUp.id }, data: { status: "SUCCEEDED", stripePaymentIntentId: paymentIntentId, transactionId: transaction.id, failureReason: null } });
   await tx.user.update({ where: { id: topUp.userId }, data: { fundingBalanceCents: { increment: topUp.creditCents } } });
+  await reconcileFundingPayment(tx, paymentIntentId);
   const activated = topUp.campaignId ? await activateFundedCohort(tx, topUp.userId, topUp.campaignId) : false;
   return { credited: true, activated, topUp };
 }
@@ -190,39 +197,63 @@ export async function autoReloadBalance(userId: string, shortfallCents: number, 
   return quote;
 }
 
-// Refunds the whole available balance to the cards that funded it, newest top-up first.
-// Anything Stripe refuses stays in the balance.
+// Reserves both the balance and its card lots before any Stripe mutation. Unknown
+// outcomes remain reserved and the next withdrawal resumes the same operations.
 export async function withdrawBalance(userId: string) {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error("Payments are not configured yet. Please try again later.");
   const reserved = await serializable(async (tx) => {
+    const pending = await tx.billingOperation.findFirst({ where: { resourceId: userId, kind: "WITHDRAWAL", state: { not: "SETTLED" } } });
+    if (pending) return pending;
     const user = await tx.user.findUnique({ where: { id: userId }, select: { fundingBalanceCents: true } });
     const amount = user?.fundingBalanceCents || 0;
     if (amount <= 0) throw new Error("Your balance is empty.");
-    await tx.user.update({ where: { id: userId }, data: { fundingBalanceCents: { decrement: amount } } });
-    const transaction = await tx.walletTransaction.create({ data: { userId, amountCents: amount, platformFeeCents: 0, type: TransactionType.BALANCE_WITHDRAWAL, status: TransactionStatus.PENDING, description: "Prepaid balance refunded to card" }, select: { id: true } });
-    return { amount, transactionId: transaction.id };
-  });
-  const topUps = await prisma.balanceTopUp.findMany({ where: { userId, status: "SUCCEEDED", stripePaymentIntentId: { not: null } }, orderBy: { createdAt: "desc" } });
-  let remaining = reserved.amount;
-  for (const topUp of topUps) {
-    if (remaining <= 0) break;
-    const amount = Math.min(remaining, topUp.creditCents - topUp.refundedCents);
-    if (amount <= 0) continue;
-    try {
-      await getStripe().refunds.create({ payment_intent: topUp.stripePaymentIntentId!, amount, metadata: { type: "SEEDENV_BALANCE_WITHDRAWAL", topUpId: topUp.id, transactionId: reserved.transactionId } }, { idempotencyKey: `seedenv-withdraw-${reserved.transactionId}-${topUp.id}` });
-    } catch (error) {
-      console.error("SeedEnv balance refund failed for a top-up:", error instanceof Error ? error.message : error);
-      continue;
+    const topUps = await tx.balanceTopUp.findMany({ where: { userId, status: "SUCCEEDED", stripePaymentIntentId: { not: null } }, orderBy: { createdAt: "desc" } });
+    for (const topUp of topUps) await reconcileFundingPayment(tx, topUp.stripePaymentIntentId!);
+    const currentUser = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+    if (currentUser.fundingBalanceCents <= 0) throw new Error("Your available balance was reversed; replace the funding debt first.");
+    const transaction = await tx.walletTransaction.create({ data: { userId, amountCents: currentUser.fundingBalanceCents, platformFeeCents: 0, type: TransactionType.BALANCE_WITHDRAWAL, status: TransactionStatus.PENDING, description: "Prepaid balance refund reserved" }, select: { id: true } });
+    let remaining = currentUser.fundingBalanceCents;
+    for (const topUp of topUps) {
+      const allocations = await tx.fundingAllocation.findMany({ where: { topUpId: topUp.id } });
+      const reversal = await tx.fundingReversal.findUnique({ where: { paymentId: topUp.stripePaymentIntentId! } });
+      const available = Math.max(0, topUp.creditCents - topUp.refundedCents - (reversal?.appliedCents ?? 0) - allocations.reduce((sum, row) => sum + row.amountCents - row.releasedCents, 0));
+      const refundAmount = Math.min(remaining, available);
+      if (!refundAmount) continue;
+      await reserveBillingOperation(tx, { id: `seedenv-withdraw-${transaction.id}-${topUp.id}`, kind: "WITHDRAWAL_REFUND", resourceId: topUp.id, userId, ledgerId: transaction.id, paymentId: topUp.stripePaymentIntentId, amountCents: refundAmount });
+      remaining -= refundAmount;
+      if (!remaining) break;
     }
-    await prisma.balanceTopUp.update({ where: { id: topUp.id }, data: { refundedCents: { increment: amount } } });
-    remaining -= amount;
-  }
-  const refundedCents = reserved.amount - remaining;
-  await serializable(async (tx) => {
-    if (remaining > 0) await tx.user.update({ where: { id: userId }, data: { fundingBalanceCents: { increment: remaining } } });
-    await tx.walletTransaction.update({ where: { id: reserved.transactionId }, data: refundedCents > 0 ? { amountCents: refundedCents, status: TransactionStatus.COMPLETED } : { status: TransactionStatus.FAILED } });
+    const refundAmount = currentUser.fundingBalanceCents - remaining;
+    if (!refundAmount) throw new Error("No refundable card funding is available for this balance. Billing reconciliation is required.");
+    await tx.user.update({ where: { id: userId }, data: { fundingBalanceCents: { decrement: refundAmount } } });
+    await tx.walletTransaction.update({ where: { id: transaction.id }, data: { amountCents: refundAmount } });
+    return reserveBillingOperation(tx, { id: `seedenv-withdraw-${transaction.id}`, kind: "WITHDRAWAL", resourceId: userId, userId, ledgerId: transaction.id, amountCents: refundAmount });
   });
-  return { refundedCents, keptCents: remaining };
+  const operations = await prisma.billingOperation.findMany({ where: { ledgerId: reserved.ledgerId, kind: "WITHDRAWAL_REFUND" }, orderBy: { createdAt: "asc" } });
+  for (const operation of operations) {
+    if (operation.state === "SETTLED" || operation.state === "CANCELLED") continue;
+    try {
+      const refund = await operationRefund(operation);
+      await serializable(async (tx) => {
+        const current = await tx.billingOperation.findUniqueOrThrow({ where: { id: operation.id } });
+        if (current.state === "SETTLED") return;
+        await tx.balanceTopUp.update({ where: { id: operation.resourceId }, data: { refundedCents: { increment: operation.amountCents } } });
+        await tx.billingOperation.update({ where: { id: operation.id }, data: { state: "SETTLED", remoteId: refund.id, error: null } });
+      });
+    } catch (error) {
+      if (await cancelFailedRefund(operation.id)) continue;
+      await prisma.billingOperation.update({ where: { id: operation.id }, data: { error: (error instanceof Error ? error.message : "Refund outcome unknown").slice(0, 1000) } });
+      throw error;
+    }
+  }
+  const settled = await prisma.billingOperation.findMany({ where: { ledgerId: reserved.ledgerId, kind: "WITHDRAWAL_REFUND", state: "SETTLED" } });
+  const refundedCents = settled.reduce((sum, row) => sum + row.amountCents, 0);
+  await serializable(async (tx) => {
+    await tx.walletTransaction.update({ where: { id: reserved.ledgerId! }, data: refundedCents ? { amountCents: refundedCents, status: TransactionStatus.COMPLETED, description: "Prepaid balance refunded to card" } : { status: TransactionStatus.FAILED, description: "Stripe refund failed; reserved funding returned to balance" } });
+    await tx.billingOperation.update({ where: { id: reserved.id }, data: { state: "SETTLED" } });
+  });
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  return { refundedCents, keptCents: Math.max(0, user.fundingBalanceCents) };
 }
 
 async function resolveStaleTopUp(topUp: { id: string; source: string; stripeCheckoutSessionId: string | null; campaignId: string | null; userId: string; createdAt: Date }, now: Date) {

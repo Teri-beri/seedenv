@@ -66,6 +66,8 @@ enum TransactionType {
   ESCROW_REFUND
   BALANCE_TOPUP
   BALANCE_WITHDRAWAL
+  FUNDING_REVERSAL
+  FUNDING_RESTORATION
   BOUNTY_PAYOUT
   PLATFORM_FEE
   WITHDRAWAL
@@ -96,6 +98,7 @@ model User {
   name                      String?
   image                     String?
   passwordHash              String?
+  sessionVersion            Int                  @default(0) @map("session_version")
   role                      UserRole             @default(TESTER)
   testerWorkspaceEnabled    Boolean              @default(false) @map("tester_workspace_enabled")
   developerWorkspaceEnabled Boolean              @default(false) @map("developer_workspace_enabled")
@@ -224,6 +227,7 @@ model AppCampaign {
   fundingModel     CohortFundingModel   @default(PREPAID) @map("funding_model")
   cancelledAt      DateTime?            @map("cancelled_at")
   refundedCents    Int                  @default(0) @map("refunded_cents")
+  billingHoldCents Int                  @default(0) @map("billing_hold_cents")
   applications     MissionApplication[]
   transactions     WalletTransaction[]
   slotCharges      SlotCharge[]
@@ -453,6 +457,57 @@ model WalletTransaction {
   @@index([type, status])
   @@index([stripePaymentId])
   @@index([campaignId])
+}
+
+// Immutable remote mutation identity survives Stripe's idempotency-key retention.
+model BillingOperation {
+  id             String   @id
+  kind           String
+  resourceId     String
+  userId         String
+  campaignId     String?
+  ledgerId       String?
+  paymentId      String?
+  destinationId  String?
+  amountCents    Int
+  feeCents       Int      @default(0)
+  state          String   @default("RESERVED")
+  firstAttemptAt DateTime?
+  remoteId       String?  @unique
+  error          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([resourceId, state])
+  @@index([state, updatedAt])
+  @@map("billing_operations")
+}
+
+model FundingReversal {
+  paymentId     String   @id
+  reversedCents Int      @default(0)
+  disputedCents Int      @default(0)
+  appliedCents  Int      @default(0)
+  userId        String?
+  campaignId    String?
+  topUpId       String?
+  updatedAt     DateTime @updatedAt
+
+  @@index([topUpId])
+  @@map("funding_reversals")
+}
+
+model FundingAllocation {
+  id          String @id @default(cuid())
+  topUpId     String
+  slotChargeId String
+  campaignId  String
+  amountCents Int
+  releasedCents Int @default(0)
+
+  @@unique([topUpId, slotChargeId])
+  @@index([campaignId])
+  @@map("funding_allocations")
 }
 
 model BillingProfile {

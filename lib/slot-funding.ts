@@ -2,10 +2,11 @@ import { CampaignStatus, Prisma, TransactionStatus, TransactionType } from "@pri
 import { autoReloadBalance, billingCompanySnapshot, sweepStaleTopUps } from "@/lib/funding-balance";
 import { quoteSlotCharge, type SlotChargeQuote } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
-import { serializable } from "@/lib/quest-ledger";
+import { billingTransaction as serializable } from "@/lib/billing-transaction";
 import { startWindowHours } from "@/lib/quest-rules";
-import { getStripe } from "@/lib/stripe";
 import { formatCents, usdToCents } from "@/lib/utils";
+import { cancelFailedRefund, operationRefund, reserveBillingOperation } from "@/lib/billing-operations";
+import { allocateSlotFunding, assertCampaignFunding, reconcileFundingPayment, releaseReplacementFunding } from "@/lib/funding-reversals";
 
 type CampaignWindow = { status: CampaignStatus; cancelledAt: Date | null; expiresAt: Date };
 
@@ -68,6 +69,7 @@ function acceptFromBalance(developerId: string, applicationId: string) {
     const application = await tx.missionApplication.findUnique({ where: { id: applicationId }, include: { campaign: true } });
     if (!application || application.campaign.developerId !== developerId || application.status !== "PENDING") throw new Error("Pending application not found for your campaign.");
     const campaign = application.campaign;
+    await assertCampaignFunding(tx, campaign.id);
     if (campaign.fundingModel !== "PAY_PER_TESTER") throw new Error("This cohort is prepaid; accept testers normally.");
     if (campaign.status !== CampaignStatus.ACTIVE || campaignHasEnded(campaign)) throw new Error("This cohort is not accepting testers.");
     const [holds, paid] = await Promise.all([
@@ -114,7 +116,8 @@ function acceptFromBalance(developerId: string, applicationId: string) {
       },
       select: { id: true },
     });
-    await tx.slotCharge.create({ data: { campaignId: campaign.id, applicationId: application.id, ...quote, processingFeeCents: 0, status: "SUCCEEDED", transactionId: transaction.id } });
+    const charge = await tx.slotCharge.create({ data: { campaignId: campaign.id, applicationId: application.id, ...quote, processingFeeCents: 0, status: "SUCCEEDED", transactionId: transaction.id } });
+    await allocateSlotFunding(tx, developerId, charge.id, campaign.id, quote.totalCents);
     await accept();
     return { kind: "debited", quote, balanceCents };
   });
@@ -147,44 +150,93 @@ export async function acceptApplicationWithFunding(developerId: string, applicat
 
 // Returns an unused place to the developer's balance. Legacy card-charged places are refunded to the card.
 async function refundSlotCharge(chargeId: string) {
-  const charge = await prisma.slotCharge.findUnique({ where: { id: chargeId }, include: { campaign: { select: { developerId: true, title: true } } } });
-  if (!charge || charge.status !== "SUCCEEDED") return 0;
-  const amount = charge.stipendCents + charge.platformFeeCents;
-  const refund = charge.stripePaymentIntentId
-    ? await getStripe().refunds.create({ payment_intent: charge.stripePaymentIntentId, amount, metadata: { type: "SEEDENV_SLOT_REFUND", slotChargeId: charge.id } }, { idempotencyKey: `seedenv-slot-refund-${charge.id}` })
-    : null;
+  const operation = await serializable(async (tx) => {
+    const existing = await tx.billingOperation.findFirst({ where: { resourceId: chargeId, kind: "SLOT_REFUND", state: { in: ["RESERVED", "SUBMITTED", "FAILED"] } } });
+    if (existing) return existing;
+    const charge = await tx.slotCharge.findUnique({ where: { id: chargeId }, include: { campaign: true } });
+    if (!charge || charge.status !== "SUCCEEDED" || !campaignHasEnded(charge.campaign)) return null;
+    const paid = await tx.slotCharge.count({ where: { campaignId: charge.campaignId, status: "SUCCEEDED" } });
+    const holds = await activeHolds(tx, charge.campaignId);
+    const reservations = await tx.billingOperation.count({ where: { campaignId: charge.campaignId, kind: "SLOT_REFUND", state: { in: ["RESERVED", "SUBMITTED", "FAILED"] } } });
+    if (unusedPaidSlots(paid, charge.campaign.claimedSlots, holds) <= reservations) return null;
+    if (charge.stripePaymentIntentId) await reconcileFundingPayment(tx, charge.stripePaymentIntentId);
+    const reversal = charge.stripePaymentIntentId ? await tx.fundingReversal.findUnique({ where: { paymentId: charge.stripePaymentIntentId } }) : null;
+    const amountCents = Math.max(0, charge.stipendCents + charge.platformFeeCents - (reversal?.appliedCents ?? 0));
+    if (!amountCents) throw new Error("This slot's card funding is fully reversed. Resolve its funding hold before refunding.");
+    // Updating the campaign makes all competing slot reservations conflict/retry.
+    await tx.appCampaign.update({ where: { id: charge.campaignId }, data: { refundedCents: { increment: 0 } } });
+    const attempt = await tx.billingOperation.count({ where: { resourceId: charge.id, kind: "SLOT_REFUND" } });
+    return reserveBillingOperation(tx, { id: `seedenv-slot-refund-${charge.id}-${attempt}`, kind: "SLOT_REFUND", resourceId: charge.id, userId: charge.campaign.developerId, campaignId: charge.campaignId, paymentId: charge.stripePaymentIntentId, amountCents, feeCents: Math.min(charge.platformFeeCents, amountCents) });
+  });
+  if (!operation) return 0;
+  let refund;
+  try { refund = operation.paymentId ? await operationRefund(operation) : null; }
+  catch (error) { await cancelFailedRefund(operation.id); throw error; }
   return serializable(async (tx) => {
+    const current = await tx.billingOperation.findUniqueOrThrow({ where: { id: operation.id } });
+    if (current.state === "SETTLED") return 0;
+    const charge = await tx.slotCharge.findUniqueOrThrow({ where: { id: operation.resourceId }, include: { campaign: true } });
     const updated = await tx.slotCharge.updateMany({ where: { id: charge.id, status: "SUCCEEDED" }, data: { status: "REFUNDED", stripeRefundId: refund?.id ?? null, refundedAt: new Date() } });
-    if (!updated.count) return 0;
-    if (!refund) await tx.user.update({ where: { id: charge.campaign.developerId }, data: { fundingBalanceCents: { increment: amount } } });
-    await tx.appCampaign.update({ where: { id: charge.campaignId }, data: { refundedCents: { increment: amount } } });
-    await tx.walletTransaction.create({ data: { userId: charge.campaign.developerId, amountCents: amount, campaignId: charge.campaignId, platformFeeCents: -charge.platformFeeCents, type: TransactionType.ESCROW_REFUND, status: TransactionStatus.COMPLETED, stripePaymentId: refund?.id ?? null, description: refund ? `Unused tester slot refunded for ${charge.campaign.title} (${charge.campaignId})` : `Unused tester place credited to balance for ${charge.campaign.title} (${charge.campaignId})` } });
-    return amount;
+    if (!updated.count) throw new Error("Refund reservation no longer matches its slot ledger. Reconciliation is required.");
+    if (!refund) {
+      await tx.user.update({ where: { id: charge.campaign.developerId }, data: { fundingBalanceCents: { increment: operation.amountCents } } });
+      const allocations = await tx.fundingAllocation.findMany({ where: { slotChargeId: charge.id } });
+      for (const allocation of allocations) await tx.fundingAllocation.update({ where: { id: allocation.id }, data: { releasedCents: allocation.amountCents } });
+    }
+    await tx.appCampaign.update({ where: { id: charge.campaignId }, data: { refundedCents: { increment: operation.amountCents } } });
+    await tx.walletTransaction.create({ data: { userId: charge.campaign.developerId, amountCents: operation.amountCents, campaignId: charge.campaignId, platformFeeCents: -operation.feeCents, type: TransactionType.ESCROW_REFUND, status: TransactionStatus.COMPLETED, stripePaymentId: refund?.id ?? null, description: refund ? `Unused tester slot refunded for ${charge.campaign.title} (${charge.campaignId})` : `Unused tester place credited to balance for ${charge.campaign.title} (${charge.campaignId})` } });
+    await tx.billingOperation.update({ where: { id: operation.id }, data: { state: "SETTLED", remoteId: refund?.id, error: null } });
+    return operation.amountCents;
   });
 }
 
 async function refundPrepaidCampaign(campaignId: string) {
-  const campaign = await prisma.appCampaign.findUnique({ where: { id: campaignId } });
-  if (!campaign || campaign.fundingModel !== "PREPAID") return 0;
-  const deposit = await prisma.walletTransaction.findFirst({ where: { campaignId, type: TransactionType.ESCROW_DEPOSIT, status: TransactionStatus.COMPLETED, stripePaymentId: { not: null } }, orderBy: { createdAt: "asc" } });
-  if (!deposit?.stripePaymentId) return 0;
-  const submissionsEver = await prisma.submission.count({ where: { campaignId } });
-  const target = Math.min(deposit.amountCents, prepaidRefundTargetCents({
-    totalSlots: campaign.totalSlots,
-    claimedSlots: campaign.claimedSlots,
-    bountyCents: usdToCents(campaign.bountyPerTaskUsd),
-    platformFeeCents: deposit.platformFeeCents ?? usdToCents(campaign.platformFeeUsd),
-    submissionsEver,
-  }));
-  const delta = target - campaign.refundedCents;
-  if (delta <= 0) return 0;
-  const refund = await getStripe().refunds.create({ payment_intent: deposit.stripePaymentId, amount: delta, metadata: { type: "SEEDENV_PREPAID_REFUND", campaignId } }, { idempotencyKey: `seedenv-prepaid-refund-${campaignId}-${target}` });
+  const operation = await serializable(async (tx) => {
+    const pending = await tx.billingOperation.findFirst({ where: { resourceId: campaignId, kind: { in: ["PREPAID_REFUND", "PREPAID_BALANCE_REFUND"] }, state: { in: ["RESERVED", "SUBMITTED", "FAILED"] } } });
+    if (pending) return pending;
+    const campaign = await tx.appCampaign.findUnique({ where: { id: campaignId } });
+    if (!campaign || campaign.fundingModel !== "PREPAID" || !campaignHasEnded(campaign)) return null;
+    const deposit = await tx.walletTransaction.findFirst({ where: { campaignId, type: TransactionType.ESCROW_DEPOSIT, status: TransactionStatus.COMPLETED, stripePaymentId: { not: null } }, orderBy: { createdAt: "asc" } });
+    if (!deposit?.stripePaymentId) return null;
+    await reconcileFundingPayment(tx, deposit.stripePaymentId);
+    const reversal = await tx.fundingReversal.findUnique({ where: { paymentId: deposit.stripePaymentId } });
+    const submissionsEver = await tx.submission.count({ where: { campaignId } });
+    const target = Math.min(deposit.amountCents, prepaidRefundTargetCents({ totalSlots: campaign.totalSlots, claimedSlots: campaign.claimedSlots, bountyCents: usdToCents(campaign.bountyPerTaskUsd), platformFeeCents: deposit.platformFeeCents ?? usdToCents(campaign.platformFeeUsd), submissionsEver }));
+    const cardRefunds = await tx.billingOperation.findMany({ where: { campaignId, kind: "PREPAID_REFUND", state: "SETTLED" } });
+    const balanceRefunds = await tx.billingOperation.findMany({ where: { campaignId, kind: "PREPAID_BALANCE_REFUND", state: "SETTLED" } });
+    const balanceReturned = balanceRefunds.reduce((sum, row) => sum + row.amountCents, 0);
+    const cardReturned = Math.max(cardRefunds.reduce((sum, row) => sum + row.amountCents, 0), campaign.refundedCents - balanceReturned);
+    const cardAvailable = Math.max(0, deposit.amountCents - cardReturned - (reversal?.appliedCents ?? 0));
+    const replacements = await tx.walletTransaction.findMany({ where: { campaignId, type: "ESCROW_DEPOSIT", status: "COMPLETED", stripePaymentId: null } });
+    const replacementCents = replacements.reduce((sum, row) => sum + row.amountCents, 0);
+    const restored = await tx.walletTransaction.findMany({ where: { campaignId, type: "FUNDING_RESTORATION", status: "COMPLETED" } });
+    const replacementRestored = restored.reduce((sum, row) => {
+      const snapshot = row.invoiceSnapshot;
+      return sum + (snapshot && typeof snapshot === "object" && !Array.isArray(snapshot) && typeof snapshot.returnedReplacementCents === "number" ? snapshot.returnedReplacementCents : 0);
+    }, 0);
+    const replacementAvailable = Math.max(0, replacementCents - balanceReturned - replacementRestored);
+    const card = cardAvailable > 0;
+    const delta = Math.min(target - campaign.refundedCents, card ? cardAvailable : replacementAvailable);
+    if (delta <= 0) return null;
+    await tx.appCampaign.update({ where: { id: campaignId }, data: { refundedCents: { increment: 0 } } });
+    const attempt = await tx.billingOperation.count({ where: { resourceId: campaignId, kind: { in: ["PREPAID_REFUND", "PREPAID_BALANCE_REFUND"] } } });
+    return reserveBillingOperation(tx, { id: `seedenv-prepaid-refund-${campaignId}-${attempt}`, kind: card ? "PREPAID_REFUND" : "PREPAID_BALANCE_REFUND", resourceId: campaignId, campaignId, userId: campaign.developerId, paymentId: card ? deposit.stripePaymentId : null, amountCents: delta, feeCents: submissionsEver === 0 ? Math.min(delta, deposit.platformFeeCents ?? 0) : 0 });
+  });
+  if (!operation) return 0;
+  let refund;
+  try { refund = operation.paymentId ? await operationRefund(operation) : null; }
+  catch (error) { await cancelFailedRefund(operation.id); throw error; }
   return serializable(async (tx) => {
-    const updated = await tx.appCampaign.updateMany({ where: { id: campaignId, refundedCents: campaign.refundedCents }, data: { refundedCents: target } });
-    if (!updated.count) return 0;
-    const feeRefund = submissionsEver === 0 ? Math.max(0, Math.min(delta, deposit.platformFeeCents ?? 0)) : 0;
-    await tx.walletTransaction.create({ data: { userId: campaign.developerId, amountCents: delta, campaignId, platformFeeCents: -feeRefund, type: TransactionType.ESCROW_REFUND, status: TransactionStatus.COMPLETED, stripePaymentId: refund.id, description: `Unused escrow refunded for ${campaign.title} (${campaignId})` } });
-    return delta;
+    const current = await tx.billingOperation.findUniqueOrThrow({ where: { id: operation.id } });
+    if (current.state === "SETTLED") return 0;
+    const campaign = await tx.appCampaign.update({ where: { id: campaignId }, data: { refundedCents: { increment: operation.amountCents } } });
+    if (!refund) {
+      await tx.user.update({ where: { id: operation.userId }, data: { fundingBalanceCents: { increment: operation.amountCents } } });
+      await releaseReplacementFunding(tx, campaignId, operation.amountCents);
+    }
+    await tx.walletTransaction.create({ data: { userId: campaign.developerId, amountCents: operation.amountCents, campaignId, platformFeeCents: -operation.feeCents, type: TransactionType.ESCROW_REFUND, status: TransactionStatus.COMPLETED, stripePaymentId: refund?.id, description: `Unused escrow refunded for ${campaign.title} (${campaignId})` } });
+    await tx.billingOperation.update({ where: { id: operation.id }, data: { state: "SETTLED", remoteId: refund?.id, error: null } });
+    return operation.amountCents;
   });
 }
 
@@ -201,7 +253,11 @@ export async function reconcileCampaignFunding(campaignId: string, now = new Dat
     // Refund newest charges first so the cumulative platform-fee floor unwinds in order.
     for (const charge of paid.slice(0, unusedPaidSlots(paid.length, campaign.claimedSlots, holds))) refundedCents += await refundSlotCharge(charge.id);
   } else if (process.env.STRIPE_SECRET_KEY) {
-    refundedCents += await refundPrepaidCampaign(campaignId);
+    for (;;) {
+      const refunded = await refundPrepaidCampaign(campaignId);
+      refundedCents += refunded;
+      if (!refunded) break;
+    }
   }
   const inProgress = await prisma.submission.count({ where: { campaignId, status: "PENDING" } });
   const finalized = inProgress === 0 && campaign.status !== CampaignStatus.COMPLETED && campaign.status !== CampaignStatus.DRAFT;

@@ -1,14 +1,12 @@
 "use client";
 
 import { KeyRound, LoaderCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { changePasswordAfterEmailVerification } from "@/app/actions/accountActions";
 
 const inputClass = "mt-2 w-full rounded-lg border border-[#2A2F3D] bg-[#090A0F] px-4 py-3 text-white outline-none transition-all placeholder:text-neutral-600 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20";
 
 export function PasswordChangeForm({ token }: { token: string }) {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -24,7 +22,6 @@ export function PasswordChangeForm({ token }: { token: string }) {
       setComplete(true);
       setPassword("");
       setConfirmPassword("");
-      router.refresh();
     });
   }
 
@@ -33,8 +30,8 @@ export function PasswordChangeForm({ token }: { token: string }) {
       <>
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-400">Verified</p>
         <h1 className="mt-3 text-2xl font-bold">Password updated</h1>
-        <p className="mt-3 text-sm leading-6 text-neutral-400">Your new password is ready to use the next time you sign in.</p>
-        <a className="mt-6 inline-flex font-semibold text-amber-400 hover:text-amber-300" href="/account">Return to account</a>
+        <p className="mt-3 text-sm leading-6 text-neutral-400">All existing sessions have been signed out. Sign in again with your new password or another linked sign-in method.</p>
+        <a className="mt-6 inline-flex font-semibold text-amber-400 hover:text-amber-300" href="/auth/signin?callbackUrl=%2Faccount">Sign in again</a>
       </>
     );
   }

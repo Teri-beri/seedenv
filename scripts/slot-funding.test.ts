@@ -66,6 +66,8 @@ function fundingHarness(options: { balance: number; autoReload?: number; paid?: 
     charges: Array.from({ length: options.paid ?? 0 }, (_, index) => ({ id: `paid-${index}`, campaignId: "c-1", status: "SUCCEEDED", stipendCents: 400, platformFeeCents: index === 0 ? 1500 : 0, stripePaymentIntentId: null, applicationId: null as string | null, createdAt: new Date(Date.now() - (10 - index) * 1000) })) as Row[],
     topUps: (options.topUps ?? []) as Row[],
     transactions: [] as Row[],
+    operations: [] as Row[],
+    allocations: [] as Row[],
     intents: 0,
     refunds: [] as Array<{ payment_intent: string; amount: number }>,
   };
@@ -97,38 +99,68 @@ function fundingHarness(options: { balance: number; autoReload?: number; paid?: 
     },
     appCampaign: {
       findUnique: async () => state.campaign,
+      findUniqueOrThrow: async () => state.campaign,
       findFirst: async () => null,
       update: async ({ data }: { data: Row }) => applyData(state.campaign as unknown as Row, data),
       updateMany: async ({ data }: { data: Row }) => { applyData(state.campaign as unknown as Row, data); return { count: 1 }; },
     },
     submission: { count: async () => 0 },
     slotCharge: {
+      count: async ({ where }: { where: Row }) => state.charges.filter((charge) => match(charge, where)).length,
       findMany: async ({ where }: { where: Row }) => state.charges.filter((charge) => match(charge, where)).sort((a, b) => Number(b.createdAt) - Number(a.createdAt)),
       findUnique: async ({ where }: { where: { id: string } }) => { const row = state.charges.find((charge) => charge.id === where.id); return row ? { ...row, campaign: state.campaign } : null; },
+      findUniqueOrThrow: async ({ where }: { where: { id: string } }) => { const row = state.charges.find((charge) => charge.id === where.id); if (!row) throw new Error("Missing fake slot charge"); return { ...row, campaign: state.campaign }; },
       create: async ({ data }: { data: Row }) => { const row = { id: `charge-${state.charges.length}`, createdAt: new Date(), ...data }; state.charges.push(row); return row; },
       updateMany: async ({ where, data }: { where: Row; data: Row }) => { const rows = state.charges.filter((charge) => match(charge, where)); rows.forEach((row) => applyData(row, data)); return { count: rows.length }; },
     },
     balanceTopUp: {
       create: async ({ data }: { data: Row }) => { const row = { id: `topup-${state.topUps.length}`, status: "PENDING", refundedCents: 0, createdAt: new Date(), updatedAt: new Date(), ...data }; state.topUps.push(row); return row; },
       findUnique: async ({ where }: { where: { id: string } }) => state.topUps.find((row) => row.id === where.id) ?? null,
+      findUniqueOrThrow: async ({ where }: { where: { id: string } }) => state.topUps.find((row) => row.id === where.id)!,
       findMany: async ({ where }: { where: Row }) => state.topUps.filter((row) => match(row, where)).sort((a, b) => Number(b.createdAt) - Number(a.createdAt)),
       update: async ({ where, data }: { where: { id: string }; data: Row }) => applyData(state.topUps.find((row) => row.id === where.id)!, data),
       updateMany: async ({ where, data }: { where: Row; data: Row }) => { const rows = state.topUps.filter((row) => match(row, where)); rows.forEach((row) => applyData(row, data)); return { count: rows.length }; },
     },
     billingProfile: { findUnique: async () => null },
     walletTransaction: {
+      findFirst: async () => null,
+      findMany: async () => [],
       create: async ({ data }: { data: Row }) => { const row = { id: `tx-${state.transactions.length}`, ...data }; state.transactions.push(row); return row; },
       update: async ({ where, data }: { where: { id: string }; data: Row }) => applyData(state.transactions.find((row) => row.id === where.id)!, data),
     },
     user: {
       findUnique: async () => ({ ...state.user }),
+      findUniqueOrThrow: async () => ({ ...state.user }),
       update: async ({ data }: { data: Row }) => applyData(state.user as unknown as Row, data),
       updateMany: async ({ where, data }: { where: Row; data: Row }) => { if (!match(state.user as unknown as Row, where)) return { count: 0 }; applyData(state.user as unknown as Row, data); return { count: 1 }; },
     },
+    billingOperation: {
+      findUnique: async ({ where }: { where: Row }) => state.operations.find((row) => match(row, where)) ?? null,
+      findUniqueOrThrow: async ({ where }: { where: Row }) => state.operations.find((row) => match(row, where))!,
+      findFirst: async ({ where }: { where: Row }) => state.operations.find((row) => match(row, where)) ?? null,
+      findMany: async ({ where }: { where: Row }) => state.operations.filter((row) => match(row, where)),
+      count: async ({ where }: { where: Row }) => state.operations.filter((row) => match(row, where)).length,
+      upsert: async ({ where, create }: { where: Row; create: Row }) => {
+        const existing = state.operations.find((row) => match(row, where));
+        if (existing) return existing;
+        const row = { state: "RESERVED", firstAttemptAt: null, remoteId: null, createdAt: new Date(), ...create };
+        state.operations.push(row);
+        return row;
+      },
+      update: async ({ where, data }: { where: Row; data: Row }) => applyData(state.operations.find((row) => match(row, where))!, data),
+      updateMany: async ({ where, data }: { where: Row; data: Row }) => { const rows = state.operations.filter((row) => match(row, where)); rows.forEach((row) => applyData(row, data)); return { count: rows.length }; },
+    },
+    fundingAllocation: {
+      findMany: async ({ where }: { where: Row }) => state.allocations.filter((row) => match(row, where)),
+      create: async ({ data }: { data: Row }) => { const row = { id: `allocation-${state.allocations.length}`, releasedCents: 0, ...data }; state.allocations.push(row); return row; },
+      update: async ({ where, data }: { where: Row; data: Row }) => applyData(state.allocations.find((row) => match(row, where))!, data),
+    },
+    fundingReversal: { findUnique: async () => null },
   };
   const stripe = {
     customers: { retrieve: async () => ({ deleted: false, invoice_settings: { default_payment_method: "pm_1" } }) },
     paymentIntents: {
+      retrieve: async () => ({ latest_charge: null, metadata: {} }),
       create: async () => {
         state.intents += 1;
         if (options.card === "declined") throw Object.assign(new Error("Your card was declined."), { type: "StripeCardError", code: "card_declined" });
@@ -138,10 +170,11 @@ function fundingHarness(options: { balance: number; autoReload?: number; paid?: 
       cancel: async () => ({}),
     },
     refunds: {
+      list: () => (async function* () { /* Empty remote ledger before a refund. */ })(),
       create: async (input: { payment_intent: string; amount: number }) => {
         if (options.refundFails) throw new Error("refund failed");
         state.refunds.push(input);
-        return { id: `re_${state.refunds.length}` };
+        return { id: `re_${state.refunds.length}`, payment_intent: input.payment_intent, amount: input.amount, currency: "usd", status: "succeeded" };
       },
     },
   };
@@ -152,8 +185,10 @@ async function withMocks<T>(harness: ReturnType<typeof fundingHarness>, work: (m
   const { mock } = await import("node:test");
   const { randomUUID } = await import("node:crypto");
   const mocks = [
+    mock.module("../lib/ai/campaign-synthesis.ts", { namedExports: { synthesizeCampaign: async () => ({ status: "skipped" }) } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: harness.db } }),
     mock.module("../lib/quest-ledger.ts", { namedExports: { serializable: (work: (tx: typeof harness.db) => Promise<unknown>) => work(harness.db) } }),
+    mock.module("../lib/billing-transaction.ts", { namedExports: { billingTransaction: (work: (tx: typeof harness.db) => Promise<unknown>) => work(harness.db) } }),
     mock.module("../lib/stripe.ts", { namedExports: { getStripe: () => harness.stripe } }),
     mock.module("../lib/stripe-customer.ts", { namedExports: { ensureStripeCustomer: async () => "cus_1" } }),
   ];
@@ -161,6 +196,10 @@ async function withMocks<T>(harness: ReturnType<typeof fundingHarness>, work: (m
   process.env.STRIPE_SECRET_KEY = "mocked";
   try {
     const id = randomUUID();
+    const operations = await import(`../lib/billing-operations.ts?t=${id}`);
+    mocks.push(mock.module("../lib/billing-operations.ts", { namedExports: operations }));
+    const reversals = await import(`../lib/funding-reversals.ts?t=${id}`);
+    mocks.push(mock.module("../lib/funding-reversals.ts", { namedExports: reversals }));
     const balance = await import(`../lib/funding-balance.ts?t=${id}`);
     mocks.push(mock.module("../lib/funding-balance.ts", { namedExports: balance }));
     const slot = await import(`../lib/slot-funding.ts?t=${id}`);
@@ -269,10 +308,10 @@ test("refunding the balance returns it to the newest top-ups first", async () =>
   assert.equal(harness.state.transactions[0].status, "COMPLETED");
 });
 
-test("a failed balance refund keeps the money in the balance", async () => {
+test("an unknown balance refund outcome keeps money reserved and surfaces the error", async () => {
   const harness = fundingHarness({ balance: 1000, refundFails: true, topUps: [{ id: "t", userId: "dev", status: "SUCCEEDED", creditCents: 2000, refundedCents: 0, stripePaymentIntentId: "pi_t", createdAt: new Date() }] });
-  const result = await withMocks(harness, ({ balance }) => balance.withdrawBalance("dev"));
-  assert.deepEqual(result, { refundedCents: 0, keptCents: 1000 });
-  assert.equal(harness.state.user.fundingBalanceCents, 1000);
-  assert.equal(harness.state.transactions[0].status, "FAILED");
+  await assert.rejects(withMocks(harness, ({ balance }) => balance.withdrawBalance("dev")), /refund failed/);
+  assert.equal(harness.state.user.fundingBalanceCents, 0);
+  assert.equal(harness.state.transactions[0].status, "PENDING");
+  assert.equal(harness.state.operations.find((row) => row.kind === "WITHDRAWAL_REFUND")?.state, "SUBMITTED");
 });

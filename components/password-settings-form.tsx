@@ -2,7 +2,8 @@
 
 import { KeyRound, MailCheck } from "lucide-react";
 import { useState, useTransition } from "react";
-import { requestPasswordChangeVerification } from "@/app/actions/accountActions";
+import { requestPasswordChangeVerification, revokeAllAccountSessions } from "@/app/actions/accountActions";
+import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
 export function PasswordSettingsForm({ email, hasPassword }: { email: string; hasPassword: boolean }) {
@@ -18,6 +19,15 @@ export function PasswordSettingsForm({ email, hasPassword }: { email: string; ha
     });
   }
 
+  function signOutEverywhere() {
+    setMessage(null);
+    startTransition(async () => {
+      const result = await revokeAllAccountSessions();
+      if (!result.ok) return setMessage({ ok: false, text: result.message });
+      await signOut({ callbackUrl: "/auth/signin" });
+    });
+  }
+
   return (
     <section className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-5 backdrop-blur-md" id="security">
       <p className="text-xs uppercase tracking-[0.24em] text-amber-500">Security</p>
@@ -29,6 +39,10 @@ export function PasswordSettingsForm({ email, hasPassword }: { email: string; ha
       <Button className="mt-5 w-full" disabled={isPending} onClick={requestVerification} type="button">
         {hasPassword ? <KeyRound className="size-4" /> : <MailCheck className="size-4" />}
         {isPending ? "Sending..." : hasPassword ? "Email Password Change Link" : "Email Setup Link"}
+      </Button>
+      <p className="mt-4 text-sm text-neutral-400">Changing your password signs out every session. If you suspect unauthorized access, sign out all devices now.</p>
+      <Button className="mt-3 w-full" disabled={isPending} onClick={signOutEverywhere} type="button">
+        Sign out all devices
       </Button>
     </section>
   );

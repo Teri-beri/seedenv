@@ -211,7 +211,10 @@ export async function setAccountPassword(data: { password: string; confirmPasswo
   const problem = validatePassword(data.password);
   if (problem) return { ok: false, message: problem };
 
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(data.password) } });
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await hashPassword(data.password), sessionVersion: { increment: 1 } },
+  });
   return { ok: true };
 }
 
@@ -270,13 +273,22 @@ export async function changePasswordAfterEmailVerification(data: { token: string
       where: { identifier, token: hashedToken, expires: { gt: new Date() } },
     });
     if (consumed.count !== 1) return false;
-    await transaction.user.update({ where: { id: user.id }, data: { passwordHash } });
+    await transaction.user.update({
+      where: { id: user.id },
+      data: { passwordHash, sessionVersion: { increment: 1 } },
+    });
     return true;
   });
 
   return changed
     ? { ok: true }
     : { ok: false, message: "This verification link is invalid or expired. Request a new one from Account Security." };
+}
+
+export async function revokeAllAccountSessions(): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  await prisma.user.update({ where: { id: user.id }, data: { sessionVersion: { increment: 1 } } });
+  return { ok: true };
 }
 
 const onboardingUsernameSchema = z.string()

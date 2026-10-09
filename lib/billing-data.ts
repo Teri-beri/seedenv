@@ -21,6 +21,7 @@ export type FundingBalanceSummary = {
   autoReloadCents: number;
   pendingTopUps: number;
   withdrawals: Array<{ id: string; amountCents: number; status: TransactionStatus; createdAt: string }>;
+  heldCampaigns?: Array<{ id: string; title: string; billingHoldCents: number }>;
 };
 
 const emptyBillingDetails: BillingDetails = { companyName: "", taxId: "", billingEmail: "", addressLine1: "", addressLine2: "", city: "", region: "", postalCode: "", country: "US" };
@@ -41,7 +42,7 @@ async function loadDefaultPaymentMethod(stripeCustomerId: string | null): Promis
 
 export async function getBillingOverview(userId: string, stripeCustomerId: string | null): Promise<BillingOverview> {
   const depositScope = { userId, type: TransactionType.ESCROW_DEPOSIT };
-  const [transactions, fees, awaiting, fundedCampaigns, settled, profile, payment, member, pendingTopUps, withdrawals] = await Promise.all([
+  const [transactions, fees, awaiting, fundedCampaigns, settled, profile, payment, member, pendingTopUps, withdrawals, heldCampaigns] = await Promise.all([
     prisma.walletTransaction.findMany({
       where: { userId, type: { in: [TransactionType.ESCROW_DEPOSIT, TransactionType.BALANCE_TOPUP] } },
       orderBy: { createdAt: "desc" },
@@ -63,6 +64,7 @@ export async function getBillingOverview(userId: string, stripeCustomerId: strin
     prisma.user.findUnique({ where: { id: userId }, select: { fundingBalanceCents: true, autoReloadCents: true } }),
     prisma.balanceTopUp.count({ where: { userId, status: "PENDING", source: "CHECKOUT", stripeCheckoutSessionId: { not: null } } }),
     prisma.walletTransaction.findMany({ where: { userId, type: TransactionType.BALANCE_WITHDRAWAL }, orderBy: { createdAt: "desc" }, take: 5, select: { id: true, amountCents: true, status: true, createdAt: true } }),
+    prisma.appCampaign.findMany({ where: { developerId: userId, billingHoldCents: { gt: 0 } }, select: { id: true, title: true, billingHoldCents: true } }),
   ]);
 
   const approvedByCampaign = fundedCampaigns.length
@@ -96,6 +98,7 @@ export async function getBillingOverview(userId: string, stripeCustomerId: strin
       autoReloadCents: member?.autoReloadCents ?? 0,
       pendingTopUps,
       withdrawals: withdrawals.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
+      heldCampaigns,
     },
   };
 }

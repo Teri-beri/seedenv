@@ -6,6 +6,8 @@ import { rankForXp, xpForBounty } from "@/lib/rank";
 import { getStripe } from "@/lib/stripe";
 import { formatCents } from "@/lib/utils";
 import { AUTO_APPROVE_AFTER_MS, isAutoApprovalDue } from "@/lib/auto-approval-window";
+import { operationTransfer, reserveBillingOperation } from "@/lib/billing-operations";
+import { assertCampaignFunding } from "@/lib/funding-reversals";
 
 export { AUTO_APPROVE_AFTER_MS, isAutoApprovalDue, isFraudHeld, autoApproveDeadlineFrom as autoApproveDeadline } from "@/lib/auto-approval-window";
 
@@ -16,6 +18,7 @@ export type ApprovalResult = { payoutCents: number; xpGain: number; testerId: st
 export async function approvePendingSubmission(tx: Prisma.TransactionClient, submissionId: string, actor: ApprovalActor): Promise<ApprovalResult> {
   const submission = await tx.submission.findUnique({ where: { id: submissionId }, include: { campaign: true, tester: true, audit: { select: { status: true, humanClearedAt: true } } } });
   if (!submission || submission.status !== SubmissionStatus.PENDING) throw new Error("Pending submission not found.");
+  await assertCampaignFunding(tx, submission.campaignId);
   if (actor.kind === "reviewer") {
     if (submission.campaign.developerId !== actor.id && !actor.admin) throw new Error("You cannot review this submission.");
     if (!submission.feedbackText && !submission.proofImageUrl) throw new Error("Proof must be submitted before approval.");
@@ -40,6 +43,7 @@ export async function approvePendingSubmission(tx: Prisma.TransactionClient, sub
   const payout = await tx.walletTransaction.create({
     data: {
       userId: submission.testerId,
+      campaignId: submission.campaignId,
       amountCents: submission.payoutCents,
       type: TransactionType.BOUNTY_PAYOUT,
       status: TransactionStatus.PENDING,
@@ -47,6 +51,7 @@ export async function approvePendingSubmission(tx: Prisma.TransactionClient, sub
     },
     select: { id: true },
   });
+  await reserveBillingOperation(tx, { id: `seedenv-payout-${payout.id}`, kind: "PAYOUT", resourceId: payout.id, ledgerId: payout.id, userId: submission.testerId, campaignId: submission.campaignId, destinationId: submission.tester.stripeConnectAccountId, amountCents: submission.payoutCents });
 
   return { payoutCents: submission.payoutCents, xpGain, testerId: submission.testerId, payoutTransactionId: payout.id, campaignTitle: submission.campaign.title };
 }
@@ -54,23 +59,34 @@ export async function approvePendingSubmission(tx: Prisma.TransactionClient, sub
 export async function transferTesterPayout(testerId: string, transactionId: string) {
   const [tester, transaction] = await Promise.all([
     prisma.user.findUnique({ where: { id: testerId }, select: { stripeConnectAccountId: true } }),
-    prisma.walletTransaction.findUnique({ where: { id: transactionId }, select: { amountCents: true, status: true } }),
+    prisma.walletTransaction.findUnique({ where: { id: transactionId } }),
   ]);
-  if (!tester || !transaction) return false;
+  if (!tester || !transaction || transaction.userId !== testerId || transaction.type !== TransactionType.BOUNTY_PAYOUT) throw new Error("Tester payout ledger does not match this member.");
   if (transaction.status === TransactionStatus.COMPLETED) return true;
-  if (!tester.stripeConnectAccountId || !process.env.STRIPE_SECRET_KEY) return false;
+  if (transaction.status !== TransactionStatus.PENDING) throw new Error("This tester payout is not pending.");
+  if (!process.env.STRIPE_SECRET_KEY) return false;
 
   try {
     const stripe = getStripe();
-    const account = await stripe.accounts.retrieve(tester.stripeConnectAccountId);
-    if (!account.payouts_enabled) return false;
+    const operation = await serializable(async (tx) => {
+      let pending = await tx.billingOperation.findUnique({ where: { id: `seedenv-payout-${transactionId}` } });
+      if (!pending) {
+        if (!tester.stripeConnectAccountId) return null;
+        // Before this migration, any PENDING payout may already have reached Stripe.
+        pending = await reserveBillingOperation(tx, { id: `seedenv-payout-${transactionId}`, kind: "LEGACY_PAYOUT", resourceId: transactionId, ledgerId: transactionId, userId: testerId, campaignId: transaction.campaignId, destinationId: tester.stripeConnectAccountId, amountCents: transaction.amountCents });
+      }
+      if (!pending.destinationId && !pending.firstAttemptAt && tester.stripeConnectAccountId) pending = await tx.billingOperation.update({ where: { id: pending.id }, data: { destinationId: tester.stripeConnectAccountId } });
+      return pending;
+    });
+    if (!operation?.destinationId) return false;
+    if (operation.userId !== testerId || operation.ledgerId !== transactionId || operation.amountCents !== transaction.amountCents) throw new Error("Payout operation does not match its immutable ledger.");
 
-    const transfer = await stripe.transfers.create({
-      amount: transaction.amountCents,
-      currency: "usd",
-      destination: tester.stripeConnectAccountId,
-      metadata: { seedenvUserId: testerId, seedenvLedgerTransactionId: transactionId },
-    }, { idempotencyKey: `seedenv-payout-${transactionId}` });
+    const transfer = await operationTransfer(operation, async () => {
+      if (!operation.campaignId) throw new Error("Payout funding provenance is missing; reconciliation is required.");
+      await serializable((tx) => assertCampaignFunding(tx, operation.campaignId!));
+      const account = await stripe.accounts.retrieve(operation.destinationId!);
+      if (!account.payouts_enabled) throw new Error("Stripe payout account is not ready. Finish Stripe onboarding before releasing this payout.");
+    });
 
     const settled = await prisma.$transaction(async (database) => {
       const updated = await database.walletTransaction.updateMany({
@@ -80,14 +96,15 @@ export async function transferTesterPayout(testerId: string, transactionId: stri
       if (updated.count) {
         await database.user.update({ where: { id: testerId }, data: { walletBalanceCents: { increment: transaction.amountCents } } });
       }
+      await database.billingOperation.update({ where: { id: operation.id }, data: { state: "SETTLED", remoteId: transfer.id, error: null } });
       return updated.count > 0;
     });
     if (settled) return true;
     const current = await prisma.walletTransaction.findUnique({ where: { id: transactionId }, select: { status: true } });
     return current?.status === TransactionStatus.COMPLETED;
   } catch (error) {
-    console.warn("Stripe tester payout transfer failed:", error instanceof Error ? error.message : "Unknown transfer error.");
-    return false;
+    await prisma.billingOperation.updateMany({ where: { id: `seedenv-payout-${transactionId}`, state: { not: "SETTLED" } }, data: { error: (error instanceof Error ? error.message : "Unknown transfer error.").slice(0, 1000) } });
+    throw error;
   }
 }
 

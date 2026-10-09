@@ -1,13 +1,18 @@
 import { handleTopUpCheckout } from "@/lib/funding-balance";
 import { prisma } from "@/lib/prisma";
-import { serializable } from "@/lib/quest-ledger";
+import { billingTransaction as serializable } from "@/lib/billing-transaction";
 import { reconcileCampaignFunding } from "@/lib/slot-funding";
 import { getStripe } from "@/lib/stripe";
 import { usdToCents } from "@/lib/utils";
+import { handleFundingReversal, reconcileFundingPayment } from "@/lib/funding-reversals";
 
 export type CampaignPaymentEvent = { type: string; data: { object: { id?: string } } };
 
 export async function handleStripeWebhook(event: CampaignPaymentEvent) {
+  if (["charge.refunded", "refund.updated", "refund.created", "refund.failed", "charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed", "charge.dispute.funds_withdrawn", "charge.dispute.funds_reinstated"].includes(event.type)) {
+    if (!event.data.object.id) throw new Error("Stripe reversal event has no object ID.");
+    return handleFundingReversal(event.type, event.data.object.id);
+  }
   if (!["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type)) return { ignored: true };
   if (!event.data.object.id) throw new Error("Checkout event has no session ID.");
   const stripe = getStripe();
@@ -42,7 +47,8 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     if (deposits.some((deposit) => deposit.status === "COMPLETED" && deposit.stripePaymentId === paymentId && deposit.amountCents === amount)) return { duplicate: true, campaignId: campaign.id };
     if (campaign.status !== "ESCROW_PENDING") throw new Error("This campaign is not awaiting funding. Reconcile the payment before changing its state.");
     if (deposits.length !== 1 || deposits[0].status !== "PENDING" || deposits[0].amountCents !== amount) throw new Error("The campaign funding ledger needs reconciliation.");
-    await tx.walletTransaction.update({ where: { id: deposits[0].id }, data: { status: "COMPLETED", stripePaymentId: paymentId } });
+    await tx.walletTransaction.update({ where: { id: deposits[0].id }, data: { status: "COMPLETED", stripePaymentId: paymentId, campaignId: campaign.id } });
+    await reconcileFundingPayment(tx, paymentId);
     if (campaign.cancelledAt) return { cancelledBeforePayment: true, campaignId: campaign.id };
     await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: "ACTIVE" } });
     return { activated: true, campaignId: campaign.id };

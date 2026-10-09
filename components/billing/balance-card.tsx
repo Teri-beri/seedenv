@@ -3,7 +3,7 @@
 import { Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { refundBalanceToCard, setAutoReload, startBalanceTopUp } from "@/app/actions/balanceActions";
+import { refundBalanceToCard, replaceReversedCampaignFunding, setAutoReload, startBalanceTopUp } from "@/app/actions/balanceActions";
 import { AUTO_RELOAD_OPTIONS_CENTS, MAX_TOP_UP_CENTS, MIN_TOP_UP_CENTS, quoteTopUp } from "@/lib/pricing";
 import { formatCents } from "@/lib/utils";
 
@@ -11,7 +11,7 @@ const PRESETS_CENTS = [2500, 5000, 10000, 25000];
 
 type Withdrawal = { id: string; amountCents: number; status: string; createdAt: string };
 
-export function BalanceCard({ balanceCents, autoReloadCents, pendingTopUps, withdrawals, hasCard, topUpResult }: { balanceCents: number; autoReloadCents: number; pendingTopUps: number; withdrawals: Withdrawal[]; hasCard: boolean; topUpResult?: string }) {
+export function BalanceCard({ balanceCents, autoReloadCents, pendingTopUps, withdrawals, heldCampaigns = [], hasCard, topUpResult }: { balanceCents: number; autoReloadCents: number; pendingTopUps: number; withdrawals: Withdrawal[]; heldCampaigns?: Array<{ id: string; title: string; billingHoldCents: number }>; hasCard: boolean; topUpResult?: string }) {
   const router = useRouter();
   const [amountUsd, setAmountUsd] = useState("50");
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
@@ -72,6 +72,13 @@ export function BalanceCard({ balanceCents, autoReloadCents, pendingTopUps, with
       {topUpResult === "success" ? <p className="mt-4 text-xs text-emerald-400" role="status">Payment received. Your balance updates as soon as Stripe confirms it, usually within a few seconds; refresh if it hasn&apos;t changed yet.</p> : null}
       {topUpResult === "cancelled" ? <p className="mt-4 text-xs text-zinc-400" role="status">Top-up cancelled. Nothing was charged. A cohort waiting on this top-up returns to your drafts within about an hour.</p> : null}
       {pendingTopUps ? <p className="mt-2 font-mono text-[11px] text-zinc-500">{pendingTopUps} checkout{pendingTopUps === 1 ? "" : "s"} awaiting payment.</p> : null}
+      {balanceCents < 0 ? <p className="mt-3 text-xs text-amber-300" role="alert">Funding debt: {formatCents(-balanceCents)}. A refund or chargeback removed backing already used for tester places. New funds first repay this debt; pay-per-tester payouts resume when it is covered.</p> : null}
+      {heldCampaigns.length ? <div className="mt-3 space-y-2">
+        {heldCampaigns.map((campaign) => <div key={campaign.id} className="flex flex-wrap items-center gap-2 text-xs text-amber-300">
+          <span>{campaign.title}: {formatCents(campaign.billingHoldCents)} of escrow reversed or disputed. Payouts are held until replaced.</span>
+          <button type="button" disabled={pending || balanceCents < campaign.billingHoldCents} onClick={() => run(() => replaceReversedCampaignFunding(campaign.id))} className="rounded-lg border border-amber-500/40 px-3 py-1.5 disabled:opacity-40">Replace from balance</button>
+        </div>)}
+      </div> : null}
       {message ? <p className={`mt-3 text-xs ${message.tone === "ok" ? "text-emerald-400" : "text-red-300"}`} role={message.tone === "ok" ? "status" : "alert"}>{message.text}</p> : null}
 
       <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-zinc-800 pt-4">
@@ -82,12 +89,12 @@ export function BalanceCard({ balanceCents, autoReloadCents, pendingTopUps, with
             <button type="button" disabled={pending} onClick={() => setConfirmRefund(false)} className="h-8 px-2 text-xs text-zinc-500 hover:text-zinc-200">Cancel</button>
           </>
         ) : (
-          <button type="button" disabled={pending || balanceCents <= 0} onClick={() => setConfirmRefund(true)} className="h-8 rounded-lg border border-zinc-700 px-3 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-600 hover:bg-zinc-800/60 disabled:opacity-40">Refund balance to card</button>
+          <button type="button" disabled={pending || (balanceCents <= 0 && !withdrawals.some((row) => row.status === "PENDING"))} onClick={() => withdrawals.some((row) => row.status === "PENDING") ? run(refundBalanceToCard) : setConfirmRefund(true)} className="h-8 rounded-lg border border-zinc-700 px-3 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-600 hover:bg-zinc-800/60 disabled:opacity-40">{withdrawals.some((row) => row.status === "PENDING") ? "Reconcile pending refund" : "Refund balance to card"}</button>
         )}
         {withdrawals.length ? (
           <ul className="ml-auto space-y-0.5 text-right font-mono text-[11px] text-zinc-500">
             {withdrawals.slice(0, 3).map((row) => (
-              <li key={row.id}>{new Date(row.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} · refunded {formatCents(row.amountCents)}{row.status === "PENDING" ? " (processing)" : row.status === "FAILED" ? " (failed, kept in balance)" : ""}</li>
+              <li key={row.id}>{new Date(row.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} · {row.status === "PENDING" ? "reserved refund" : "refunded"} {formatCents(row.amountCents)}{row.status === "PENDING" ? " (processing/reconciliation)" : row.status === "FAILED" ? " (failed, kept in balance)" : ""}</li>
             ))}
           </ul>
         ) : null}

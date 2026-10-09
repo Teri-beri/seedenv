@@ -1,5 +1,5 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { PrismaClient, UserRole } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import { Resend } from "resend";
 import { type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -7,8 +7,8 @@ import EmailProvider from "next-auth/providers/email";
 import GitHubProvider from "next-auth/providers/github";
 import GoogleProvider from "next-auth/providers/google";
 import { verifyPassword } from "@/lib/password";
-
-const prisma = new PrismaClient();
+import { decodeSessionToken, validateSessionToken } from "@/lib/session-security";
+import { prisma } from "@/lib/prisma";
 
 const MAX_FAILED_LOGINS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
@@ -122,7 +122,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         failedLogins.delete(email);
-        return { id: user.id, email: user.email, name: user.name, image: user.image, role: user.role };
+        return { id: user.id, email: user.email, name: user.name, image: user.image, role: user.role, sessionVersion: user.sessionVersion };
       },
     }),
     EmailProvider({
@@ -232,6 +232,7 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
+  jwt: { decode: decodeSessionToken },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
@@ -240,13 +241,19 @@ export const authOptions: NextAuthOptions = {
         if (shouldPromoteOwner) {
           await prisma.user.update({ where: { id: user.id }, data: { role: UserRole.DEVELOPER, developerWorkspaceEnabled: true } });
         }
-        token.role = shouldPromoteOwner ? UserRole.DEVELOPER : user.role || UserRole.TESTER;
-      } else if (token.id) {
         const currentUser = await prisma.user.findUnique({
-          where: { id: token.id },
-          select: { role: true },
+          where: { id: user.id },
+          select: { sessionVersion: true, role: true },
         });
-        if (currentUser) token.role = currentUser.role;
+        if (!currentUser || (user.sessionVersion !== undefined && user.sessionVersion !== currentUser.sessionVersion)) {
+          throw new Error("Account session changed during sign-in. Please sign in again.");
+        }
+        token.role = currentUser.role;
+        token.sessionVersion = currentUser.sessionVersion;
+      } else {
+        const validated = await validateSessionToken(token);
+        if (!validated) throw new Error("Session revoked. Sign in again.");
+        return validated;
       }
       return token;
     },

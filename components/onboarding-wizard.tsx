@@ -3,6 +3,7 @@
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, KeyRound, LoaderCircle, Rocket, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { useState, useTransition } from "react";
 import { saveOnboardingProfile, setAccountPassword } from "@/app/actions/accountActions";
 
@@ -64,7 +65,7 @@ export function OnboardingWizard({ hasPassword, nextPath, initial }: OnboardingW
       if (!result.ok) return setError(result.message);
       setPassword("");
       setConfirmPassword("");
-      goNext();
+      await signOut({ callbackUrl: "/auth/signin?callbackUrl=%2Fonboarding%2Fsetup" });
     });
   }
 
@@ -116,7 +117,7 @@ export function OnboardingWizard({ hasPassword, nextPath, initial }: OnboardingW
         <form className="mt-6 space-y-5" onSubmit={submitPassword}>
           <div className="flex items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-sm text-zinc-400">
             <ShieldCheck className="mt-0.5 size-5 shrink-0 text-emerald-400" />
-            <p>Create a password so you can sign in without waiting for an email link. You can still use email links or GitHub/Google any time.</p>
+            <p>Create a password so you can sign in without waiting for an email link. You can still use email links or GitHub/Google any time. For security, saving it signs out existing sessions; sign in again to finish your profile.</p>
           </div>
           <input autoComplete="username" className="hidden" readOnly type="email" value={initial.email} />
           <label className={labelClass}>New password

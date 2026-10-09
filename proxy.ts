@@ -1,5 +1,6 @@
 import { getToken } from "next-auth/jwt";
 import { NextRequest, NextResponse } from "next/server";
+import { decodeSessionToken } from "@/lib/session-security";
 
 const roleHome = {
   TESTER: "/dashboard",
@@ -23,7 +24,7 @@ export async function proxy(request: NextRequest) {
   if (!route) return NextResponse.next();
 
   try {
-    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET, decode: decodeSessionToken });
     if (!token) {
       const signInUrl = new URL("/auth/signin", request.url);
       signInUrl.searchParams.set("callbackUrl", pathname);
