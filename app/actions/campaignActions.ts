@@ -12,6 +12,9 @@ import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templ
 import { billingDetailsSchema } from "@/lib/enterprise-rules";
 import { cancelCohort } from "@/lib/slot-funding";
 import { formatCents } from "@/lib/utils";
+import { serviceTaxAudit, taxLedgerFields, QA_SERVICE_TAX_CODE, stripeTaxEnabled } from "@/lib/billing/tax-policy";
+import { seedenvTaxMetadata, storedValueCheckoutTax } from "@/lib/stripe/billing";
+import { ensureStripeCustomer } from "@/lib/stripe-customer";
 
 const taskInstructionSchema = z.object({
   instructionTitle: z.string().min(3).max(90),
@@ -157,12 +160,13 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
     const draft = await saveCampaignDraft(developer.id, input, draftId);
     return { campaignId: draft.id, checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true };
   }
+  const tax = stripeTaxEnabled() ? await prisma.$transaction((tx) => serviceTaxAudit(tx, developer.id)) : null;
 
   if (!isBundleType(input.cohortType)) {
     const firstTester = quoteSlotCharge(Math.round(input.bountyPerTaskUsd * 100), 0, 0);
     const funded = developer.fundingBalanceCents >= firstTester.totalCents;
     const { data: liveData } = buildCampaignData(input, developer.id, funded ? CampaignStatus.ACTIVE : CampaignStatus.ESCROW_PENDING);
-    const payPerTester = { ...liveData, fundingModel: CohortFundingModel.PAY_PER_TESTER };
+    const payPerTester = { ...liveData, fundingModel: CohortFundingModel.PAY_PER_TESTER, ...(tax ? { taxSnapshot: tax } : {}) };
     let live;
     if (draftId) {
       const ownedDraft = await prisma.appCampaign.findFirst({ where: { id: draftId, developerId: developer.id, status: CampaignStatus.DRAFT }, select: { id: true } });
@@ -213,7 +217,8 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
 
   const profile = await prisma.billingProfile.findUnique({ where: { userId: developer.id } });
   const company = profile ? billingDetailsSchema.parse({ ...profile, taxId: profile.taxId || "", billingEmail: profile.billingEmail || "", addressLine2: profile.addressLine2 || "", region: profile.region || "" }) : null;
-  const { data: campaignData, escrowTotalCents, terms } = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING);
+  const { data: baseCampaignData, escrowTotalCents, terms } = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING);
+  const campaignData = { ...baseCampaignData, ...(tax ? { taxSnapshot: tax } : {}) };
   let campaign;
   if (draftId) {
     const ownedDraft = await prisma.appCampaign.findFirst({
@@ -235,6 +240,7 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
       amountCents: escrowTotalCents,
       campaignId: campaign.id,
       platformFeeCents: Math.round(campaignData.platformFeeUsd * 100),
+      ...taxLedgerFields(tax),
       invoiceSnapshot: {
         version: 1,
         cohortId: campaign.id,
@@ -242,6 +248,7 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
         rewardPoolCents: escrowTotalCents - Math.round(campaignData.platformFeeUsd * 100),
         platformFeeCents: Math.round(campaignData.platformFeeUsd * 100),
         company,
+        ...(tax ? { tax } : {}),
       },
       type: TransactionType.ESCROW_DEPOSIT,
       status: TransactionStatus.PENDING,
@@ -254,7 +261,8 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
   try {
     session = await stripe.checkout.sessions.create({
       mode: "payment",
-      customer: developer.stripeCustomerId || undefined,
+      customer: stripeTaxEnabled() ? await ensureStripeCustomer(developer) : developer.stripeCustomerId || undefined,
+      ...storedValueCheckoutTax(),
       payment_method_types: ["card"],
       line_items: [
         {
@@ -262,7 +270,9 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
           price_data: {
             currency: "usd",
             unit_amount: escrowTotalCents,
+            tax_behavior: "exclusive",
             product_data: {
+              tax_code: QA_SERVICE_TAX_CODE,
               name: `SeedEnv escrow: ${campaign.title}`,
               description: checkoutDescription(input, terms),
             },
@@ -272,6 +282,8 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
       success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?view=billing&escrow=success&campaign=${campaign.id}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?view=billing&escrow=cancelled&campaign=${campaign.id}`,
       metadata: {
+        ...seedenvTaxMetadata(),
+        seedenvServiceTax: tax ? "1" : "0",
         type: "SEEDENV_CAMPAIGN_ESCROW",
         campaignId: campaign.id,
         developerId: developer.id,

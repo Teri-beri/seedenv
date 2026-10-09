@@ -212,7 +212,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
 
           {params.topup === "cancelled" && checkoutCampaign ? <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-200" role="status">Top-up cancelled, so {checkoutCampaign.title} is not live yet. It returns to your drafts within about an hour; nothing was charged.</p> : null}
 
-          <BalanceCard {...billing.balance} hasCard={Boolean(billing.paymentMethod)} topUpResult={checkoutCampaign ? undefined : params.topup} />
+          <BalanceCard {...billing.balance} floridaTaxPolicyOnly={process.env.SEEDENV_STRIPE_TAX_ENABLED === "1"} hasCard={Boolean(billing.paymentMethod)} topUpResult={checkoutCampaign ? undefined : params.topup} />
 
           <BillingMetrics metrics={billing.metrics} />
 

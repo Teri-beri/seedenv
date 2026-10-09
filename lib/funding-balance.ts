@@ -7,6 +7,9 @@ import { getStripe } from "@/lib/stripe";
 import { ensureStripeCustomer } from "@/lib/stripe-customer";
 import { reconcileFundingPayment } from "@/lib/funding-reversals";
 import { cancelFailedRefund, operationRefund, reserveBillingOperation } from "@/lib/billing-operations";
+import { storedValueCheckoutTax, storedValueProductTax, seedenvTaxMetadata, validateStoredValueCheckout } from "@/lib/stripe/billing";
+import { storedValueTaxAudit, stripeTaxEnabled, taxLedgerFields, type TaxAudit } from "@/lib/billing/tax-policy";
+import type Stripe from "stripe";
 
 export const STALE_TOP_UP_MS = 15 * 60 * 1000;
 const CHECKOUT_EXPIRY_SECONDS = 60 * 60;
@@ -50,7 +53,7 @@ async function activateFundedCohort(tx: Prisma.TransactionClient, userId: string
 }
 
 // Credits a paid top-up exactly once and writes its receipt.
-export async function creditTopUp(tx: Prisma.TransactionClient, topUpId: string, paymentIntentId: string) {
+export async function creditTopUp(tx: Prisma.TransactionClient, topUpId: string, paymentIntentId: string, checkoutTax: TaxAudit | null = null) {
   const topUp = await tx.balanceTopUp.findUnique({ where: { id: topUpId } });
   if (!topUp) throw new Error("Balance top-up record is missing.");
   if (topUp.stripePaymentIntentId && topUp.stripePaymentIntentId !== paymentIntentId) throw new Error("Top-up funding payment does not match its ledger.");
@@ -58,11 +61,13 @@ export async function creditTopUp(tx: Prisma.TransactionClient, topUpId: string,
     await reconcileFundingPayment(tx, paymentIntentId);
     return { credited: false, activated: false, topUp };
   }
+  const tax = checkoutTax ?? (stripeTaxEnabled() && topUp.source === "AUTO_RELOAD" ? storedValueTaxAudit() : null);
   const transaction = await tx.walletTransaction.create({
     data: {
       userId: topUp.userId,
       amountCents: topUp.totalCents,
       platformFeeCents: 0,
+      ...taxLedgerFields(tax),
       invoiceSnapshot: {
         version: 1,
         kind: "TOP_UP",
@@ -72,6 +77,7 @@ export async function creditTopUp(tx: Prisma.TransactionClient, topUpId: string,
         platformFeeCents: 0,
         processingFeeCents: topUp.processingFeeCents,
         company: await billingCompanySnapshot(tx, topUp.userId),
+        ...(tax ? { tax } : {}),
       },
       type: TransactionType.BALANCE_TOPUP,
       status: TransactionStatus.COMPLETED,
@@ -98,15 +104,16 @@ export async function createTopUpCheckout(user: TopUpMember, creditCents: number
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
       customer: customerId,
+      ...storedValueCheckoutTax(),
       expires_at: Math.floor(Date.now() / 1000) + CHECKOUT_EXPIRY_SECONDS,
       payment_method_types: ["card"],
       line_items: [
-        { quantity: 1, price_data: { currency: "usd", unit_amount: quote.creditCents, product_data: { name: "SeedEnv prepaid balance", description: "Used for tester rewards and platform fees as you accept testers. Unused balance is refundable to your card at any time." } } },
+        { quantity: 1, price_data: { currency: "usd", unit_amount: quote.creditCents, tax_behavior: "exclusive", product_data: { ...storedValueProductTax(), name: "SeedEnv prepaid balance", description: "Used for tester rewards and platform fees as you accept testers. Unused balance is refundable to your card at any time." } } },
       ],
-      payment_intent_data: { setup_future_usage: "off_session", description: "SeedEnv prepaid balance top-up", metadata: { type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id } },
+      payment_intent_data: { setup_future_usage: "off_session", description: "SeedEnv prepaid balance top-up", metadata: { ...seedenvTaxMetadata(), type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id } },
       success_url: `${base}${options.successPath}`,
       cancel_url: `${base}${options.cancelPath}`,
-      metadata: { type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id, seedenvUserId: user.id },
+      metadata: { ...seedenvTaxMetadata(), seedenvAutomaticTax: stripeTaxEnabled() ? "1" : "0", type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id, seedenvUserId: user.id },
     }, { idempotencyKey: `seedenv-topup-${topUp.id}` });
     if (!session.url) throw new Error("Stripe did not return a checkout link.");
     await prisma.balanceTopUp.update({ where: { id: topUp.id }, data: { stripeCheckoutSessionId: session.id } });
@@ -118,15 +125,16 @@ export async function createTopUpCheckout(user: TopUpMember, creditCents: number
 }
 
 // Stripe Checkout webhook for top-ups. Verifies amount and owner before crediting.
-export async function handleTopUpCheckout(session: { id: string; mode: string | null; status: string | null; payment_status: string; currency: string | null; amount_total: number | null; metadata: Record<string, string> | null; payment_intent: string | { id: string } | null; customer: string | { id: string } | null }) {
+export async function handleTopUpCheckout(session: { id: string; mode: string | null; status: string | null; payment_status: string; currency: string | null; amount_total: number | null; metadata: Record<string, string> | null; payment_intent: string | { id: string } | null; customer: string | { id: string } | null } & Partial<Pick<Stripe.Checkout.Session, "automatic_tax" | "total_details" | "customer_details">>) {
   const metadata = session.metadata || {};
   if (session.mode !== "payment" || session.status !== "complete" || session.payment_status !== "paid") return { awaitingPayment: true };
   const topUp = metadata.topUpId ? await prisma.balanceTopUp.findUnique({ where: { id: metadata.topUpId } }) : null;
   if (!topUp || topUp.userId !== metadata.seedenvUserId) throw new Error("Balance top-up does not match a member.");
   if (session.currency !== "usd" || session.amount_total !== topUp.totalCents) throw new Error("Balance top-up amount or currency does not match.");
+  const tax = validateStoredValueCheckout(session);
   const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
   if (!paymentIntentId) throw new Error("Balance top-up has no payment reference.");
-  const result = await serializable((tx) => creditTopUp(tx, topUp.id, paymentIntentId));
+  const result = await serializable((tx) => creditTopUp(tx, topUp.id, paymentIntentId, tax));
   await rememberCardForAutoReload(typeof session.customer === "string" ? session.customer : session.customer?.id, paymentIntentId);
   return { balanceCredited: result.credited, cohortActivated: result.activated, topUpId: topUp.id };
 }
@@ -178,7 +186,7 @@ export async function autoReloadBalance(userId: string, shortfallCents: number, 
       off_session: true,
       confirm: true,
       description: "SeedEnv prepaid balance auto-reload",
-      metadata: { type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id },
+      metadata: { ...seedenvTaxMetadata(), type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id },
     }, { idempotencyKey: `seedenv-topup-${topUp.id}` });
     if (intent.status !== "succeeded") {
       try { await getStripe().paymentIntents.cancel(intent.id); } catch { /* already final */ }
@@ -268,7 +276,7 @@ async function resolveStaleTopUp(topUp: { id: string; source: string; stripeChec
     const session = await stripe.checkout.sessions.retrieve(topUp.stripeCheckoutSessionId);
     const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
     if (session.status === "complete" && session.payment_status === "paid" && paymentIntentId) {
-      await serializable((tx) => creditTopUp(tx, topUp.id, paymentIntentId));
+      await handleTopUpCheckout(session);
       return;
     }
     if (session.status === "expired") return markFailed("Checkout expired before payment.");

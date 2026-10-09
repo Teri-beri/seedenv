@@ -11,7 +11,7 @@ const PRESETS_CENTS = [2500, 5000, 10000, 25000];
 
 type Withdrawal = { id: string; amountCents: number; status: string; createdAt: string };
 
-export function BalanceCard({ balanceCents, autoReloadCents, pendingTopUps, withdrawals, heldCampaigns = [], hasCard, topUpResult }: { balanceCents: number; autoReloadCents: number; pendingTopUps: number; withdrawals: Withdrawal[]; heldCampaigns?: Array<{ id: string; title: string; billingHoldCents: number }>; hasCard: boolean; topUpResult?: string }) {
+export function BalanceCard({ balanceCents, autoReloadCents, pendingTopUps, withdrawals, heldCampaigns = [], hasCard, topUpResult, floridaTaxPolicyOnly = false }: { balanceCents: number; autoReloadCents: number; pendingTopUps: number; withdrawals: Withdrawal[]; heldCampaigns?: Array<{ id: string; title: string; billingHoldCents: number }>; hasCard: boolean; topUpResult?: string; floridaTaxPolicyOnly?: boolean }) {
   const router = useRouter();
   const [amountUsd, setAmountUsd] = useState("50");
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
@@ -39,6 +39,7 @@ export function BalanceCard({ balanceCents, autoReloadCents, pendingTopUps, with
           <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-100"><Wallet className="size-4 text-emerald-400" />Prepaid balance</h3>
           <p className="mt-2 font-mono text-3xl font-semibold tracking-tight text-zinc-50">{formatCents(balanceCents)}</p>
           <p className="mt-1 max-w-md text-xs text-zinc-500">Each accepted tester draws their reward plus the platform fee from this balance. No card charge per tester. Unused places come back here when a cohort ends, and you can refund the balance to your card any time.</p>
+          {floridaTaxPolicyOnly ? <p className="mt-3 max-w-md text-xs leading-5 text-amber-300" role="note">Top-ups purchase stored-value credit with $0 tax. Testing purchases currently require a Florida billing address and an approved service-tax policy. If your billing address is elsewhere, contact support before adding funds; redemption is unavailable until that jurisdiction is configured.</p> : null}
         </div>
         <div className="w-full max-w-sm space-y-3">
           <fieldset>

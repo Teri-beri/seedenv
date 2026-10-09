@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { applicationEligibility, startWindowHours } from "@/lib/quest-rules";
 import { assertCampaignFunding } from "@/lib/funding-reversals";
+import { serviceTaxAudit } from "@/lib/billing/tax-policy";
 
 export async function createMissionApplication(tx: Prisma.TransactionClient, testerId: string, campaignId: string, note: string) {
   const user = await tx.user.findUniqueOrThrow({ where: { id: testerId } });
@@ -27,6 +28,7 @@ export async function reviewMissionApplication(tx: Prisma.TransactionClient, dev
   if (decision === "accept") {
     const campaign = application.campaign;
     await assertCampaignFunding(tx, campaign.id);
+    await serviceTaxAudit(tx, developerId);
     if (campaign.status !== "ACTIVE" || campaign.expiresAt <= new Date()) throw new Error("Activate the campaign before accepting testers.");
     if (campaign.fundingModel === "PAY_PER_TESTER") throw new Error("Pay-per-tester cohorts must charge the slot before accepting.");
     const held = await tx.missionApplication.count({ where: { campaignId: campaign.id, status: "ACCEPTED", startBy: { gt: new Date() } } });

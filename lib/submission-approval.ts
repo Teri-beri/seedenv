@@ -8,6 +8,7 @@ import { formatCents } from "@/lib/utils";
 import { AUTO_APPROVE_AFTER_MS, isAutoApprovalDue } from "@/lib/auto-approval-window";
 import { operationTransfer, reserveBillingOperation } from "@/lib/billing-operations";
 import { assertCampaignFunding } from "@/lib/funding-reversals";
+import { releaseBountyAndDeductFee } from "@/lib/billing/ledger";
 
 export { AUTO_APPROVE_AFTER_MS, isAutoApprovalDue, isFraudHeld, autoApproveDeadlineFrom as autoApproveDeadline } from "@/lib/auto-approval-window";
 
@@ -40,18 +41,14 @@ export async function approvePendingSubmission(tx: Prisma.TransactionClient, sub
   });
   await awardQuestXp(tx, submission.testerId, `approved:${submission.id}`, 25, actor.kind === "auto" ? "Auto-approved contribution" : "Developer-approved contribution");
   await qualifyReferral(tx, submission.testerId);
-  const payout = await tx.walletTransaction.create({
-    data: {
-      userId: submission.testerId,
-      campaignId: submission.campaignId,
-      amountCents: submission.payoutCents,
-      type: TransactionType.BOUNTY_PAYOUT,
-      status: TransactionStatus.PENDING,
-      description: `${actor.kind === "auto" ? "Auto-approved payout" : "Payout"} pending Stripe transfer for ${submission.campaign.title}`,
-    },
-    select: { id: true },
+  const payout = await releaseBountyAndDeductFee(tx, {
+    testerId: submission.testerId,
+    missionId: submission.campaignId,
+    bountyCents: submission.payoutCents,
+    taxSnapshot: submission.campaign.taxSnapshot,
+    destinationId: submission.tester.stripeConnectAccountId,
+    description: `${actor.kind === "auto" ? "Auto-approved payout" : "Payout"} pending Stripe transfer for ${submission.campaign.title}`,
   });
-  await reserveBillingOperation(tx, { id: `seedenv-payout-${payout.id}`, kind: "PAYOUT", resourceId: payout.id, ledgerId: payout.id, userId: submission.testerId, campaignId: submission.campaignId, destinationId: submission.tester.stripeConnectAccountId, amountCents: submission.payoutCents });
 
   return { payoutCents: submission.payoutCents, xpGain, testerId: submission.testerId, payoutTransactionId: payout.id, campaignTitle: submission.campaign.title };
 }

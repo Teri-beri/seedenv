@@ -58,7 +58,7 @@ test("refund gates only return money nobody is using", () => {
 
 type Row = Record<string, unknown>;
 
-function fundingHarness(options: { balance: number; autoReload?: number; paid?: number; card?: "succeeded" | "declined" | "network"; refundFails?: boolean; topUps?: Row[]; campaign?: Partial<Row> }) {
+function fundingHarness(options: { balance: number; autoReload?: number; paid?: number; card?: "succeeded" | "declined" | "network"; refundFails?: boolean; topUps?: Row[]; campaign?: Partial<Row>; taxAddress?: { country: string; region: string } }) {
   const state = {
     user: { id: "dev", fundingBalanceCents: options.balance, autoReloadCents: options.autoReload ?? 0, stripeCustomerId: "cus_1" },
     application: { id: "app-1", status: "PENDING", campaignId: "c-1", startBy: null as Date | null },
@@ -121,7 +121,7 @@ function fundingHarness(options: { balance: number; autoReload?: number; paid?: 
       update: async ({ where, data }: { where: { id: string }; data: Row }) => applyData(state.topUps.find((row) => row.id === where.id)!, data),
       updateMany: async ({ where, data }: { where: Row; data: Row }) => { const rows = state.topUps.filter((row) => match(row, where)); rows.forEach((row) => applyData(row, data)); return { count: rows.length }; },
     },
-    billingProfile: { findUnique: async () => null },
+    billingProfile: { findUnique: async () => options.taxAddress ?? null },
     walletTransaction: {
       findFirst: async () => null,
       findMany: async () => [],
@@ -226,6 +226,36 @@ test("accepting the first tester draws reward + floor fee from the balance with 
   assert.equal(harness.state.charges[0].processingFeeCents, 0);
   assert.equal(harness.state.transactions[0].type, "ESCROW_DEPOSIT");
   assert.equal(harness.state.transactions[0].stripePaymentId, undefined);
+});
+
+test("Florida tax gating blocks unsupported redemption before any debit or auto-reload", async () => {
+  const enabled = process.env.SEEDENV_STRIPE_TAX_ENABLED;
+  const confirmed = process.env.SEEDENV_FLORIDA_QA_TAX_POLICY_CONFIRMED;
+  process.env.SEEDENV_STRIPE_TAX_ENABLED = "1";
+  process.env.SEEDENV_FLORIDA_QA_TAX_POLICY_CONFIRMED = "1";
+  try {
+    for (const paid of [0, 1]) {
+      const blocked = fundingHarness({ balance: 5000, autoReload: 5000, paid, taxAddress: { country: "US", region: "CA" } });
+      const { error } = await accept(blocked);
+      assert.match(error?.message ?? "", /only configured for Florida/);
+      assert.equal(blocked.state.user.fundingBalanceCents, 5000);
+      assert.equal(blocked.state.application.status, "PENDING");
+      assert.equal(blocked.state.intents, 0);
+      assert.equal(blocked.state.transactions.length, 0);
+    }
+    const missing = fundingHarness({ balance: 5000 });
+    assert.match((await accept(missing)).error?.message ?? "", /only configured for Florida/);
+    const allowed = fundingHarness({ balance: 5000, taxAddress: { country: "US", region: "FL" } });
+    assert.equal((await accept(allowed)).value?.accepted, true);
+    assert.equal(allowed.state.user.fundingBalanceCents, 3100);
+    assert.equal(allowed.state.transactions[0].taxAmountCents, 0);
+    assert.equal(allowed.state.transactions[0].taxCode, "txcd_20030000");
+  } finally {
+    if (enabled === undefined) delete process.env.SEEDENV_STRIPE_TAX_ENABLED;
+    else process.env.SEEDENV_STRIPE_TAX_ENABLED = enabled;
+    if (confirmed === undefined) delete process.env.SEEDENV_FLORIDA_QA_TAX_POLICY_CONFIRMED;
+    else process.env.SEEDENV_FLORIDA_QA_TAX_POLICY_CONFIRMED = confirmed;
+  }
 });
 
 test("a freed paid place is reused without drawing from the balance", async () => {

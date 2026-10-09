@@ -5,6 +5,9 @@ import { reconcileCampaignFunding } from "@/lib/slot-funding";
 import { getStripe } from "@/lib/stripe";
 import { usdToCents } from "@/lib/utils";
 import { handleFundingReversal, reconcileFundingPayment } from "@/lib/funding-reversals";
+import { taxLedgerFields } from "@/lib/billing/tax-policy";
+import { validateServiceCheckout } from "@/lib/stripe/billing";
+import { invoiceSnapshotSchema } from "@/lib/enterprise-rules";
 
 export type CampaignPaymentEvent = { type: string; data: { object: { id?: string } } };
 
@@ -40,6 +43,7 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
   const result = await serializable(async (tx) => {
     const campaign = await tx.appCampaign.findUnique({ where: { id: metadata.campaignId } });
     if (!campaign || campaign.developerId !== metadata.developerId) throw new Error("Campaign funding ownership does not match.");
+    const serviceTax = validateServiceCheckout(session, campaign.taxSnapshot);
     const amount = usdToCents(campaign.totalBudgetUsd);
     if (session.currency !== "usd" || session.amount_total !== amount) throw new Error("Campaign funding amount or currency does not match.");
     const description = `Escrow deposit for ${campaign.title} (${campaign.id})`;
@@ -47,10 +51,13 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     if (deposits.some((deposit) => deposit.status === "COMPLETED" && deposit.stripePaymentId === paymentId && deposit.amountCents === amount)) return { duplicate: true, campaignId: campaign.id };
     if (campaign.status !== "ESCROW_PENDING") throw new Error("This campaign is not awaiting funding. Reconcile the payment before changing its state.");
     if (deposits.length !== 1 || deposits[0].status !== "PENDING" || deposits[0].amountCents !== amount) throw new Error("The campaign funding ledger needs reconciliation.");
-    await tx.walletTransaction.update({ where: { id: deposits[0].id }, data: { status: "COMPLETED", stripePaymentId: paymentId, campaignId: campaign.id } });
+    await tx.walletTransaction.update({ where: { id: deposits[0].id }, data: {
+      status: "COMPLETED", stripePaymentId: paymentId, campaignId: campaign.id, ...taxLedgerFields(serviceTax),
+      ...(serviceTax ? { invoiceSnapshot: { ...invoiceSnapshotSchema.parse(deposits[0].invoiceSnapshot), tax: serviceTax } } : {}),
+    } });
     await reconcileFundingPayment(tx, paymentId);
     if (campaign.cancelledAt) return { cancelledBeforePayment: true, campaignId: campaign.id };
-    await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: "ACTIVE" } });
+    await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: "ACTIVE", ...(serviceTax ? { taxSnapshot: serviceTax } : {}) } });
     return { activated: true, campaignId: campaign.id };
   });
   // A cohort cancelled while checkout was open is refunded instead of activated.

@@ -228,6 +228,7 @@ model AppCampaign {
   cancelledAt      DateTime?            @map("cancelled_at")
   refundedCents    Int                  @default(0) @map("refunded_cents")
   billingHoldCents Int                  @default(0) @map("billing_hold_cents")
+  taxSnapshot      Json?
   applications     MissionApplication[]
   transactions     WalletTransaction[]
   slotCharges      SlotCharge[]
@@ -450,6 +451,9 @@ model WalletTransaction {
   campaign         AppCampaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   platformFeeCents Int?
   invoiceSnapshot  Json?
+  taxAmountCents   Int?
+  taxCode          String?
+  taxAudit         Json?
   description      String
   createdAt        DateTime          @default(now())
 

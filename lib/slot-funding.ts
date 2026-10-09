@@ -7,6 +7,8 @@ import { startWindowHours } from "@/lib/quest-rules";
 import { formatCents, usdToCents } from "@/lib/utils";
 import { cancelFailedRefund, operationRefund, reserveBillingOperation } from "@/lib/billing-operations";
 import { allocateSlotFunding, assertCampaignFunding, reconcileFundingPayment, releaseReplacementFunding } from "@/lib/funding-reversals";
+import { escrowMissionCredits } from "@/lib/billing/ledger";
+import { taxLedgerFields, serviceTaxAudit } from "@/lib/billing/tax-policy";
 
 type CampaignWindow = { status: CampaignStatus; cancelledAt: Date | null; expiresAt: Date };
 
@@ -80,6 +82,7 @@ function acceptFromBalance(developerId: string, applicationId: string) {
     const accept = () => tx.missionApplication.update({ where: { id: application.id }, data: { status: "ACCEPTED", startBy: acceptanceDeadline(campaign.expiresAt) } });
 
     if (unusedPaidSlots(paid.length, campaign.claimedSlots, holds) > 0) {
+      await serviceTaxAudit(tx, developerId);
       await accept();
       return { kind: "credit" };
     }
@@ -89,10 +92,10 @@ function acceptFromBalance(developerId: string, applicationId: string) {
       paid.reduce((sum, charge) => sum + charge.stipendCents, 0),
       paid.reduce((sum, charge) => sum + charge.platformFeeCents, 0),
     );
-    const debited = await tx.user.updateMany({ where: { id: developerId, fundingBalanceCents: { gte: quote.totalCents } }, data: { fundingBalanceCents: { decrement: quote.totalCents } } });
+    const funding = await escrowMissionCredits(tx, developerId, quote.totalCents, campaign.id);
     const developer = await tx.user.findUnique({ where: { id: developerId }, select: { fundingBalanceCents: true } });
     const balanceCents = developer?.fundingBalanceCents ?? 0;
-    if (!debited.count) return { kind: "short", quote, balanceCents };
+    if (!funding.debited) return { kind: "short", quote, balanceCents };
 
     const transaction = await tx.walletTransaction.create({
       data: {
@@ -100,6 +103,7 @@ function acceptFromBalance(developerId: string, applicationId: string) {
         amountCents: quote.totalCents,
         campaignId: campaign.id,
         platformFeeCents: quote.platformFeeCents,
+        ...taxLedgerFields(funding.tax),
         invoiceSnapshot: {
           version: 1,
           kind: "SLOT",
@@ -109,6 +113,7 @@ function acceptFromBalance(developerId: string, applicationId: string) {
           platformFeeCents: quote.platformFeeCents,
           processingFeeCents: 0,
           company: await billingCompanySnapshot(tx, developerId),
+          ...(funding.tax ? { tax: funding.tax } : {}),
         },
         type: TransactionType.ESCROW_DEPOSIT,
         status: TransactionStatus.COMPLETED,

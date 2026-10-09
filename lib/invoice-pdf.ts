@@ -4,6 +4,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb } from "pdf-lib";
 import { invoiceNumber } from "./billing";
 import type { InvoiceSnapshot } from "./enterprise-rules";
+import { redemptionLineItems } from "@/lib/billing/ledger";
 
 export async function generateInvoicePdf(input: { id: string; date: Date; amountCents: number; paymentReference: string; snapshot: InvoiceSnapshot }) {
   const document = await PDFDocument.create();
@@ -61,11 +62,20 @@ export async function generateInvoicePdf(input: { id: string; date: Date; amount
   } else {
     line(`Cohort: ${input.snapshot.cohortTitle}`, 14);
     line(`Cohort ID: ${input.snapshot.cohortId}`);
-    line(`${kind === "SLOT" ? "Tester stipend (one slot)" : "Tester reward pool"}: ${money(input.snapshot.rewardPoolCents)}`);
-    line(`Platform fee: ${money(input.snapshot.platformFeeCents)}`);
+    if (input.snapshot.tax?.stage === "SERVICE_REDEMPTION") {
+      for (const item of redemptionLineItems(input.snapshot.rewardPoolCents, input.snapshot.platformFeeCents, input.snapshot.tax)) line(`${item.description}: ${money(item.amountCents)}`);
+    } else {
+      line(`${kind === "SLOT" ? "Tester stipend (one slot)" : "Tester reward pool"}: ${money(input.snapshot.rewardPoolCents)}`);
+      line(`Platform fee: ${money(input.snapshot.platformFeeCents)}`);
+    }
     if (input.snapshot.processingFeeCents) line(`Card processing (passed through): ${money(input.snapshot.processingFeeCents)}`);
     if (kind === "SLOT" && !input.snapshot.processingFeeCents) line("Paid from your SeedEnv prepaid balance.");
   }
+  if (input.snapshot.tax?.stage === "CREDIT_PURCHASE") {
+    line("Stored-value purchase - service tax evaluated on redemption.");
+    line(`Tax Collected: ${money(input.snapshot.tax.taxAmountCents)}`);
+  }
+  if (input.snapshot.tax) line(`Tax policy: ${input.snapshot.tax.policyVersion}; tax code: ${input.snapshot.tax.taxCode}`, 9);
   line(`${kind === "SLOT" ? "Total drawn" : "Total paid"}: ${money(input.amountCents)}`, 14);
   cursor -= 20;
   line("Unless itemized above, Stripe processing and payout fees are separate. This receipt does not certify VAT registration or replace a jurisdiction-specific tax invoice.", 9);

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { taxAuditSchema } from "@/lib/billing/tax-policy";
 
 export const billingDetailsSchema = z.object({
   companyName: z.string().trim().min(1).max(150),
@@ -22,11 +23,12 @@ export const invoiceSnapshotSchema = z.object({
   processingFeeCents: z.number().int().nonnegative().optional(),
   kind: z.enum(["COHORT", "SLOT", "TOP_UP"]).optional(),
   company: billingDetailsSchema.nullable(),
+  tax: taxAuditSchema.optional(),
 });
 export type InvoiceSnapshot = z.infer<typeof invoiceSnapshotSchema>;
 
 export function invoiceTotalMatches(snapshot: InvoiceSnapshot, amountCents: number) {
-  return Number.isSafeInteger(amountCents) && amountCents > 0 && snapshot.rewardPoolCents + snapshot.platformFeeCents + (snapshot.processingFeeCents ?? 0) === amountCents;
+  return Number.isSafeInteger(amountCents) && amountCents > 0 && snapshot.rewardPoolCents + snapshot.platformFeeCents + (snapshot.processingFeeCents ?? 0) + (snapshot.tax?.taxAmountCents ?? 0) === amountCents;
 }
 
 export const supportCategories = ["Cohort Dispute", "Billing & Escrow", "Technical Bug", "General Support"] as const;
