@@ -1,5 +1,6 @@
 import type { Prisma, SubmissionAuditStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { versionDirections } from "@/lib/instruction-versions";
 import { serializable } from "@/lib/quest-ledger";
 import { downloadProofObject } from "@/lib/storage";
 import { isStoredRecording } from "@/lib/recording";
@@ -73,7 +74,8 @@ export function buildClarificationNote(intake: QaIntakeResult) {
 }
 
 const auditInclude = {
-  campaign: { select: { id: true, title: true, appUrl: true, platform: true, developerId: true, instructions: { orderBy: { stepNumber: "asc" }, select: { instructionTitle: true, instructionDetail: true } } } },
+  instructionVersion: true,
+  campaign: { select: { id: true, title: true, appUrl: true, platform: true, developerId: true } },
   tester: { select: { email: true, username: true } },
   audit: true,
 } satisfies Prisma.SubmissionInclude;
@@ -117,7 +119,8 @@ export async function auditSubmission(submissionId: string, options: { client?: 
       take: 200,
       select: { id: true, feedbackText: true, submittedAt: true },
     });
-    const missionSteps = submission.campaign.instructions.map((step) => `${step.instructionTitle}: ${step.instructionDetail}`);
+    if (!submission.instructionVersion) throw new Error("Accepted directions are missing; manual review is required.");
+    const missionSteps = versionDirections(submission.instructionVersion).map((step) => `${step.instructionTitle}: ${step.instructionDetail}`);
     const intake = await runQaIntakeAgent(client, {
       missionTitle: submission.campaign.title,
       missionSteps,

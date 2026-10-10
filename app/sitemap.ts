@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { isPublicHandle, publicProfilePath, SEED_ACCOUNT_EMAIL_SUFFIX } from "@/lib/public-profile";
 import { SITE_URL } from "@/lib/seo";
 import { listPublishedPosts } from "@/lib/growth/blog";
+import { testingGuides } from "@/lib/testing-guides";
 
 export const revalidate = 3600;
 
@@ -20,7 +21,8 @@ async function developerProfiles(): Promise<MetadataRoute.Sitemap> {
     return users
       .filter((user) => isPublicHandle(user.username) && counts.get(user.username.toLowerCase()) === 1)
       .map((user) => ({ url: `${SITE_URL}${publicProfilePath(user.username)}`, lastModified: user.updatedAt, changeFrequency: "weekly" as const, priority: 0.4 }));
-  } catch {
+  } catch (error) {
+    console.error("SeedEnv sitemap profile lookup failed:", error);
     return [];
   }
 }
@@ -33,6 +35,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/validators/join`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/community`, changeFrequency: "daily", priority: 0.7 },
     { url: `${SITE_URL}/blog`, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${SITE_URL}/guides`, changeFrequency: "monthly", priority: 0.8 },
+    ...testingGuides.map((guide) => ({ url: `${SITE_URL}/guides/${guide.slug}`, changeFrequency: "monthly" as const, priority: 0.7 })),
     { url: `${SITE_URL}/auth/signin`, changeFrequency: "yearly", priority: 0.5 },
     { url: `${SITE_URL}/faq`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/about`, changeFrequency: "monthly", priority: 0.6 },

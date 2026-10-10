@@ -220,6 +220,8 @@ model AppCampaign {
   completedSlots   Int                  @default(0)
   status           CampaignStatus       @default(DRAFT)
   instructions     TaskInstruction[]
+  instructionRevision Int              @default(1)
+  instructionVersions CohortInstructionVersion[]
   submissions      Submission[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
@@ -354,6 +356,20 @@ model TaskInstruction {
   @@index([campaignId])
 }
 
+model CohortInstructionVersion {
+  id          String       @id @default(cuid())
+  campaignId  String
+  campaign    AppCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  revision    Int
+  directions  Json
+  editedById  String
+  createdAt   DateTime     @default(now())
+  applications MissionApplication[]
+  submissions  Submission[]
+
+  @@unique([campaignId, revision])
+}
+
 enum ApplicationStatus {
   PENDING
   ACCEPTED
@@ -397,6 +413,8 @@ model MissionApplication {
   status       ApplicationStatus @default(PENDING)
   passReserved Boolean           @default(false)
   startBy      DateTime?
+  instructionVersionId String?
+  instructionVersion CohortInstructionVersion? @relation(fields: [instructionVersionId], references: [id], onDelete: Restrict)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
@@ -455,6 +473,8 @@ model Submission {
   campaign            AppCampaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   testerId            String
   tester              User              @relation("TesterSubmissions", fields: [testerId], references: [id], onDelete: Cascade)
+  instructionVersionId String?
+  instructionVersion CohortInstructionVersion? @relation(fields: [instructionVersionId], references: [id], onDelete: Restrict)
   proofImageUrl       String?
   recordingUrl        String?
   proofImageHash      String?

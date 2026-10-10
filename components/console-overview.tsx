@@ -103,7 +103,7 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-zinc-200">${lockedUsd.toFixed(2)}</td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-emerald-400">${releasedUsd.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right"><EndCohortButton campaignId={cohort.id} title={cohort.title} payPerTester={cohort.fundingModel === "PAY_PER_TESTER"} /></td>
+                    <td className="px-4 py-3 text-right"><div className="flex flex-col items-end gap-2"><Link href={`/console/cohorts/${cohort.id}/directions`} className="text-xs text-emerald-300 underline">Edit directions</Link><Link href={`/console/cohorts/${cohort.id}/directions#history`} className="text-xs text-zinc-400 underline">View instruction history</Link><EndCohortButton campaignId={cohort.id} title={cohort.title} payPerTester={cohort.fundingModel === "PAY_PER_TESTER"} /></div></td>
                   </tr>
                 );
               })}

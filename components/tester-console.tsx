@@ -13,7 +13,7 @@ import { autoApproveDeadlineFrom as autoApproveDeadline } from "@/lib/auto-appro
 import { formatCents } from "@/lib/utils";
 import { formatRankLevel, validatorNodeId } from "@/lib/validator-identity";
 
-type ConsoleMission = Pick<AppCampaign, "id" | "title" | "appUrl" | "iconUrl" | "targetVibe" | "description" | "bountyPerTaskUsd" | "totalSlots" | "claimedSlots" | "completedSlots" | "platform" | "discoveryAllowed" | "discoveryMinRep" | "estimatedMinutes" | "testerPerk"> & { instructions: TaskInstruction[] };
+type ConsoleMission = Pick<AppCampaign, "id" | "title" | "appUrl" | "iconUrl" | "targetVibe" | "description" | "bountyPerTaskUsd" | "totalSlots" | "claimedSlots" | "completedSlots" | "platform" | "discoveryAllowed" | "discoveryMinRep" | "estimatedMinutes" | "testerPerk"> & { instructions: TaskInstruction[]; acceptedInstructionRevision?: number; directionsUpdated?: boolean; ownedByTester?: boolean };
 
 export type TesterConsoleData = {
   activeView: TesterView;
@@ -72,7 +72,14 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
 
         <div className="mobile-tester-content mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
           <p className="rounded-xl border border-amber-500/30 p-4 text-sm text-amber-100">Rewards require genuine work that meets the published instructions, evidence standards, and any stated participation period (including 14 continuous days where required). If a developer denies your work, only that submission&apos;s unpaid reward is held for manual review; automatic approval pauses. An operator may approve payment or confirm the denial. Other earnings and money already paid are unaffected. <Link className="underline" href="/terms">Read the reward and review terms.</Link></p>
+          <p className="text-sm text-emerald-200">Your work will be reviewed against the instructions you accepted. Later edits will not change your reward eligibility.</p>
+          {[...new Map([...missions, ...pending.map((item) => item.campaign)].filter((mission) => mission.directionsUpdated).map((mission) => [mission.id, mission])).values()].map((mission) => <p key={mission.id} role="status" className="rounded-lg border border-emerald-500/30 p-4 text-sm">{mission.title}: the developer updated the directions. Your assignment still uses version {mission.acceptedInstructionRevision}; follow your saved steps, not the newer requirements.</p>)}
           {pending.filter((item) => item.denialReviewPending).map((item) => <p role="status" key={item.id} className="rounded border border-amber-500/30 p-4">{item.campaign.title}: ${(item.payoutCents / 100).toFixed(2)} held for manual review. Reason: {item.rejectionReason}</p>)}
+          {pending.map((item) => <details key={`directions-${item.id}`} className="rounded-lg border border-zinc-800 p-4">
+            <summary className="cursor-pointer text-sm text-emerald-200">{item.campaign.title}: view accepted directions (version {item.campaign.acceptedInstructionRevision ?? "not recorded"})</summary>
+            <p className="mt-3 text-xs text-zinc-400">These directions remain available during submission review and reward holds. Later edits do not apply to this work.</p>
+            <ol className="mt-4 space-y-4">{item.campaign.instructions.map((step) => <li key={step.id}><h3 className="text-sm font-semibold">{step.stepNumber}. {step.instructionTitle}</h3><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-300">{step.instructionDetail}</p><p className="mt-2 text-xs text-zinc-400">Proof: {step.proofType}</p></li>)}</ol>
+          </details>)}
           <div>
             <p className="font-mono text-xs uppercase tracking-wider text-emerald-400">{formatRankLevel(rank)} · {progress.label}</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{selectedView.label}</h1>

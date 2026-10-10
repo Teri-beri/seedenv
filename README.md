@@ -2,7 +2,17 @@
 
 SeedEnv is a production-grade dark-mode marketplace connecting indie app developers with paid early-access beta testers.
 
+## Cohort instruction versions
+
+- Apply `20261021_instruction_versions` before running this release. It archives non-draft cohorts' current directions and anchors existing accepted applications and submissions to that baseline; it cannot reconstruct pre-migration edits.
+- Active cohort owners can edit only existing step titles/details from Console → Edit directions. Step IDs/order, proof types, REP floors, funding and rewards are not changed by this action. Stale revisions are rejected; saves and both prepaid/balance-funded acceptances use serializable transactions.
+- Each acceptance pins an immutable `CohortInstructionVersion`; starting copies that version ID to the submission. Revisions retain it. New applications reset the previous assignment link and use the current version on acceptance.
+- Tester dashboards/workspaces show pinned directions and an update notice when a newer version exists. Developer review, automated QA and the manual denial queue use assigned directions, not current tasks. Owners and operators can view the complete version history.
+- Run focused tests with `node --conditions=react-server --experimental-test-module-mocks --import tsx --test scripts/instruction-versions.test.ts`. Set `RUN_INSTRUCTION_VERSION_DB_TESTS=1` only against the guarded sandbox database to exercise real PostgreSQL transactions; Stripe and email remain mocked.
+
 ## Stack
+
+Tester join requests are separate from submitted-proof reviews. The developer console shows the pending request count and links to `/applications#tester-requests`; the desktop header also links to Tester requests. The application center lists pending requests before history and keeps eligibility configuration collapsed below the queue. Join actions return explicit success/error results so expected denials (own cohort, duplicate application, REP/pass requirements) are readable in production; unexpected failures are logged and never shown as success. The public cohort directory sits immediately after the developer workflow section.
 
 - Next.js App Router with Server Actions and Route Handlers
 - TypeScript strict mode

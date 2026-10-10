@@ -16,6 +16,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
           <nav aria-label="Primary" className="flex flex-wrap items-center gap-5 text-sm text-neutral-300">
             <Link href="/explore" className="hover:text-emerald-300">Explore</Link>
             <Link href="/pricing" className="hover:text-emerald-300">Pricing</Link>
+            <Link href="/guides" className="hover:text-emerald-300">Guides</Link>
             <Link href="/about" className="hover:text-emerald-300">About</Link>
             <Link href="/auth/signin" className="font-semibold text-emerald-300">Sign In</Link>
           </nav>

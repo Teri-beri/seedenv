@@ -4,17 +4,27 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireMember } from "@/lib/member";
 import { serializable } from "@/lib/quest-ledger";
-import { createMissionApplication, reviewMissionApplication, closeMissionApplication } from "@/lib/mission-applications";
+import { createMissionApplication, reviewMissionApplication, closeMissionApplication, MissionApplicationError } from "@/lib/mission-applications";
 import { prisma } from "@/lib/prisma";
 import { acceptApplicationWithFunding } from "@/lib/slot-funding";
 
 export async function requestMission(campaignId: string, note: string) {
-  const member = await requireMember("TESTER");
-  const message = z.string().trim().min(12, "Describe why you are a good fit (at least 12 characters).").max(600).parse(note);
-  await serializable((tx) => createMissionApplication(tx, member.id, campaignId, message));
-  revalidatePath("/dashboard");
-  revalidatePath("/applications");
-  return "Request sent. The developer will decide whether to accept you.";
+  const input = z.object({
+    campaignId: z.string().min(1),
+    note: z.string().trim().min(12, "Describe why you are a good fit (at least 12 characters).").max(600),
+  }).safeParse({ campaignId, note });
+  if (!input.success) return { ok: false as const, message: input.error.issues[0]?.message || "Check your application details." };
+  try {
+    const member = await requireMember();
+    if (member.role !== "TESTER") return { ok: false as const, message: "Switch to your tester workspace before requesting to join." };
+    await serializable((tx) => createMissionApplication(tx, member.id, input.data.campaignId, input.data.note));
+    for (const path of ["/dashboard", "/applications", "/console"]) revalidatePath(path);
+    return { ok: true as const, message: "Request sent. The developer will decide whether to accept you." };
+  } catch (error) {
+    if (error instanceof MissionApplicationError) return { ok: false as const, message: error.message };
+    console.error("Mission join request failed", error);
+    return { ok: false as const, message: "Your request could not be sent. Check that you are signed in, then try again. If it continues, contact support." };
+  }
 }
 
 export async function decideApplication(id: string, decision: "accept" | "decline") {

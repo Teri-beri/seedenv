@@ -161,8 +161,8 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
               <span className="text-zinc-600" aria-hidden="true">|</span>
               <span className="text-zinc-400 transition-colors group-hover:text-zinc-200">{missions.length ? "Inspect Open Slots" : "View Cohorts"} <span aria-hidden="true">→</span></span>
             </a>
-            <h1 className="mt-4 max-w-5xl text-4xl font-semibold leading-tight text-white md:text-5xl">Human validation infrastructure for pre-launch mobile &amp; web apps.</h1>
-            <p className="mt-5 max-w-3xl text-base leading-7 text-zinc-400">Production-grade human testing cohorts before public App Store distribution. Define scenarios and review real-device evidence.</p>
+            <h1 className="mt-4 max-w-5xl text-4xl font-semibold leading-tight text-white md:text-5xl">Find beta testers for your iOS, Android &amp; web app.</h1>
+            <p className="mt-5 max-w-3xl text-base leading-7 text-zinc-400">Run TestFlight, Google Play or web testing cohorts before launch. Define scenarios, collect structured bug reports and UX feedback, and review real-device evidence.</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={developerHref} className={primaryAction} onClick={() => trackAnalytics("signup_start", { role: "DEVELOPER", callbackUrl: "/console?view=new-drop" })}>Deploy a Cohort <ArrowRight className="size-4" /></Link>
               <Link href={landingViewHref("cohorts")} className={secondaryAction}>Explore Live Board</Link>
@@ -188,25 +188,6 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
             </div>
           </div>
         </section>
-        <section id="validators" className={`${sectionShell} ${surfaceTint}`}><div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" /><div className={sectionClass}>
-          <div className="flex flex-wrap items-end justify-between gap-5">
-            <div><p className={labelClass}>For validators</p><h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">Progression &amp; Verification Protocol</h2></div>
-            <Link href="/validators/join" className={secondaryAction} onClick={() => trackAnalytics("signup_start", { role: "TESTER", callbackUrl: "/validators/join" })}>Become a Validator <ArrowRight className="size-4" /></Link>
-          </div>
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            <WorkflowStep number="01" icon={<ShieldCheck className="size-5" />} title="Hardware & Technical Onboarding" text="Record your device, OS, and testing background. Include reproducible, original evidence from the hardware required by the cohort; hardware details are reviewed rather than assumed verified." />
-            <WorkflowStep number="02" icon={<Layers className="size-5" />} title="Verified Milestones" text="Build reputation through reviewed submissions and useful technical evidence. Scenario eligibility is checked automatically; Discovery Pass rules remain explicit." />
-            <WorkflowStep number="03" icon={<CheckCircle2 className="size-5" />} title="Escrow-backed Stipends" text="See the reward and acceptance criteria before applying. Approved work enters the payout ledger; a successful Stripe transfer completes payment. Payout setup is required." />
-          </div>
-          <div className="mt-10 grid gap-6 border-t border-white/10 pt-7 md:grid-cols-3">
-            {[
-              ["Tier 1: Functional Checks", "First-run flows, visual hierarchy, and supported-device fit."],
-              ["Tier 2: Scenario & Log Audits", "Session recovery, authentication, sandbox payments, and reproducible bugs."],
-              ["Tier 3: Pre-Submission Hardening", "Release-focused validation briefs and store-readiness evidence."],
-            ].map(([title, text]) => <div key={title}><p className="font-mono text-xs text-emerald-400">{title}</p><p className="mt-3 text-sm leading-6 text-zinc-400">{text}</p></div>)}
-          </div>
-        </div></section>
-
         <section id="cohorts" className={sectionShell}>
           <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />
           <div className={sectionClass}><div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 sm:p-8">
@@ -231,7 +212,38 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
             )}
           </div></div>
         </section>
+        <section id="validators" className={`${sectionShell} ${surfaceTint}`}><div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" /><div className={sectionClass}>
+          <div className="flex flex-wrap items-end justify-between gap-5">
+            <div><p className={labelClass}>For validators</p><h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">Progression &amp; Verification Protocol</h2></div>
+            <Link href="/validators/join" className={secondaryAction} onClick={() => trackAnalytics("signup_start", { role: "TESTER", callbackUrl: "/validators/join" })}>Become a Validator <ArrowRight className="size-4" /></Link>
+          </div>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            <WorkflowStep number="01" icon={<ShieldCheck className="size-5" />} title="Hardware & Technical Onboarding" text="Record your device, OS, and testing background. Include reproducible, original evidence from the hardware required by the cohort; hardware details are reviewed rather than assumed verified." />
+            <WorkflowStep number="02" icon={<Layers className="size-5" />} title="Verified Milestones" text="Build reputation through reviewed submissions and useful technical evidence. Scenario eligibility is checked automatically; Discovery Pass rules remain explicit." />
+            <WorkflowStep number="03" icon={<CheckCircle2 className="size-5" />} title="Escrow-backed Stipends" text="See the reward and acceptance criteria before applying. Approved work enters the payout ledger; a successful Stripe transfer completes payment. Payout setup is required." />
+          </div>
+          <div className="mt-10 grid gap-6 border-t border-white/10 pt-7 md:grid-cols-3">
+            {[
+              ["Tier 1: Functional Checks", "First-run flows, visual hierarchy, and supported-device fit."],
+              ["Tier 2: Scenario & Log Audits", "Session recovery, authentication, sandbox payments, and reproducible bugs."],
+              ["Tier 3: Pre-Submission Hardening", "Release-focused validation briefs and store-readiness evidence."],
+            ].map(([title, text]) => <div key={title}><p className="font-mono text-xs text-emerald-400">{title}</p><p className="mt-3 text-sm leading-6 text-zinc-400">{text}</p></div>)}
+          </div>
+        </div></section>
         <DeveloperPricing href={developerHref} />
+        <section className={sectionShell} aria-labelledby="testing-guides-title">
+          <div className={sectionClass}>
+            <p className={labelClass}>Plan your beta test</p>
+            <h2 id="testing-guides-title" className="mt-3 text-xl font-semibold sm:text-2xl">From your first testers to a release-ready testing plan.</h2>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {[
+                ["Find beta testers", "/guides/find-beta-testers", "Choose your audience, recruit thoughtfully and write a brief that produces useful feedback."],
+                ["Run a TestFlight beta", "/guides/testflight-beta-testing", "Prepare external tester access, device coverage and reproducible reports for your iOS build."],
+                ["Plan Google Play closed testing", "/guides/google-play-closed-testing", "Understand the 14-day testing window and prepare an honest production-access summary."],
+              ].map(([title, href, text]) => <Link key={href} href={href} className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5 transition-colors hover:border-emerald-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"><h3 className="font-semibold text-emerald-300">{title}</h3><p className="mt-3 text-sm leading-6 text-zinc-400">{text}</p><span className="mt-4 inline-block text-sm text-zinc-200">Read the guide <span aria-hidden="true">→</span></span></Link>)}
+            </div>
+          </div>
+        </section>
 
         <section id="pwa" className={`${sectionShell} ${surfaceTint}`}>
           <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />

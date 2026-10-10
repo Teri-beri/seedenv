@@ -27,6 +27,7 @@ type ReviewSubmission = {
   aiHold?: boolean;
   audit?: AiAuditView | null;
   rejectionReason?: string | null;
+  acceptedInstructionRevision?: number | null;
   id: string;
   proofImageUrl: string | null;
   recordingUrl: string | null;
@@ -833,6 +834,8 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                 <div>
                   <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">{active.campaign.title}</p>
                   <h3 className="mt-2 text-xl font-bold text-white">Tester instructions</h3>
+                  <p className="mt-2 text-sm text-emerald-200">Review against accepted version {active.acceptedInstructionRevision ?? "not recorded"}. Later direction changes do not apply to this work.</p>
+                  {active.acceptedInstructionRevision === null ? <p role="alert" className="text-sm text-rose-300">Assigned directions are missing. Contact support before deciding; do not substitute the current cohort instructions.</p> : null}
                 </div>
                 {active.campaign.instructions.length ? active.campaign.instructions.map((item) => (
                   <div key={item.stepNumber} className="rounded-xl border border-zinc-800 bg-[#090A0F]/55 p-4">

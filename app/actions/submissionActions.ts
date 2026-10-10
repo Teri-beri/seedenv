@@ -18,6 +18,7 @@ import { approvePendingSubmission, settleApprovedPayout, transferTesterPayout } 
 import { requireMember } from "@/lib/member";
 import { serializable } from "@/lib/quest-ledger";
 import { startAcceptedApplication } from "@/lib/mission-applications";
+import { versionDirections } from "@/lib/instruction-versions";
 import { auditSubmission } from "@/lib/ai/qa-audit";
 import { assertProofEditable, rejectProof, requestProofRevision, startProofRevision } from "@/lib/submission-lifecycle";
 
@@ -71,11 +72,15 @@ export async function claimTaskSlot(campaignId: string) {
     });
     if (existing && existing.status === SubmissionStatus.PENDING) {
       if (existing.expiresAt <= new Date() && !existing.feedbackText && !existing.proofImageUrl) throw new Error("This claim has expired. Wait for the slot to be released.");
-      return existing;
+      const version = existing.instructionVersionId ? await tx.cohortInstructionVersion.findUnique({ where: { id: existing.instructionVersionId } }) : null;
+      if (!version) throw new Error("Accepted directions are missing. Contact SeedEnv support.");
+      return { ...existing, acceptedDirections: versionDirections(version), instructionRevision: version.revision };
     }
     if (existing && existing.status === SubmissionStatus.APPROVED) throw new Error("You already completed this mission.");
     if (campaign.claimedSlots >= campaign.totalSlots) throw new Error("This mission is fully claimed.");
-    await startAcceptedApplication(tx, tester.id, campaignId);
+    const instructionVersionId = await startAcceptedApplication(tx, tester.id, campaignId);
+    const version = await tx.cohortInstructionVersion.findUniqueOrThrow({ where: { id: instructionVersionId } });
+    if (version.campaignId !== campaignId) throw new Error("Accepted directions do not match this cohort.");
 
     const claimed = await tx.appCampaign.updateMany({
       where: { id: campaignId, claimedSlots: { lt: campaign.totalSlots } },
@@ -83,9 +88,10 @@ export async function claimTaskSlot(campaignId: string) {
     });
     if (claimed.count !== 1) throw new Error("This mission is fully claimed.");
 
-    return tx.submission.upsert({
+    const submission = await tx.submission.upsert({
       where: { campaignId_testerId: { campaignId, testerId: tester.id } },
       update: {
+        instructionVersionId,
         status: SubmissionStatus.PENDING,
         rejectionReason: null,
         revisionRequestedAt: null,
@@ -107,6 +113,7 @@ export async function claimTaskSlot(campaignId: string) {
         payoutCents: usdToCents(campaign.bountyPerTaskUsd),
       },
       create: {
+        instructionVersionId,
         campaignId,
         testerId: tester.id,
         status: SubmissionStatus.PENDING,
@@ -114,6 +121,7 @@ export async function claimTaskSlot(campaignId: string) {
         payoutCents: usdToCents(campaign.bountyPerTaskUsd),
       },
     });
+    return { ...submission, acceptedDirections: versionDirections(version), instructionRevision: version.revision };
   });
 }
 

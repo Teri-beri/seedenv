@@ -13,7 +13,6 @@ import { xpForBounty } from "@/lib/rank";
 import { availableSlots, discoverMissions, type MissionFilter, type MissionSort } from "@/lib/tester-console";
 import { formatCents } from "@/lib/utils";
 import { requestMission } from "@/app/actions/applicationActions";
-import { MemberAction } from "@/components/member-action";
 import { applicationEligibility } from "@/lib/quest-rules";
 import Link from "next/link";
 
@@ -43,6 +42,9 @@ type Mission = {
   estimatedMinutes?: number | null;
   testerPerk?: string | null;
   instructions: Instruction[];
+  acceptedInstructionRevision?: number;
+  directionsUpdated?: boolean;
+  ownedByTester?: boolean;
 };
 
 type ProofTelemetry = { osBuild: string; deviceModel: string; screenResolution: string; appBuildVersion: string; networkType: string; recordingUrl: string; crashLogs: string; networkLogs: string };
@@ -209,7 +211,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
       try {
         const submission = await claimTaskSlot(mission.id);
         resetProof();
-        setActiveMission(mission);
+        setActiveMission({ ...mission, instructions: submission.acceptedDirections, acceptedInstructionRevision: submission.instructionRevision });
         setSubmissionId(submission.id);
         setExpiresAt(new Date(submission.expiresAt));
         setProofSubmitted(Boolean(submission.feedbackText || submission.proofImageUrl));
@@ -389,7 +391,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                 </div>
                 <p className="mt-3 flex gap-2 text-[11px] leading-5 text-zinc-500"><ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-400" /><span><span className="text-zinc-300">Reward reserved before you start.</span> Unreviewed proof auto-approves after 48h unless held for denial or fraud review. Work must meet the instructions and required participation period.</span></p>
                 {!completed && !assignment && !accepted ? (
-                  application && !["DECLINED", "WITHDRAWN", "STARTED"].includes(application.status) ? <Link className="mt-4 block min-h-11 rounded-xl border border-stroke p-3 text-center text-sm text-emerald-300" href="/applications">Application: {application.status.toLowerCase()} / View</Link> : <MissionRequest missionId={mission.id} eligibility={eligibility} passes={discoveryPasses} />
+                  mission.ownedByTester ? <p className="mt-4 rounded-xl border border-zinc-800 p-3 text-sm text-zinc-400">You own this cohort. You cannot apply to your own cohort; use a separate tester account to test joining.</p> : application && !["DECLINED", "WITHDRAWN", "STARTED"].includes(application.status) ? <Link className="mt-4 block min-h-11 rounded-xl border border-stroke p-3 text-center text-sm text-emerald-300" href="/applications">Application: {application.status.toLowerCase()} / View</Link> : <MissionRequest missionId={mission.id} eligibility={eligibility} passes={discoveryPasses} />
                 ) : <Button className="mt-5 w-full" onClick={() => handleClaim(mission)} disabled={isPending || completed || Boolean(assignment && !resumable) || (!resumable && spotsLeft <= 0)}>
                   {completed ? "Completed" : assignment?.submitted ? "In review" : resumable ? "Resume mission" : assignment ? "Claim expired" : spotsLeft <= 0 ? "Fully claimed" : "Claim Slot (30m Reserve) →"}
                 </Button>}
@@ -409,6 +411,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
               </div>
               <button type="button" disabled={isPending} aria-label="Close mission workspace" onClick={() => { setActiveMission(null); setMessage(null); resetProof(); }} className="rounded-lg p-2 text-neutral-500 hover:bg-white/5 hover:text-white disabled:opacity-50"><X className="size-4" /></button>
             </div>
+            <p className="rounded-lg border border-emerald-500/25 p-3 text-sm text-emerald-200">Accepted directions{activeMission.acceptedInstructionRevision ? `: version ${activeMission.acceptedInstructionRevision}` : ""}. Your work is reviewed against these saved instructions. Later edits do not change reward eligibility.{activeMission.directionsUpdated ? " The developer has published a newer version for new assignments; your steps remain unchanged." : ""}</p>
             {proofSubmitted ? (
               <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-5"><CheckCircle2 className="size-8 text-emerald-400" /><h3 className="mt-3 text-lg font-bold">Your feedback is with the developer.</h3><p className="mt-2 text-sm leading-6 text-neutral-400">If approved, you will earn {formatCents(payoutCents)} and {xpGain} REP. You can explore another mission while this one is reviewed.</p></div>
             ) : expired ? (
@@ -487,7 +490,19 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
 
 function MissionRequest({ missionId, eligibility, passes }: { missionId: string; eligibility: "standard" | "pass" | "locked"; passes: number }) {
   const [note, setNote] = useState("");
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+  const router = useRouter();
   if (eligibility === "locked") return <p className="mt-4 text-sm text-neutral-500">Build more REP through approved work to qualify.</p>;
   if (eligibility === "pass" && passes < 1) return <Link className="mt-4 block rounded-xl border border-zinc-800 p-3 text-sm text-emerald-300" href="/quests">Earn a Discovery Pass in Quest Center</Link>;
-  return <details className="mt-4 rounded-xl border border-stroke p-3"><summary className="min-h-8 cursor-pointer text-sm font-semibold text-amber-300">{eligibility === "pass" ? "Request with Discovery Pass" : "Request to join"}</summary><label className="mt-3 block text-xs text-neutral-400">Why are you a good fit? Include relevant devices and experience.<textarea maxLength={600} value={note} onChange={(event) => setNote(event.target.value)} className="mt-2 min-h-20 w-full rounded-lg border border-stroke bg-background p-2 text-sm text-white" /></label><p className="my-2 text-xs leading-5 text-neutral-500">{eligibility === "pass" ? "Reserves one pass. Returned if declined, withdrawn, or expired." : "The developer reviews your request. No timer starts yet."}</p><MemberAction disabled={note.trim().length < 12} action={() => requestMission(missionId, note)}>Send request</MemberAction></details>;
+  return <details className="mt-4 rounded-xl border border-stroke p-3"><summary className="min-h-8 cursor-pointer text-sm font-semibold text-amber-300">{eligibility === "pass" ? "Request with Discovery Pass" : "Request to join"}</summary><label className="mt-3 block text-xs text-neutral-400">Why are you a good fit? Include relevant devices and experience.<textarea disabled={pending || result?.ok} maxLength={600} value={note} onChange={(event) => { setNote(event.target.value); setResult(null); }} className="mt-2 min-h-20 w-full rounded-lg border border-stroke bg-background p-2 text-sm text-white" /></label><p className="my-2 text-xs leading-5 text-neutral-500">{eligibility === "pass" ? "Reserves one pass. Returned if declined, withdrawn, or expired." : "The developer reviews your request. No timer starts yet."}</p><button type="button" disabled={pending || result?.ok || note.trim().length < 12} className="min-h-11 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50" onClick={() => startTransition(async () => {
+    setResult(null);
+    try {
+      const response = await requestMission(missionId, note);
+      setResult(response);
+      if (response.ok) router.refresh();
+    } catch {
+      setResult({ ok: false, message: "Your request could not be confirmed. Refresh the page and check Applications before retrying." });
+    }
+  })}>{pending ? "Sending..." : result?.ok ? "Request sent" : "Send request"}</button>{result ? <p role={result.ok ? "status" : "alert"} className={`mt-2 text-sm leading-6 ${result.ok ? "text-emerald-300" : "text-rose-300"}`}>{result.message}</p> : null}<Link href="/applications" className="mt-3 block text-xs text-emerald-300 underline">View your applications</Link></details>;
 }

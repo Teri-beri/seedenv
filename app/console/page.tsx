@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { versionDirections } from "@/lib/instruction-versions";
 import { autoApproveDeadline, isFraudHeld, sweepOverdueSubmissionsLazily } from "@/lib/submission-approval";
 import { recordingHref } from "@/lib/recording";
 import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
@@ -63,11 +64,12 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   };
   const overview = activeView === "overview";
   const activeCampaignScope = { ...campaignScope, status: CampaignStatus.ACTIVE };
-  const [pendingReviewCount, activeCohortCount, runsInProgress, verifiedValidators] = await Promise.all([
+  const [pendingReviewCount, activeCohortCount, runsInProgress, verifiedValidators, pendingApplicationCount] = await Promise.all([
     activeView === "review-deck" || overview ? prisma.submission.count({ where: pendingReviewWhere }) : 0,
     overview ? prisma.appCampaign.count({ where: activeCampaignScope }) : 0,
     overview ? prisma.submission.count({ where: { status: SubmissionStatus.PENDING, campaign: activeCampaignScope, proofImageUrl: null, feedbackText: null } }) : 0,
     overview ? prisma.submission.groupBy({ by: ["testerId"], where: { status: SubmissionStatus.APPROVED, campaign: campaignScope } }).then((rows) => rows.length) : 0,
+    prisma.missionApplication.count({ where: { status: "PENDING", campaign: campaignScope } }),
   ]);
   const reviewTotalPages = Math.max(1, Math.ceil(pendingReviewCount / reviewPageSize));
   const requestedReviewPage = Number.parseInt(params.reviewPage || "1", 10);
@@ -77,7 +79,8 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       where: pendingReviewWhere,
       include: {
         tester: { select: { username: true, avatarUrl: true } },
-        campaign: { select: { id: true, title: true, syncGitHubRepo: true, instructions: { orderBy: { stepNumber: "asc" } } } },
+        instructionVersion: true,
+        campaign: { select: { id: true, title: true, syncGitHubRepo: true } },
         audit: { select: { status: true, qualityScore: true, reproductionValid: true, missingFields: true, isDuplicate: true, duplicateRefId: true, feedbackToTester: true, fraudRiskScore: true, fraudFlags: true, fraudExplanation: true, mediaChecked: true, autoClarifiedAt: true, humanClearedAt: true } },
       },
       skip: (reviewPage - 1) * reviewPageSize,
@@ -176,6 +179,8 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       const deadline = autoApproveDeadline(submission.submittedAt);
       return {
         ...submission,
+        acceptedInstructionRevision: submission.instructionVersion?.revision ?? null,
+        campaign: { ...submission.campaign, instructions: submission.instructionVersion ? versionDirections(submission.instructionVersion) : [] },
         proofImageUrl: await getProofImageUrl(submission.proofImageUrl),
         recordingUrl: recordingHref(submission.id, submission.recordingUrl),
         aiHold: isFraudHeld(submission.audit),
@@ -200,6 +205,10 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       {canManageCohortPromos(session.user) ? <div className="mt-4 flex gap-4"><Link href="/admin/promos" className="inline-flex min-h-11 items-center text-sm text-emerald-300 underline">Manage cohort promo codes</Link><Link href="/admin/proof-reviews" className="inline-flex min-h-11 items-center text-sm text-amber-300 underline">Review denied tester work</Link></div> : null}
       {security?.platformFeeWaived ? <p role="status" className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-300">Platform fees are permanently waived for your developer account. Tester rewards remain fully funded. Existing charges are unchanged.</p> : null}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <section aria-labelledby="tester-requests-heading" className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-5">
+          <div><h2 id="tester-requests-heading" className="text-sm font-semibold text-zinc-100">Tester join requests <span className="ml-2 rounded bg-emerald-400/10 px-2 py-1 font-mono text-emerald-300">{pendingApplicationCount}</span></h2><p className="mt-2 text-sm text-zinc-400">{pendingApplicationCount ? "Testers are waiting for your decision. Accept or decline their requests in Applications." : "No pending join requests. New requests will appear in Applications."} Join requests are separate from submitted proof reviews.</p></div>
+          <Link href="/applications#tester-requests" className="inline-flex min-h-11 items-center rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-black">Review tester requests</Link>
+        </section>
         {overview ? <>
           {params.launched ? <p className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">{launchedCampaign?.status === CampaignStatus.ESCROW_PENDING ? `${launchedCampaign.title} goes live as soon as Stripe confirms your top-up, usually within a few seconds. Refresh shortly.` : "Cohort launched. Each tester you accept in Applications draws their reward and the platform fee from your prepaid balance."}</p> : null}
           <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: security?.platformFeeWaived ? 0 : COHORT_PLATFORM_FEE_RATE, balanceCents: security?.fundingBalanceCents ?? 0 }} />

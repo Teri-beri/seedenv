@@ -16,7 +16,7 @@ export default async function BlogIndexPage() {
       <p>Practical guides on beta testing, TestFlight, Google Play closed tests and getting real feedback before launch.</p>
       {posts.length === 0 ? (
         <div className="mt-10 rounded-xl border border-dashed border-zinc-800 bg-zinc-900/30 px-6 py-10 text-center text-sm text-zinc-400">
-          The first guides are being written. Meanwhile, read the <Link href="/docs" className="text-emerald-300 underline">documentation</Link> or the <Link href="/faq" className="text-emerald-300 underline">FAQ</Link>.
+          Start with our <Link href="/guides" className="text-emerald-300 underline">beta testing guides</Link>, read the <Link href="/docs" className="text-emerald-300 underline">documentation</Link>, or browse the <Link href="/faq" className="text-emerald-300 underline">FAQ</Link>.
         </div>
       ) : (
         <ul className="mt-10 divide-y divide-zinc-800 rounded-xl border border-zinc-800 bg-zinc-900/40">

@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { assignedCampaign } from "@/lib/instruction-versions";
 import { sweepOverdueSubmissionsLazily } from "@/lib/submission-approval";
 import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
@@ -56,7 +57,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     prisma.submission.findMany({
       where: { testerId: session.user.id, status: SubmissionStatus.PENDING },
       orderBy: { claimedAt: "desc" },
-      include: { campaign: { include: { instructions: { orderBy: { stepNumber: "asc" } } } } },
+      include: { instructionVersion: true, campaign: { include: { instructions: { orderBy: { stepNumber: "asc" } } } } },
     }),
     prisma.submission.findMany({
       where: { testerId: session.user.id, status: SubmissionStatus.APPROVED },
@@ -66,13 +67,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       where: { userId: session.user.id, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING },
       _sum: { amountCents: true },
     }),
-    prisma.missionApplication.findMany({ where: { testerId: session.user.id }, select: { campaignId: true, status: true, startBy: true } }),
+    prisma.missionApplication.findMany({ where: { testerId: session.user.id }, select: { campaignId: true, status: true, startBy: true, instructionVersion: true } }),
   ]);
 
-  const pendingWithPreviews = pending.map((item) => ({ ...item, proofPreviewUrl: item.revisionRequestedAt && item.proofImageUrl ? `/api/submissions/${item.id}/proof` : null }));
+  const pendingWithPreviews = pending.map((item) => ({ ...item, campaign: assignedCampaign(item.campaign, item.instructionVersion), proofPreviewUrl: item.revisionRequestedAt && item.proofImageUrl ? `/api/submissions/${item.id}/proof` : null }));
+  const testerMissions = missions.map((mission) => {
+    const application = applications.find((item) => item.campaignId === mission.id && ["ACCEPTED", "STARTED"].includes(item.status));
+    return { ...(application ? assignedCampaign(mission, application.instructionVersion) : mission), ownedByTester: mission.developerId === session.user.id };
+  });
   return (
     <AuthCheck role="TESTER">
-      <TesterConsole activeView={activeView} tester={tester} missions={missions} leaderboard={leaderboard} summary={summary} recent={recent} pending={pendingWithPreviews} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ ...item, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} />
+      <TesterConsole activeView={activeView} tester={tester} missions={testerMissions} leaderboard={leaderboard} summary={summary} recent={recent} pending={pendingWithPreviews} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ campaignId: item.campaignId, status: item.status, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} />
     </AuthCheck>
   );
 }

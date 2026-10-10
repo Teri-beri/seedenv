@@ -1,21 +1,21 @@
 import type { Metadata } from "next";
 
 export const SITE_URL = "https://seedenv.com";
-export const SITE_DESCRIPTION = "Connect indie developers with verified beta testers. Launch TestFlight missions, gather qualitative UX feedback, and reward top testers.";
+export const SITE_DESCRIPTION = "Find beta testers for iOS, Android and web apps. Launch TestFlight or Google Play testing cohorts, collect structured bug reports and UX feedback with SeedEnv.";
 
 export const siteMetadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: "SeedEnv",
   title: {
-    default: "SeedEnv | Beta Testing Platform & App Feedback",
+    default: "Find Beta Testers for iOS, Android & Web Apps | SeedEnv",
     template: "%s | SeedEnv",
   },
   description: SITE_DESCRIPTION,
   keywords: ["beta testing", "TestFlight beta testers", "iOS app testing", "indie hackers", "app feedback", "user testing platform", "SeedEnv"],
   alternates: { canonical: SITE_URL },
   openGraph: {
-    title: "SeedEnv | Launch Faster with Verified Beta Testers",
-    description: "Claim missions, test mobile & web apps, and deliver structured feedback to developers.",
+    title: "Find Beta Testers for iOS, Android & Web Apps | SeedEnv",
+    description: SITE_DESCRIPTION,
     url: SITE_URL,
     siteName: "SeedEnv",
     locale: "en_US",
@@ -24,8 +24,8 @@ export const siteMetadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "SeedEnv | Beta Testing & Feedback Platform",
-    description: "Turn everyday testers into early adopters. High-signal beta testing for modern software teams.",
+    title: "Find Beta Testers for iOS, Android & Web Apps | SeedEnv",
+    description: SITE_DESCRIPTION,
     images: [{ url: "/twitter-image?v=seedcube-v3", width: 1200, height: 630, alt: "SeedEnv - High-Signal Beta Testing & App Store Readiness" }],
   },
 };
@@ -44,29 +44,32 @@ export const siteStructuredData = {
   "@context": "https://schema.org",
   "@graph": [
     {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "SeedEnv",
+      url: SITE_URL,
+      logo: `${SITE_URL}/icons/favicon-512.png`,
+      parentOrganization: { "@type": "Organization", name: "TERIMUS LLC", url: `${SITE_URL}/terimus` },
+      contactPoint: { "@type": "ContactPoint", contactType: "customer support", email: "terimus@seedenv.com", url: `${SITE_URL}/contact` },
+    },
+    {
       "@type": "WebSite",
       "@id": `${SITE_URL}/#website`,
       name: "SeedEnv",
       url: SITE_URL,
       description: SITE_DESCRIPTION,
       inLanguage: "en-US",
+      publisher: { "@id": `${SITE_URL}/#organization` },
     },
     {
       "@type": "SoftwareApplication",
       "@id": `${SITE_URL}/#application`,
       name: "SeedEnv",
       applicationCategory: "DeveloperApplication",
-      operatingSystem: "Web, iOS, Android",
+      operatingSystem: "Web",
       url: SITE_URL,
       description: SITE_DESCRIPTION,
-      offers: {
-        "@type": "Offer",
-        name: "Public mission browsing",
-        price: "0",
-        priceCurrency: "USD",
-        description: "Browse public beta testing missions for free. Funded developer campaigns have separate tester rewards and platform fees.",
-        url: `${SITE_URL}/pricing`,
-      },
+      publisher: { "@id": `${SITE_URL}/#organization` },
     },
   ],
 };

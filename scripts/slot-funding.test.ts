@@ -81,8 +81,9 @@ type Row = Record<string, unknown>;
 function fundingHarness(options: { balance: number; platformFeeWaived?: boolean; autoReload?: number; paid?: number; card?: "succeeded" | "declined" | "network"; refundFails?: boolean; topUps?: Row[]; campaign?: Partial<Row>; taxAddress?: { country: string; region: string } }) {
   const state = {
     user: { id: "dev", platformFeeWaived: options.platformFeeWaived ?? false, fundingBalanceCents: options.balance, autoReloadCents: options.autoReload ?? 0, stripeCustomerId: "cus_1" },
-    application: { id: "app-1", status: "PENDING", campaignId: "c-1", startBy: null as Date | null },
-    campaign: { id: "c-1", title: "Cohort", developerId: "dev", status: "ACTIVE", fundingModel: "PAY_PER_TESTER", cancelledAt: null as Date | null, expiresAt: new Date(Date.now() + 86400000), claimedSlots: 0, totalSlots: 3, bountyPerTaskUsd: 4, refundedCents: 0, ...options.campaign },
+    application: { id: "app-1", status: "PENDING", campaignId: "c-1", startBy: null as Date | null, instructionVersionId: null as string | null },
+    campaign: { id: "c-1", title: "Cohort", developerId: "dev", status: "ACTIVE", fundingModel: "PAY_PER_TESTER", cancelledAt: null as Date | null, expiresAt: new Date(Date.now() + 86400000), claimedSlots: 0, totalSlots: 3, bountyPerTaskUsd: 4, refundedCents: 0, instructionRevision: 1, instructions: [{ id: "step-1", stepNumber: 1, instructionTitle: "Test the build", instructionDetail: "Follow the onboarding workflow.", proofType: "SCREENSHOT", minimumRep: 0 }], ...options.campaign },
+    instructionVersions: [] as Row[],
     charges: Array.from({ length: options.paid ?? 0 }, (_, index) => ({ id: `paid-${index}`, campaignId: "c-1", status: "SUCCEEDED", stipendCents: 400, platformFeeCents: index === 0 ? 1500 : 0, stripePaymentIntentId: null, applicationId: null as string | null, createdAt: new Date(Date.now() - (10 - index) * 1000) })) as Row[],
     topUps: (options.topUps ?? []) as Row[],
     transactions: [] as Row[],
@@ -112,6 +113,14 @@ function fundingHarness(options: { balance: number; platformFeeWaived?: boolean;
     return row;
   };
   const db = {
+    cohortInstructionVersion: {
+      findUnique: async ({ where }: { where: { campaignId_revision: { campaignId: string; revision: number } } }) => state.instructionVersions.find((version) => version.campaignId === where.campaignId_revision.campaignId && version.revision === where.campaignId_revision.revision) ?? null,
+      create: async ({ data }: { data: Row }) => {
+        const version = { id: `version-${state.instructionVersions.length + 1}`, ...data };
+        state.instructionVersions.push(version);
+        return version;
+      },
+    },
     missionApplication: {
       findUnique: async () => ({ ...state.application, campaign: state.campaign }),
       count: async () => 0,
@@ -258,6 +267,8 @@ test("accepting the first tester draws reward + floor fee from the balance with 
   assert.equal(harness.state.intents, 0);
   assert.equal(harness.state.user.fundingBalanceCents, 3100);
   assert.equal(harness.state.application.status, "ACCEPTED");
+  assert.equal(harness.state.application.instructionVersionId, "version-1");
+  assert.equal(harness.state.instructionVersions.length, 1);
   assert.equal(harness.state.charges[0].status, "SUCCEEDED");
   assert.equal(harness.state.charges[0].totalCents, 1900);
   assert.equal(harness.state.charges[0].processingFeeCents, 0);

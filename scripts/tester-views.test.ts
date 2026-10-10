@@ -36,6 +36,14 @@ test("each tester screen renders only its own sections and marks the selected na
     }] }));
     assert.ok(heldActivity.includes("Held for manual review"));
     assert.ok(heldActivity.includes("only that submission"));
+    const updatedMission = renderToStaticMarkup(createElement(TesterConsole, { ...props, activeView: "missions", missions: [{
+      id: "versioned-mission", title: "Versioned test", appUrl: "https://example.invalid", iconUrl: null, targetVibe: "Testing",
+      description: "Test original directions", bountyPerTaskUsd: 4, totalSlots: 5, claimedSlots: 1, completedSlots: 0, platform: "WEB_STAGING",
+      discoveryAllowed: false, discoveryMinRep: 0, estimatedMinutes: null, testerPerk: null, instructions: [],
+      acceptedInstructionRevision: 1, directionsUpdated: true,
+    }] }));
+    assert.ok(updatedMission.includes("Your assignment still uses version 1"));
+    assert.ok(updatedMission.includes("Later edits will not change your reward eligibility."));
   } finally {
     for (const moduleMock of mocks.reverse()) moduleMock.restore();
   }

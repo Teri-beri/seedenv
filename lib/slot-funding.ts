@@ -1,4 +1,5 @@
 import { CampaignStatus, Prisma, TransactionStatus, TransactionType } from "@prisma/client";
+import { currentInstructionVersion } from "@/lib/instruction-versions";
 import { autoReloadBalance, billingCompanySnapshot, sweepStaleTopUps } from "@/lib/funding-balance";
 import { quoteSlotCharge, type SlotChargeQuote } from "@/lib/pricing";
 import { prisma } from "@/lib/prisma";
@@ -80,7 +81,10 @@ function acceptFromBalance(developerId: string, applicationId: string) {
       tx.slotCharge.findMany({ where: { campaignId: campaign.id, status: "SUCCEEDED" }, select: { stipendCents: true, platformFeeCents: true } }),
     ]);
     if (campaign.claimedSlots + holds >= campaign.totalSlots) throw new Error("All tester places in this cohort are already reserved.");
-    const accept = () => tx.missionApplication.update({ where: { id: application.id }, data: { status: "ACCEPTED", startBy: acceptanceDeadline(campaign.expiresAt) } });
+    const accept = async () => {
+      const version = await currentInstructionVersion(tx, campaign.id);
+      return tx.missionApplication.update({ where: { id: application.id }, data: { status: "ACCEPTED", instructionVersionId: version.id, startBy: acceptanceDeadline(campaign.expiresAt) } });
+    };
 
     if (unusedPaidSlots(paid.length, campaign.claimedSlots, holds) > 0) {
       await serviceTaxAudit(tx, developerId);
