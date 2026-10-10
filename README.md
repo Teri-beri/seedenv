@@ -95,6 +95,12 @@ There is no automatic “assume not sent” admin/CLI command. A successful empt
 
 ## Production Security Operations
 
+### Launch wizard autosave
+
+The launch wizard privately autosaves incomplete details, tasks, budget settings, wizard progress, uploaded icon URLs, and AI drafting inputs to the signed-in account after 700ms of inactivity. Open New Drop again to resume across devices. Saved campaign drafts have their own recovery entries; saving does not publish a campaign, reserve funds, or contact Stripe. Original icon files are not retained until upload succeeds.
+
+`User.launchWizardDrafts` stores versioned, validated draft data; `launchWizardDraftRevision` prevents stale tabs/devices from overwriting newer work. The UI reports conflicts and save failures rather than claiming success. A user-scoped browser recovery copy protects edits while account saving is pending; wait for “Saved to your account” before moving to another device. Use “Discard saved work” to reset. Successfully created campaigns clear the wizard entry; historical campaigns and billing are unchanged.
+
 ### Developer platform fee waivers
 
 `User.platformFeeWaived` is a server-managed, persistent account entitlement (default `false`). The `20261015_owner_platform_fee_waiver` migration grants it once to the verified owner account by immutable user ID and checks the email before granting; changing an email or sending a client flag cannot acquire a waiver. Do not expose this field in profile/settings actions.

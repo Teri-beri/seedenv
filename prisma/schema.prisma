@@ -123,6 +123,8 @@ model User {
   fundingBalanceCents       Int                  @default(0) @map("funding_balance_cents")
   autoReloadCents           Int                  @default(0) @map("auto_reload_cents")
   platformFeeWaived         Boolean              @default(false) @map("platform_fee_waived")
+  launchWizardDrafts        Json                 @default("{}") @map("launch_wizard_drafts")
+  launchWizardDraftRevision Int                  @default(0) @map("launch_wizard_draft_revision")
   balanceTopUps             BalanceTopUp[]
   stripeConnectAccountId    String?
   questXp                   Int                  @default(0)

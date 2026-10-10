@@ -17,6 +17,8 @@ import type { SpecBlueprint } from "@/lib/ai/agents/spec-architect.agent";
 import { formatCents } from "@/lib/utils";
 import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templates";
 import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, projectPerTesterCharges, quoteCampaignFunding, quoteTopUp, topUpForShortfall, type CohortTypeKey } from "@/lib/pricing";
+import { emptyAiDraftInputs, type LaunchWizardDraft } from "@/lib/launch-wizard-draft";
+import { useLaunchAutosave } from "@/components/use-launch-autosave";
 
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
@@ -94,12 +96,12 @@ const optionStyle = { backgroundColor: "#0E1017", color: "#F8FAFC" };
 
 export type DeveloperStudioView = "overview" | "new-drop" | "review-deck" | "asset-vault";
 
-export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0, platformFeeWaived = false }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number; platformFeeWaived?: boolean }) {
+export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0, platformFeeWaived = false, userId, savedWizard, draftRevision }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number; platformFeeWaived?: boolean; userId: string; savedWizard?: LaunchWizardDraft; draftRevision: number }) {
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [highestStep, setHighestStep] = useState(1);
+  const [step, setStep] = useState(savedWizard?.step ?? 1);
+  const [highestStep, setHighestStep] = useState(savedWizard?.highestStep ?? 1);
   const draftId = initialDraft?.id;
-  const [form, setForm] = useState<CampaignInput>(() => initialDraft ? {
+  const [form, setForm] = useState<CampaignInput>(() => savedWizard ? savedWizard.form : initialDraft ? {
     title: initialDraft.title,
     platform: initialDraft.platform,
     appUrl: initialDraft.appUrl,
@@ -141,10 +143,11 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     testerPerk: "",
   });
   const [message, setMessage] = useState<string | null>(null);
+  const [createdCampaignUrl, setCreatedCampaignUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isUploadingIcon, setIsUploadingIcon] = useState(false);
   const [iconMessage, setIconMessage] = useState("");
-  const [iconFileName, setIconFileName] = useState("");
+  const [iconFileName, setIconFileName] = useState(savedWizard?.iconFileName ?? "");
   const [isPending, startTransition] = useTransition();
 
   const payoutPool = useMemo(() => form.totalSlots * form.bountyPerTaskUsd, [form.totalSlots, form.bountyPerTaskUsd]);
@@ -152,7 +155,22 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const activeBundle = isBundleType(form.cohortType) ? COHORT_BUNDLES[form.cohortType] : null;
   const totalEscrow = fundingQuote.totalBudgetUsd;
   const platformFee = fundingQuote.platformFeeUsd;
-  const [topUpTesters, setTopUpTesters] = useState(5);
+  const [topUpTesters, setTopUpTesters] = useState(savedWizard?.topUpTesters ?? 5);
+  const [aiInputs, setAiInputs] = useState(savedWizard?.ai ?? emptyAiDraftInputs);
+  const autosaveSnapshot = useMemo<LaunchWizardDraft>(() => ({
+    version: 1, form, step, highestStep, topUpTesters, iconFileName, ai: aiInputs,
+  }), [form, step, highestStep, topUpTesters, iconFileName, aiInputs]);
+  const autosave = useLaunchAutosave({
+    userId, sourceDraftId: draftId, revision: draftRevision, draft: autosaveSnapshot, enabled: view === "new-drop",
+    restore: (saved) => {
+      setForm(saved.form);
+      setStep(saved.step);
+      setHighestStep(saved.highestStep);
+      setTopUpTesters(saved.topUpTesters);
+      setIconFileName(saved.iconFileName);
+      setAiInputs(saved.ai);
+    },
+  });
   const topUpOptions = useMemo(() => {
     const stipendCents = Math.round(form.bountyPerTaskUsd * 100);
     return [...new Set([1, 5, 10, form.totalSlots].filter((count) => count <= form.totalSlots))].map((count) => {
@@ -300,7 +318,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   }
 
   function launchCampaign() {
-    if (isUploadingIcon) return;
+    if (isUploadingIcon || createdCampaignUrl) return;
     for (let stepToValidate = 1; stepToValidate <= 3; stepToValidate += 1) {
       if (!validateStep(stepToValidate)) {
         setStep(stepToValidate);
@@ -310,17 +328,22 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     setMessage(null);
     startTransition(async () => {
       try {
+        await autosave.flush();
         const result = await createCampaignWithEscrow(form, draftId, needsTopUp && chosenTopUp ? { topUpCents: chosenTopUp.creditCents } : undefined);
         if (result.requiresPaymentSetup) {
           router.push(`/account?tab=portfolio&draft=${encodeURIComponent(result.campaignId)}#stripe-setup`);
           return;
         }
         if (result.launched) {
+          setCreatedCampaignUrl(`/console?view=overview&launched=${encodeURIComponent(result.campaignId)}`);
+          await autosave.clear();
           router.push(`/console?view=overview&launched=${encodeURIComponent(result.campaignId)}`);
           router.refresh();
           return;
         }
         if (result.checkoutUrl?.startsWith("http")) {
+          setCreatedCampaignUrl(result.checkoutUrl);
+          await autosave.clear();
           window.location.href = result.checkoutUrl;
           return;
         }
@@ -333,7 +356,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   }
 
   function saveNoChargeTestDraft() {
-    if (isUploadingIcon) return;
+    if (isUploadingIcon || createdCampaignUrl) return;
     for (let stepToValidate = 1; stepToValidate <= 3; stepToValidate += 1) {
       if (!validateStep(stepToValidate)) {
         setStep(stepToValidate);
@@ -344,7 +367,10 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     setMessage(null);
     startTransition(async () => {
       try {
+        await autosave.flush();
         const draft = await saveTestCampaignDraft(form);
+        setCreatedCampaignUrl(`/console?view=billing&testDraft=${encodeURIComponent(draft.campaignId)}`);
+        await autosave.clear();
         router.push(`/console?view=billing&testDraft=${encodeURIComponent(draft.campaignId)}`);
         router.refresh();
       } catch (error) {
@@ -379,6 +405,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   return (
     <section className="space-y-8">
       {message ? <p className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 text-sm text-zinc-200" role="status">{message}</p> : null}
+      {createdCampaignUrl ? <p role="status" className="text-sm text-emerald-300">Your campaign has already been created. <a className="underline" href={createdCampaignUrl}>Continue to your campaign or checkout</a>. Do not launch it again.</p> : null}
       {view === "overview" ? <DeveloperInsights submissions={auditReports} /> : null}
       {view === "new-drop" ? (
         <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -397,6 +424,20 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
             </div>
           </div>
 
+          <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-zinc-400">
+            <p role="status" aria-live="polite">{autosave.status}</p>
+            <span>Private draft - resumes on your account across devices.</span>
+            <button type="button" className="underline hover:text-white" onClick={autosave.retry}>Save now</button>
+            <button type="button" disabled={isPending} className="underline hover:text-white" onClick={() => {
+              if (!window.confirm("Discard this saved wizard draft and start over? This does not cancel any launched campaign.")) return;
+              startTransition(async () => {
+                try { await autosave.clear(); window.location.reload(); }
+                catch (error) { setMessage(error instanceof Error ? error.message : "Could not clear your draft."); }
+              });
+            }}>Discard saved work</button>
+          </div>
+          {autosave.error ? <p role="alert" className="mt-3 text-sm text-amber-300">{autosave.error}</p> : null}
+
           {step === 1 && (
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <fieldset className="md:col-span-2">
@@ -411,7 +452,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                 </div>
                 {activeBundle ? <p className="mt-2 text-xs leading-5 text-zinc-500">{activeBundle.summary}</p> : null}
               </fieldset>
-              <AiSpecDrafter onApply={applyBlueprint} platform={form.platform === PlatformType.WEB_STAGING ? "WEB" : form.platform === PlatformType.PLAY_STORE ? "ANDROID" : "IOS"} />
+              <AiSpecDrafter inputs={aiInputs} onInputsChange={setAiInputs} onApply={applyBlueprint} platform={form.platform === PlatformType.WEB_STAGING ? "WEB" : form.platform === PlatformType.PLAY_STORE ? "ANDROID" : "IOS"} />
               <Field error={errors.title} label="App title" maxLength={90} required value={form.title} onChange={(value) => updateFormField("title", value)} />
               <label className="space-y-2 text-sm font-semibold text-white/72">
                 Platform
@@ -558,7 +599,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                     <Metric label="Total escrow" value={`$${totalEscrow.toFixed(2)}`} gold />
                   </div>
                   <p className="text-xs leading-5 text-white/50">Bundle pricing is fixed, paid up front, and verified again at checkout. Unused tester stipends are refunded automatically if the cohort ends early.</p>
-                  <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending}>
+                  <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending || Boolean(createdCampaignUrl)}>
                     <BadgeDollarSign className="size-5" /> Pay ${totalEscrow.toFixed(0)} & Launch
                   </Button>
                 </>
@@ -596,7 +637,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                     </fieldset>
                   ) : null}
                   <p className="text-xs leading-5 text-white/50">You only pay for testers who actually join: each accepted tester draws their reward plus the platform fee from your prepaid balance. Places freed by withdrawn or rejected testers are reused first. Ending the cohort, or 30 days passing, returns unused places to your balance, and you can refund your balance in full to your card any time.</p>
-                  <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending}>
+                  <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending || Boolean(createdCampaignUrl)}>
                     <BadgeDollarSign className="size-5" /> {needsTopUp && chosenTopUp ? `Add ${usd(chosenTopUp.creditCents)} & Launch` : "Launch Cohort"}
                   </Button>
                 </>
