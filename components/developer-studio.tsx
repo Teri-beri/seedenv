@@ -19,6 +19,7 @@ import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templ
 import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, projectPerTesterCharges, quoteCampaignFunding, quoteTopUp, topUpForShortfall, type CohortTypeKey } from "@/lib/pricing";
 import { emptyAiDraftInputs, type LaunchWizardDraft } from "@/lib/launch-wizard-draft";
 import { useLaunchAutosave } from "@/components/use-launch-autosave";
+import { CohortPromoInput, type AppliedCohortPromo } from "@/components/cohort-promo-input";
 
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
@@ -76,6 +77,8 @@ type CampaignDraft = {
   hardwareStrict: boolean;
   estimatedMinutes: number | null;
   testerPerk: string | null;
+  promoCode?: string;
+  promoReserved?: boolean;
   instructions: Array<{ stepNumber: number; instructionTitle: string; instructionDetail: string; proofType: TaskProofType; minimumRep: number }>;
 };
 
@@ -101,7 +104,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const [step, setStep] = useState(savedWizard?.step ?? 1);
   const [highestStep, setHighestStep] = useState(savedWizard?.highestStep ?? 1);
   const draftId = initialDraft?.id;
-  const [form, setForm] = useState<CampaignInput>(() => savedWizard ? savedWizard.form : initialDraft ? {
+  const [form, setForm] = useState<CampaignInput>(() => savedWizard ? { ...savedWizard.form, ...(initialDraft?.promoReserved ? { promoCode: initialDraft.promoCode } : {}) } : initialDraft ? {
     title: initialDraft.title,
     platform: initialDraft.platform,
     appUrl: initialDraft.appUrl,
@@ -118,6 +121,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     hardwareStrict: initialDraft.hardwareStrict,
     estimatedMinutes: initialDraft.estimatedMinutes,
     testerPerk: initialDraft.testerPerk || "",
+    promoCode: initialDraft.promoCode || "",
   } : {
     title: "",
     platform: PlatformType.TESTFLIGHT,
@@ -149,9 +153,13 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const [iconMessage, setIconMessage] = useState("");
   const [iconFileName, setIconFileName] = useState(savedWizard?.iconFileName ?? "");
   const [isPending, startTransition] = useTransition();
+  const [appliedPromo, setAppliedPromo] = useState<AppliedCohortPromo | null>(null);
+  const normalizedPromo = form.promoCode?.split(",").map((code) => code.trim().toUpperCase()).filter(Boolean).join(",");
+  const promoDiscountPercent = appliedPromo?.code === normalizedPromo ? appliedPromo?.discountPercent ?? 0 : 0;
 
   const payoutPool = useMemo(() => form.totalSlots * form.bountyPerTaskUsd, [form.totalSlots, form.bountyPerTaskUsd]);
-  const fundingQuote = useMemo(() => quoteCampaignFunding(payoutPool, form.cohortType, platformFeeWaived), [payoutPool, form.cohortType, platformFeeWaived]);
+  const fundingQuote = useMemo(() => quoteCampaignFunding(payoutPool, form.cohortType, platformFeeWaived, promoDiscountPercent), [payoutPool, form.cohortType, platformFeeWaived, promoDiscountPercent]);
+  const undiscountedQuote = quoteCampaignFunding(payoutPool, form.cohortType, platformFeeWaived);
   const activeBundle = isBundleType(form.cohortType) ? COHORT_BUNDLES[form.cohortType] : null;
   const totalEscrow = fundingQuote.totalBudgetUsd;
   const platformFee = fundingQuote.platformFeeUsd;
@@ -163,7 +171,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const autosave = useLaunchAutosave({
     userId, sourceDraftId: draftId, revision: draftRevision, draft: autosaveSnapshot, enabled: view === "new-drop",
     restore: (saved) => {
-      setForm(saved.form);
+      setForm({ ...saved.form, ...(initialDraft?.promoReserved ? { promoCode: initialDraft.promoCode } : {}) });
       setStep(saved.step);
       setHighestStep(saved.highestStep);
       setTopUpTesters(saved.topUpTesters);
@@ -174,13 +182,13 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const topUpOptions = useMemo(() => {
     const stipendCents = Math.round(form.bountyPerTaskUsd * 100);
     return [...new Set([1, 5, 10, form.totalSlots].filter((count) => count <= form.totalSlots))].map((count) => {
-      const needed = projectPerTesterCharges(count, stipendCents, platformFeeWaived).maxTotalCents - balanceCents;
+      const needed = projectPerTesterCharges(count, stipendCents, platformFeeWaived, promoDiscountPercent).maxTotalCents - balanceCents;
       const creditCents = topUpForShortfall(needed);
       return { count, creditCents, quote: quoteTopUp(creditCents) };
     });
-  }, [form.totalSlots, form.bountyPerTaskUsd, balanceCents, platformFeeWaived]);
+  }, [form.totalSlots, form.bountyPerTaskUsd, balanceCents, platformFeeWaived, promoDiscountPercent]);
   const chosenTopUp = topUpOptions.find((option) => option.count === topUpTesters) || topUpOptions[0];
-  const perTester = useMemo(() => projectPerTesterCharges(form.totalSlots, Math.round(form.bountyPerTaskUsd * 100), platformFeeWaived), [form.totalSlots, form.bountyPerTaskUsd, platformFeeWaived]);
+  const perTester = useMemo(() => projectPerTesterCharges(form.totalSlots, Math.round(form.bountyPerTaskUsd * 100), platformFeeWaived, promoDiscountPercent), [form.totalSlots, form.bountyPerTaskUsd, platformFeeWaived, promoDiscountPercent]);
   const needsTopUp = !activeBundle && (perTester.firstCharge?.totalCents ?? 0) > balanceCents;
   const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
   const testerFundingShare = totalEscrow > 0 ? (fundingQuote.payoutPoolUsd / totalEscrow * 100).toFixed(2) : "0.00";
@@ -319,6 +327,10 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
 
   function launchCampaign() {
     if (isUploadingIcon || createdCampaignUrl) return;
+    if (form.promoCode?.trim() && (!appliedPromo || appliedPromo.code !== normalizedPromo)) {
+      setMessage("Apply a valid promo code or remove it before launching.");
+      return;
+    }
     for (let stepToValidate = 1; stepToValidate <= 3; stepToValidate += 1) {
       if (!validateStep(stepToValidate)) {
         setStep(stepToValidate);
@@ -330,6 +342,10 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
       try {
         await autosave.flush();
         const result = await createCampaignWithEscrow(form, draftId, needsTopUp && chosenTopUp ? { topUpCents: chosenTopUp.creditCents } : undefined);
+        if ("promoError" in result) {
+          setMessage(result.promoError);
+          return;
+        }
         if (result.requiresPaymentSetup) {
           router.push(`/account?tab=portfolio&draft=${encodeURIComponent(result.campaignId)}#stripe-setup`);
           return;
@@ -393,7 +409,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
           setMessage("Revision request sent to the tester.");
         } else {
           await rejectSubmission(submissionId, reason || "Low Effort");
-          setMessage("Submission rejected and slot returned.");
+          setMessage("Denial sent for manual review. This work's unpaid reward and slot remain held until an operator resolves it.");
         }
         router.refresh();
       } catch (error) {
@@ -580,9 +596,14 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
 
           {step === 3 && (
             <div className="mt-6 space-y-5">
+              <CohortPromoInput code={form.promoCode || ""} waived={platformFeeWaived} draftId={draftId} reserved={initialDraft?.promoReserved} onCodeChange={(code) => {
+                setAppliedPromo(null);
+                updateFormField("promoCode", code);
+              }} onApplied={setAppliedPromo} />
+              {promoDiscountPercent > 0 ? <p role="status" className="text-sm text-emerald-300">Promo savings: ${(undiscountedQuote.platformFeeUsd - platformFee).toFixed(2)} in platform fees if all places fill. {promoDiscountPercent}% discount locked to this cohort at launch.</p> : null}
               {activeBundle ? (
                 <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
-                  <p className="font-mono text-[11px] uppercase tracking-wider text-emerald-400">{activeBundle.name} · flat ${totalEscrow.toFixed(0)}</p>
+                  <p className="font-mono text-[11px] uppercase tracking-wider text-emerald-400">{activeBundle.name} · flat ${totalEscrow.toFixed(2)}</p>
                   <ul className="mt-3 space-y-1.5 text-sm text-zinc-300">{activeBundle.features.map((feature) => <li key={feature}>· {feature}</li>)}</ul>
                 </div>
               ) : (
@@ -595,12 +616,12 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                 <>
                   <div className="grid gap-3 md:grid-cols-3">
                     <Metric label={`Tester payout escrow (${testerFundingShare}%)`} value={`$${payoutPool.toFixed(2)}`} />
-                    <Metric label={platformFeeWaived ? "Platform fee waived" : "Flat platform fee"} value={`$${platformFee.toFixed(2)}`} />
+                    <Metric label={platformFeeWaived ? "Platform fee waived" : promoDiscountPercent ? `Platform fee (${promoDiscountPercent}% off)` : "Flat platform fee"} value={`$${platformFee.toFixed(2)}`} />
                     <Metric label="Total escrow" value={`$${totalEscrow.toFixed(2)}`} gold />
                   </div>
                   <p className="text-xs leading-5 text-white/50">Bundle pricing is fixed, paid up front, and verified again at checkout. Unused tester stipends are refunded automatically if the cohort ends early.</p>
                   <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending || Boolean(createdCampaignUrl)}>
-                    <BadgeDollarSign className="size-5" /> Pay ${totalEscrow.toFixed(0)} & Launch
+                    <BadgeDollarSign className="size-5" /> Pay ${totalEscrow.toFixed(2)} & Launch
                   </Button>
                 </>
               ) : (
@@ -614,11 +635,11 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                     <p className="mb-2 text-[11px] uppercase tracking-wider text-zinc-500">Full cohort breakdown</p>
                     <dl className="space-y-1.5">
                       <div className="flex justify-between"><dt>Tester rewards ({form.totalSlots} × ${form.bountyPerTaskUsd.toFixed(2)})</dt><dd className="text-zinc-200">{usd(perTester.stipendCents)}</dd></div>
-                      <div className="flex justify-between"><dt>{platformFeeWaived ? "Platform fee (waived for your account)" : `Platform fee (${COHORT_PLATFORM_FEE_RATE * 100}%, $${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum)`}</dt><dd className="text-zinc-200">{usd(perTester.platformFeeCents)}</dd></div>
+                      <div className="flex justify-between"><dt>{platformFeeWaived ? "Platform fee (waived for your account)" : promoDiscountPercent ? `Platform fee (${promoDiscountPercent}% off, including minimum)` : `Platform fee (${COHORT_PLATFORM_FEE_RATE * 100}%, $${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum)`}</dt><dd className="text-zinc-200">{usd(perTester.platformFeeCents)}</dd></div>
                       <div className="flex justify-between border-t border-zinc-800 pt-1.5"><dt className="text-zinc-300">Maximum drawn from balance</dt><dd className="text-emerald-400">{usd(perTester.maxTotalCents)}</dd></div>
                     </dl>
                     {perTester.firstCharge && perTester.typicalCharge && perTester.firstCharge.totalCents !== perTester.typicalCharge.totalCents ? (
-                      <p className="mt-3 text-[11px] leading-5 text-zinc-500">The first accepted tester draws {usd(perTester.firstCharge.totalCents)} because it carries the ${COHORT_MIN_PLATFORM_FEE_CENTS / 100} minimum fee; each tester after is about {usd(perTester.typicalCharge.totalCents)}.</p>
+                      <p className="mt-3 text-[11px] leading-5 text-zinc-500">The first accepted tester draws {usd(perTester.firstCharge.totalCents)}, including {usd(perTester.firstCharge.platformFeeCents)} in platform fees{promoDiscountPercent ? " after your discount" : ""}; each tester after is about {usd(perTester.typicalCharge.totalCents)}.</p>
                     ) : null}
                   </div>
                   {needsTopUp ? (
@@ -636,7 +657,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                       {chosenTopUp ? <p className="mt-3 font-mono text-[11px] text-zinc-500">Card charged <span className="text-zinc-200">{usd(chosenTopUp.quote.totalCents)}</span>, all added to your balance. No processing or top-up fees.</p> : null}
                     </fieldset>
                   ) : null}
-                  <p className="text-xs leading-5 text-white/50">You only pay for testers who actually join: each accepted tester draws their reward plus the platform fee from your prepaid balance. Places freed by withdrawn or rejected testers are reused first. Ending the cohort, or 30 days passing, returns unused places to your balance, and you can refund your balance in full to your card any time.</p>
+                  <p className="text-xs leading-5 text-white/50">Each accepted tester draws their reward plus the platform fee from your prepaid balance. Withdrawn places, or places released after a manual review confirms denial, are reused first. Pending denial cases keep their unpaid reward held. Ending the cohort, or 30 days passing, returns unused places to your balance; refundable balance can be returned to your card from Billing.</p>
                   <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending || Boolean(createdCampaignUrl)}>
                     <BadgeDollarSign className="size-5" /> {needsTopUp && chosenTopUp ? `Add ${usd(chosenTopUp.creditCents)} & Launch` : "Launch Cohort"}
                   </Button>
@@ -750,7 +771,7 @@ function IconButton({ label, icon, onClick, disabled = false }: { label: string;
   return <button aria-label={label} disabled={disabled} type="button" onClick={onClick} className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-2 text-white/72 backdrop-blur-md transition-all hover:border-zinc-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-35">{icon}</button>;
 }
 
-const rejectionReasons = ["Blurry Image", "Irrelevant Content", "Incomplete Steps", "Low Effort", "Generic Feedback", "Did not follow test script", "Incomplete video proof"] as const;
+const rejectionReasons = ["Blurry Image", "Irrelevant Content", "Incomplete Steps", "Low Effort", "Generic Feedback", "Did not follow test script", "Incomplete video proof", "Required participation period not completed"] as const;
 
 function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalCount }: { submissions: ReviewSubmission[]; onReview: (id: string, action: "approve" | "reject" | "revision", reason?: string) => void; isPending: boolean; page: number; totalPages: number; totalCount: number }) {
   const [selectedId, setSelectedId] = useState("");
@@ -856,12 +877,13 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                         <select className="mt-2 w-full rounded-lg border border-[#2A2F3D] bg-[#090A0F] p-3 text-white outline-none focus:border-zinc-500" onChange={(event) => setRejectionReason(event.target.value as (typeof rejectionReasons)[number])} value={rejectionReason}>
                           {rejectionReasons.map((reason) => <option key={reason} value={reason}>{reason}</option>)}
                         </select>
+                        <span className="mt-2 block text-xs font-normal text-amber-200">This sends the work to manual review and holds only its unpaid reward. The place cannot be reused or refunded until an operator resolves the case.</span>
                       </label>
                     )}
                     {error ? <p className="text-xs text-rose-300" role="alert">{error}</p> : null}
                     <div className="flex flex-wrap justify-end gap-2">
                       <Button disabled={isPending} type="button" variant="outline" onClick={() => { setDecision(null); setError(""); }}>Cancel</Button>
-                      <Button disabled={isPending} type="button" variant={decision === "reject" ? "danger" : "light"} onClick={confirmDecision}>{isPending ? "Saving..." : decision === "approve" ? "Confirm approval & release" : decision === "reject" ? "Confirm rejection" : "Send revision request"}</Button>
+                      <Button disabled={isPending} type="button" variant={decision === "reject" ? "danger" : "light"} onClick={confirmDecision}>{isPending ? "Saving..." : decision === "approve" ? "Confirm approval & release" : decision === "reject" ? "Send denial for manual review" : "Send revision request"}</Button>
                     </div>
                   </div>
                 ) : (

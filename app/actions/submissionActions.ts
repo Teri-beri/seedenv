@@ -264,6 +264,7 @@ export async function rejectSubmission(submissionId: string, reason: string) {
   const result = await serializable((tx) => rejectProof(tx, reviewer.id, reviewer.role === "ADMIN", submissionId, reason));
   revalidatePath("/dashboard");
   revalidatePath("/console");
+  revalidatePath("/admin/proof-reviews");
   return result;
 }
 

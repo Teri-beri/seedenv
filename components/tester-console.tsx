@@ -21,7 +21,7 @@ export type TesterConsoleData = {
   missions: ConsoleMission[];
   leaderboard: Array<Pick<User, "id" | "username" | "xpPoints">>;
   summary: Array<{ status: SubmissionStatus; _count: { _all: number }; _sum: { payoutCents: number | null } }>;
-  recent: Array<Pick<Submission, "id" | "status" | "feedbackText" | "proofImageUrl" | "rejectionReason" | "revisionRequestedAt" | "payoutCents" | "expiresAt"> & { campaign: { title: string } }>;
+  recent: Array<Pick<Submission, "id" | "status" | "feedbackText" | "proofImageUrl" | "rejectionReason" | "revisionRequestedAt" | "payoutCents" | "expiresAt"> & { denialReviewPending?: boolean; campaign: { title: string } }>;
   pending: Array<Submission & { campaign: ConsoleMission; proofPreviewUrl: string | null }>;
   approvedCampaigns: Array<{ campaignId: string }>;
   pendingPayoutCents: number;
@@ -42,7 +42,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
   const inReview = pending.filter((item) => !item.revisionRequestedAt && Boolean(item.feedbackText || item.proofImageUrl));
   const active = pending.filter((item) => item.revisionRequestedAt || (!item.feedbackText && !item.proofImageUrl && item.expiresAt > now));
   const auditCents = inReview.reduce((total, item) => total + item.payoutCents, 0);
-  const nextRelease = inReview.map((item) => autoApproveDeadline(item.submittedAt)).filter((date): date is Date => Boolean(date)).sort((a, b) => a.getTime() - b.getTime())[0];
+  const nextRelease = inReview.filter((item) => !item.denialReviewPending).map((item) => autoApproveDeadline(item.submittedAt)).filter((date): date is Date => Boolean(date)).sort((a, b) => a.getTime() - b.getTime())[0];
   const nextReleaseHours = nextRelease ? Math.max(0, Math.ceil((nextRelease.getTime() - now.getTime()) / 3_600_000)) : null;
   const completedIds = new Set(approvedCampaigns.map((item) => item.campaignId));
   const newMissions = missions.filter((mission) => availableSlots(mission) > 0 && !completedIds.has(mission.id) && !pending.some((item) => item.campaignId === mission.id));
@@ -71,6 +71,8 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
         </header>
 
         <div className="mobile-tester-content mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+          <p className="rounded-xl border border-amber-500/30 p-4 text-sm text-amber-100">Rewards require genuine work that meets the published instructions, evidence standards, and any stated participation period (including 14 continuous days where required). If a developer denies your work, only that submission&apos;s unpaid reward is held for manual review; automatic approval pauses. An operator may approve payment or confirm the denial. Other earnings and money already paid are unaffected. <Link className="underline" href="/terms">Read the reward and review terms.</Link></p>
+          {pending.filter((item) => item.denialReviewPending).map((item) => <p role="status" key={item.id} className="rounded border border-amber-500/30 p-4">{item.campaign.title}: ${(item.payoutCents / 100).toFixed(2)} held for manual review. Reason: {item.rejectionReason}</p>)}
           <div>
             <p className="font-mono text-xs uppercase tracking-wider text-emerald-400">{formatRankLevel(rank)} · {progress.label}</p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{selectedView.label}</h1>
@@ -120,6 +122,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
             <MissionExperience key={activeView} mode={activeView} missions={missions} assignments={pending.map((item) => ({
               id: item.id, campaign: item.campaign, expiresAt: item.expiresAt.toISOString(), submitted: !item.revisionRequestedAt && Boolean(item.feedbackText || item.proofImageUrl),
               revisionRequested: Boolean(item.revisionRequestedAt), revisionStarted: Boolean(item.revisionStartedAt), revisionNote: item.rejectionReason,
+              denialReviewPending: item.denialReviewPending,
               feedbackText: item.feedbackText, proofPreviewUrl: item.proofPreviewUrl, hasScreenshot: Boolean(item.proofImageUrl), hasRecording: isStoredRecording(item.recordingUrl),
               telemetry: { osBuild: item.osBuild || "", deviceModel: item.deviceModel || "", screenResolution: item.screenResolution || "", appBuildVersion: item.appBuildVersion || "", networkType: item.networkType || "", recordingUrl: isStoredRecording(item.recordingUrl) ? "" : item.recordingUrl || "", crashLogs: item.crashLogs || "", networkLogs: item.networkLogs || "" },
             }))} completedCampaignIds={approvedCampaigns.map((item) => item.campaignId)} initialNow={now.getTime()} applications={applications} reputation={tester.xpPoints} discoveryPasses={discoveryPasses} />
@@ -152,7 +155,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
               <div className="mt-5 space-y-3">
                 {recent.length ? recent.map((item) => {
                   const submitted = Boolean(item.feedbackText || item.proofImageUrl);
-                  const status = item.status === "APPROVED" ? "Approved" : item.status === "REJECTED" ? "Not approved" : item.revisionRequestedAt ? "Revision requested" : item.status === "EXPIRED" || (!submitted && item.expiresAt <= now) ? "Expired" : submitted ? "In review" : "In progress";
+                  const status = item.status === "APPROVED" ? "Approved" : item.status === "REJECTED" ? "Not approved" : item.denialReviewPending ? "Held for manual review" : item.revisionRequestedAt ? "Revision requested" : item.status === "EXPIRED" || (!submitted && item.expiresAt <= now) ? "Expired" : submitted ? "In review" : "In progress";
                   return <div className="flex gap-3 rounded-xl border border-zinc-800 p-4" key={item.id}><span className={`mt-0.5 ${item.status === "APPROVED" ? "text-emerald-400" : "text-neutral-500"}`}>{item.status === "APPROVED" ? <CheckCircle2 className="size-4" /> : <Clock3 className="size-4" />}</span><div className="min-w-0 flex-1"><p className="break-words text-sm font-semibold">{item.campaign.title}</p><p className="mt-1 text-xs text-neutral-500">{status}{item.status === "APPROVED" ? ` / ${formatCents(item.payoutCents)} earned` : ""}</p>{item.rejectionReason ? <p className="mt-2 break-words text-xs leading-5 text-rose-300">{item.rejectionReason}</p> : null}</div></div>;
                 }) : <div className="rounded-xl border border-dashed border-zinc-800 p-6 text-center"><Sparkles className="mx-auto size-6 text-emerald-400" /><p className="mt-3 text-sm font-semibold">Your first contribution belongs here.</p><p className="mt-2 text-xs leading-5 text-neutral-500">Explore a mission, follow the brief, and submit your own proof.</p></div>}
               </div>

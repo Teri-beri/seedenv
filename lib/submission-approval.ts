@@ -19,6 +19,7 @@ export type ApprovalResult = { payoutCents: number; xpGain: number; testerId: st
 export async function approvePendingSubmission(tx: Prisma.TransactionClient, submissionId: string, actor: ApprovalActor): Promise<ApprovalResult> {
   const submission = await tx.submission.findUnique({ where: { id: submissionId }, include: { campaign: true, tester: true, audit: { select: { status: true, humanClearedAt: true } } } });
   if (!submission || submission.status !== SubmissionStatus.PENDING) throw new Error("Pending submission not found.");
+  if (submission.denialReviewPending) throw new Error("This proof is held for manual denial review.");
   await assertCampaignFunding(tx, submission.campaignId);
   if (actor.kind === "reviewer") {
     if (submission.campaign.developerId !== actor.id && !actor.admin) throw new Error("You cannot review this submission.");
@@ -30,7 +31,7 @@ export async function approvePendingSubmission(tx: Prisma.TransactionClient, sub
 
   const xpGain = xpForBounty(submission.payoutCents);
   const approval = await tx.submission.updateMany({
-    where: { id: submissionId, status: SubmissionStatus.PENDING, ...(actor.kind === "auto" ? { revisionRequestedAt: null } : {}) },
+    where: { id: submissionId, status: SubmissionStatus.PENDING, denialReviewPending: false, ...(actor.kind === "auto" ? { revisionRequestedAt: null } : {}) },
     data: { status: SubmissionStatus.APPROVED, reviewedAt: new Date() },
   });
   if (approval.count !== 1) throw new Error("This submission has already been reviewed.");
@@ -138,6 +139,7 @@ export function autoApproveOverdueSubmissions(now = new Date(), limit = 25) {
       where: {
         status: SubmissionStatus.PENDING,
         revisionRequestedAt: null,
+        denialReviewPending: false,
         submittedAt: { lte: new Date(now.getTime() - AUTO_APPROVE_AFTER_MS) },
         OR: [{ feedbackText: { not: null } }, { proofImageUrl: { not: null } }],
         NOT: { audit: { is: { status: "FLAGGED_FRAUD", humanClearedAt: null } } },

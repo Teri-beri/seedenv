@@ -125,11 +125,16 @@ model User {
   platformFeeWaived         Boolean              @default(false) @map("platform_fee_waived")
   launchWizardDrafts        Json                 @default("{}") @map("launch_wizard_drafts")
   launchWizardDraftRevision Int                  @default(0) @map("launch_wizard_draft_revision")
+  promoRedemptions          CohortPromoRedemption[]
   balanceTopUps             BalanceTopUp[]
   stripeConnectAccountId    String?
   questXp                   Int                  @default(0)
   discoveryPasses           Int                  @default(0)
   referralCode              String?              @unique
+  developerReferralCode     String?              @unique @map("developer_referral_code")
+  developerReferralsSent    DeveloperReferral[]  @relation("DeveloperReferrer")
+  developerReferralReceived DeveloperReferral?   @relation("DeveloperReferred")
+  ownedPromoCodes           CohortPromoCode[]
   questTheme                String               @default("classic")
   clipProfile               ClipProfile?
   clipCampaigns             ClipCampaign[]
@@ -236,10 +241,56 @@ model AppCampaign {
   transactions     WalletTransaction[]
   slotCharges      SlotCharge[]
   synthesis        CampaignSynthesis?
+  platformFeeDiscountPercent Int                @default(0) @map("platform_fee_discount_percent")
+  promoCodeDraft   String?              @map("promo_code_draft") @db.VarChar(81)
+  promoRedemptions CohortPromoRedemption[]
 
   @@index([developerId, status])
   @@index([status, expiresAt])
   @@index([platform])
+}
+
+model CohortPromoCode {
+  id              String                  @id @default(cuid())
+  code            String                  @unique @db.VarChar(40)
+  discountPercent Int                     @map("discount_percent")
+  maxRedemptions  Int                     @map("max_redemptions")
+  reservedCount   Int                     @default(0) @map("reserved_count")
+  expiresAt       DateTime?               @map("expires_at")
+  ownerId         String?                @map("owner_id")
+  owner           User?                  @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  enabled         Boolean                 @default(true)
+  createdAt       DateTime                @default(now()) @map("created_at")
+  redemptions     CohortPromoRedemption[]
+}
+
+model CohortPromoRedemption {
+  id              String         @id @default(cuid())
+  promoCodeId      String         @map("promo_code_id")
+  promoCode        CohortPromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Restrict)
+  developerId     String         @map("developer_id")
+  developer       User           @relation(fields: [developerId], references: [id], onDelete: Restrict)
+  campaignId      String         @map("campaign_id")
+  campaign        AppCampaign    @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  discountPercent Int            @map("discount_percent")
+  consumedAt      DateTime?      @map("consumed_at")
+  paymentPending  Boolean        @default(false) @map("payment_pending")
+  checkoutSessionId String?      @map("checkout_session_id")
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  @@unique([promoCodeId, developerId])
+  @@index([campaignId])
+}
+
+model DeveloperReferral {
+  id            String    @id @default(cuid())
+  inviterId     String    @map("inviter_id")
+  inviter       User      @relation("DeveloperReferrer", fields: [inviterId], references: [id], onDelete: Restrict)
+  developerId   String    @unique @map("developer_id")
+  developer     User      @relation("DeveloperReferred", fields: [developerId], references: [id], onDelete: Restrict)
+  qualifiedAt   DateTime? @map("qualified_at")
+  qualifiedCampaignId String? @map("qualified_campaign_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
 }
 
 // One off-session card charge that funds a single tester slot on a pay-per-tester cohort.
@@ -425,6 +476,11 @@ model Submission {
   audit               SubmissionAudit?
   status              SubmissionStatus  @default(PENDING)
   rejectionReason     String?
+  denialReviewPending Boolean           @default(false) @map("denial_review_pending")
+  denialRequestedAt   DateTime?         @map("denial_requested_at")
+  denialResolvedAt    DateTime?         @map("denial_resolved_at")
+  denialResolution    String?           @map("denial_resolution") @db.VarChar(1000)
+  denialReviewerId    String?           @map("denial_reviewer_id")
   revisionRequestedAt DateTime?
   revisionStartedAt   DateTime?
   submittedAt         DateTime?         @map("submitted_at")

@@ -9,6 +9,7 @@ import { cancelFailedRefund, operationRefund, reserveBillingOperation } from "@/
 import { allocateSlotFunding, assertCampaignFunding, reconcileFundingPayment, releaseReplacementFunding } from "@/lib/funding-reversals";
 import { escrowMissionCredits } from "@/lib/billing/ledger";
 import { taxLedgerFields, serviceTaxAudit } from "@/lib/billing/tax-policy";
+import { consumeCohortPromo } from "@/lib/cohort-promos";
 
 type CampaignWindow = { status: CampaignStatus; cancelledAt: Date | null; expiresAt: Date };
 
@@ -41,7 +42,7 @@ export type SlotChargePreview = { credit: boolean; quote: SlotChargeQuote | null
 export async function previewNextSlotCharges(campaignIds: string[]) {
   const previews = new Map<string, SlotChargePreview>();
   if (!campaignIds.length) return previews;
-  const campaigns = await prisma.appCampaign.findMany({ where: { id: { in: campaignIds }, fundingModel: "PAY_PER_TESTER" }, select: { id: true, bountyPerTaskUsd: true, claimedSlots: true, developer: { select: { platformFeeWaived: true } } } });
+  const campaigns = await prisma.appCampaign.findMany({ where: { id: { in: campaignIds }, fundingModel: "PAY_PER_TESTER" }, select: { id: true, bountyPerTaskUsd: true, claimedSlots: true, platformFeeDiscountPercent: true, developer: { select: { platformFeeWaived: true } } } });
   await Promise.all(campaigns.map(async (campaign) => {
     const [holds, paid] = await Promise.all([
       prisma.missionApplication.count({ where: { campaignId: campaign.id, status: "ACCEPTED", startBy: { gt: new Date() } } }),
@@ -53,7 +54,7 @@ export async function previewNextSlotCharges(campaignIds: string[]) {
     }
     previews.set(campaign.id, {
       credit: false,
-      quote: quoteSlotCharge(usdToCents(campaign.bountyPerTaskUsd), paid.reduce((sum, charge) => sum + charge.stipendCents, 0), paid.reduce((sum, charge) => sum + charge.platformFeeCents, 0), campaign.developer.platformFeeWaived),
+      quote: quoteSlotCharge(usdToCents(campaign.bountyPerTaskUsd), paid.reduce((sum, charge) => sum + charge.stipendCents, 0), paid.reduce((sum, charge) => sum + charge.platformFeeCents, 0), campaign.developer.platformFeeWaived, campaign.platformFeeDiscountPercent),
     });
   }));
   return previews;
@@ -93,6 +94,7 @@ function acceptFromBalance(developerId: string, applicationId: string) {
       paid.reduce((sum, charge) => sum + charge.stipendCents, 0),
       paid.reduce((sum, charge) => sum + charge.platformFeeCents, 0),
       feePolicy.platformFeeWaived,
+      campaign.platformFeeDiscountPercent,
     );
     const funding = await escrowMissionCredits(tx, developerId, quote.totalCents, campaign.id);
     const developer = await tx.user.findUnique({ where: { id: developerId }, select: { fundingBalanceCents: true } });
@@ -124,6 +126,7 @@ function acceptFromBalance(developerId: string, applicationId: string) {
       select: { id: true },
     });
     const charge = await tx.slotCharge.create({ data: { campaignId: campaign.id, applicationId: application.id, ...quote, processingFeeCents: 0, status: "SUCCEEDED", transactionId: transaction.id } });
+    if (campaign.platformFeeDiscountPercent > 0) await consumeCohortPromo(tx, campaign.id);
     await allocateSlotFunding(tx, developerId, charge.id, campaign.id, quote.totalCents);
     await accept();
     return { kind: "debited", quote, balanceCents };

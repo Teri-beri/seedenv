@@ -22,7 +22,9 @@ import { prisma } from "@/lib/prisma";
 import { isPublicHandle, publicProfilePath } from "@/lib/public-profile";
 import { getProofImageUrl } from "@/lib/storage";
 import { COHORT_PLATFORM_FEE_RATE } from "@/lib/pricing";
+import Link from "next/link";
 import { launchDraftKey, launchWizardDraftsSchema } from "@/lib/launch-wizard-draft";
+import { canManageCohortPromos } from "@/lib/cohort-promos";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +57,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   const campaignScope = { developerId: session.user.id };
   const pendingReviewWhere = {
     status: SubmissionStatus.PENDING,
+    denialReviewPending: false,
     campaign: campaignScope,
     OR: [{ proofImageUrl: { not: null } }, { feedbackText: { not: null } }],
   };
@@ -69,7 +72,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   const reviewTotalPages = Math.max(1, Math.ceil(pendingReviewCount / reviewPageSize));
   const requestedReviewPage = Number.parseInt(params.reviewPage || "1", 10);
   const reviewPage = Number.isFinite(requestedReviewPage) ? Math.min(Math.max(requestedReviewPage, 1), reviewTotalPages) : 1;
-  const [pendingSubmissions, approvedAssets, campaigns, completedEscrow, auditReports, billing] = await Promise.all([
+  const [pendingSubmissions, approvedAssets, campaigns, completedEscrow, auditReports, billing, heldDenials] = await Promise.all([
     prisma.submission.findMany({
       where: pendingReviewWhere,
       include: {
@@ -126,6 +129,11 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       },
     }),
     activeView === "billing" ? getBillingOverview(session.user.id, security?.stripeCustomerId || null) : null,
+    activeView === "review-deck" ? prisma.submission.findMany({
+      where: { campaign: campaignScope, status: SubmissionStatus.PENDING, denialReviewPending: true },
+      orderBy: { denialRequestedAt: "asc" }, take: 100,
+      select: { id: true, payoutCents: true, rejectionReason: true, campaign: { select: { title: true } }, tester: { select: { username: true } } },
+    }) : [],
   ]);
   const escrowSum = (type: TransactionType) => completedEscrow.find((row) => row.type === type)?._sum.amountCents || 0;
   const completedEscrowCents = Math.max(0, escrowSum(TransactionType.ESCROW_DEPOSIT) - escrowSum(TransactionType.ESCROW_REFUND));
@@ -142,7 +150,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   const launchDraft = activeView === "new-drop" && params.draft
     ? await prisma.appCampaign.findFirst({
         where: { id: params.draft, developerId: session.user.id, status: CampaignStatus.DRAFT },
-        include: { instructions: { orderBy: { stepNumber: "asc" } } },
+        include: { instructions: { orderBy: { stepNumber: "asc" } }, promoRedemptions: { include: { promoCode: { select: { code: true } } } } },
       })
     : null;
   const savedWizard = activeView === "new-drop"
@@ -189,6 +197,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     <AuthCheck role="DEVELOPER">
     <main className="mobile-app-shell min-h-screen bg-[#0A0D12] pb-16 text-white" id="console-top">
       <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} />
+      {canManageCohortPromos(session.user) ? <div className="mt-4 flex gap-4"><Link href="/admin/promos" className="inline-flex min-h-11 items-center text-sm text-emerald-300 underline">Manage cohort promo codes</Link><Link href="/admin/proof-reviews" className="inline-flex min-h-11 items-center text-sm text-amber-300 underline">Review denied tester work</Link></div> : null}
       {security?.platformFeeWaived ? <p role="status" className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-300">Platform fees are permanently waived for your developer account. Tester rewards remain fully funded. Existing charges are unchanged.</p> : null}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {overview ? <>
@@ -197,7 +206,12 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
           <ActiveCohorts cohorts={cohortRows} total={activeCohortCount} />
           <ReleaseReports rows={releaseReports} />
         </> : null}
-        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}`} userId={session.user.id} savedWizard={savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft || undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
+        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}`} userId={session.user.id} savedWizard={savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft ? { ...launchDraft, promoCode: launchDraft.promoRedemptions.map((entry) => entry.promoCode.code).join(",") || launchDraft.promoCodeDraft || undefined, promoReserved: Boolean(launchDraft.promoRedemptions.length) } : undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
+        {heldDenials.length ? <section className="mt-6 space-y-3 rounded-xl border border-amber-500/30 p-5">
+          <h2 className="font-semibold text-amber-200">Denials awaiting manual review</h2>
+          <p className="text-sm text-zinc-400">Oldest 100 cases. These places and unpaid rewards stay reserved until SeedEnv approves the work or confirms denial. They cannot auto-approve, be edited, or be reused while held.</p>
+          {heldDenials.map((item) => <p key={item.id} className="text-sm">{item.campaign.title} - @{item.tester.username} - ${(item.payoutCents / 100).toFixed(2)} held. Reason: {item.rejectionReason}</p>)}
+        </section> : null}
 
         {billing ? <section className="space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-4">

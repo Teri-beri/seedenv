@@ -33,6 +33,7 @@ export const launchWizardDraftSchema = z.object({
     hardwareStrict: z.boolean(),
     estimatedMinutes: z.number().int().min(0).max(240).nullable().optional(),
     testerPerk: z.string().max(80).optional(),
+    promoCode: z.string().max(81).optional(),
   }),
   step: z.number().int().min(1).max(3),
   highestStep: z.number().int().min(1).max(3),

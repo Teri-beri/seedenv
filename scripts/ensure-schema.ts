@@ -42,6 +42,8 @@ const statements = [
   `ALTER TABLE "User"
     ADD COLUMN IF NOT EXISTS "launch_wizard_drafts" JSONB NOT NULL DEFAULT '{}',
     ADD COLUMN IF NOT EXISTS "launch_wizard_draft_revision" INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE "AppCampaign" ADD COLUMN IF NOT EXISTS "platform_fee_discount_percent" INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE "AppCampaign" ADD COLUMN IF NOT EXISTS "promo_code_draft" VARCHAR(81)`,
   `ALTER TABLE "BillingProfile" ADD COLUMN IF NOT EXISTS "billingEmail" VARCHAR(254)`,
   `ALTER TABLE "User"
     ALTER COLUMN "bio" TYPE VARCHAR(200) USING left("bio", 200),

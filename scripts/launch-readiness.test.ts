@@ -88,7 +88,12 @@ test("missing Stripe configuration or funding method saves a draft without creat
   const updated: Array<{ status: string }> = [];
   const transaction = {
     taskInstruction: { deleteMany: async () => ({ count: 1 }) },
-    appCampaign: { update: async ({ data }: { data: { status: string } }) => {
+    appCampaign: {
+      create: async ({ data }: { data: { status: string; totalBudgetUsd: number; platformFeeUsd: number } }) => {
+        created.push(data);
+        return { id: `payment-draft-${created.length}`, ...data };
+      },
+      update: async ({ data }: { data: { status: string } }) => {
       updated.push(data);
       return { id: "existing-payment-draft", ...data };
     } },
@@ -96,13 +101,14 @@ test("missing Stripe configuration or funding method saves a draft without creat
   const modules = [
     mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "payment-test-developer", role: "DEVELOPER", stripeCustomerId: null, platformFeeWaived, fundingBalanceCents: 400 }) } }),
     mock.module("next/cache", { namedExports: { revalidatePath: () => {} } }),
+    mock.module("../lib/billing-transaction.ts", { namedExports: { billingTransaction: async (work: (tx: typeof transaction) => Promise<unknown>) => work(transaction) } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: {
       appCampaign: {
         create: async ({ data }: { data: { status: string; totalBudgetUsd: number; platformFeeUsd: number } }) => {
           created.push(data);
           return { id: `payment-draft-${created.length}`, ...data };
         },
-        findFirst: async () => ({ id: "existing-payment-draft" }),
+        findFirst: async () => ({ id: "existing-payment-draft", promoRedemptions: [] }),
       },
       walletTransaction: { create: async () => assert.fail("Setup fallback must not create escrow or wallet entries.") },
       $transaction: async (work: (tx: typeof transaction) => Promise<unknown>) => work(transaction),
@@ -155,6 +161,9 @@ test("missing Stripe configuration or funding method saves a draft without creat
 
 test("public landing survives unavailable cohort and optional account lookups without seeding data", async () => {
   let signedIn = false;
+  type Offer = { code: string; enabled: boolean; ownerId: string | null; discountPercent: number; expiresAt: Date; reservedCount: number; maxRedemptions: number };
+  let offer: Offer | null = null;
+  let offerUnavailable = false;
   const loggedErrors: string[] = [];
   const log = mock.method(console, "error", (message: string) => { loggedErrors.push(message); });
   const modules = [
@@ -165,6 +174,10 @@ test("public landing survives unavailable cohort and optional account lookups wi
     mock.module("../lib/prisma.ts", { namedExports: { prisma: {
       appCampaign: { findMany: async () => { throw new Error("Database unavailable in isolated test."); } },
       user: { findUnique: async () => { throw new Error("Optional account lookup unavailable."); } },
+      cohortPromoCode: { findUnique: async () => {
+        if (offerUnavailable) throw new Error("Promo lookup unavailable.");
+        return offer;
+      } },
     } } }),
   ];
   try {
@@ -175,6 +188,19 @@ test("public landing survives unavailable cohort and optional account lookups wi
     assert.deepEqual(guest.props.missions, []);
     assert.equal(guest.props.viewer, null);
     assert.equal(guest.props.directoryUnavailable, true);
+    assert.equal(guest.props.launchOffer, null);
+    offer = { code: "FIRSTDROP", enabled: true, ownerId: null, discountPercent: 100, expiresAt: new Date(Date.now() + 86400000), reservedCount: 3, maxRedemptions: 20 };
+    const page = () => Home({ params: Promise.resolve({}), searchParams: Promise.resolve({}) });
+    assert.deepEqual((await page()).props.launchOffer, { code: "FIRSTDROP", remaining: 17, expiresAt: offer.expiresAt.toISOString() });
+    for (const change of [{ enabled: false }, { ownerId: "private-owner" }, { discountPercent: 50 }, { expiresAt: new Date(0) }, { reservedCount: 20 }]) {
+      const activeOffer: Offer = offer;
+      offer = { ...activeOffer, ...change };
+      assert.equal((await page()).props.launchOffer, null, "Inactive, private, partial, expired or exhausted offers must not be advertised.");
+      offer = activeOffer;
+    }
+    offerUnavailable = true;
+    assert.equal((await page()).props.launchOffer, null);
+    assert.ok(loggedErrors.some((message) => message.includes("promo availability lookup")));
     signedIn = true;
     const expiredViewer = await Home({ params: Promise.resolve({}), searchParams: Promise.resolve({}) });
     assert.equal(expiredViewer.props.viewer, null);

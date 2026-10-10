@@ -6,8 +6,10 @@ import { prisma } from "@/lib/prisma";
 import { saveMemberReferral } from "@/lib/quest-ledger";
 import { requireMember } from "@/lib/member";
 import { ensureValidatorHandle } from "@/lib/validator-handle";
+import { billingTransaction } from "@/lib/billing-transaction";
+import { attachDeveloperReferral, DeveloperReferralError } from "@/lib/developer-referrals";
 
-const allowedNextPaths = ["/dashboard", "/console", "/admin", "/validators/join"];
+const allowedNextPaths = ["/dashboard", "/console", "/admin", "/account", "/validators/join"];
 
 function cleanNextPath(value: string | undefined) {
   if (!value?.startsWith("/")) return "/dashboard";
@@ -34,7 +36,7 @@ function cleanUrl(value: string | undefined) {
   }
 }
 
-export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ role?: string; next?: string; name?: string; username?: string; bio?: string; portfolioUrl?: string; companyName?: string; productUrl?: string; ref?: string }> }) {
+export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ role?: string; next?: string; name?: string; username?: string; bio?: string; portfolioUrl?: string; companyName?: string; productUrl?: string; ref?: string; devref?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/auth/signin");
 
@@ -86,6 +88,20 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
     }
   }
   const finalRole = requestedRole ?? user?.role;
+  if (finalRole === UserRole.DEVELOPER && params.devref) {
+    const developerReferralCode = params.devref;
+    try {
+      await billingTransaction(async (tx) => {
+        const existing = await tx.developerReferral.findUnique({ where: { developerId: session.user.id }, include: { inviter: { select: { developerReferralCode: true } } } });
+        if (existing?.inviter.developerReferralCode === developerReferralCode.trim().toUpperCase()) return;
+        await attachDeveloperReferral(tx, session.user.id, developerReferralCode);
+      });
+    } catch (error) {
+      console.error("SeedEnv signup developer referral could not be applied:", error);
+      const message = error instanceof DeveloperReferralError ? error.message : "Could not attach your developer referral. Retry from account settings.";
+      nextPath = `/account?tab=profile&devref=${encodeURIComponent(params.devref)}&developerReferralError=${encodeURIComponent(message)}`;
+    }
+  }
   if (finalRole === UserRole.TESTER) {
     await ensureValidatorHandle(session.user.id);
     redirect(nextPath);

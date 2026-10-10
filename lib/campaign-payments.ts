@@ -8,6 +8,7 @@ import { handleFundingReversal, reconcileFundingPayment } from "@/lib/funding-re
 import { taxLedgerFields } from "@/lib/billing/tax-policy";
 import { validateServiceCheckout } from "@/lib/stripe/billing";
 import { invoiceSnapshotSchema } from "@/lib/enterprise-rules";
+import { consumeCohortPromo } from "@/lib/cohort-promos";
 
 export type CampaignPaymentEvent = { type: string; data: { object: { id?: string } } };
 
@@ -47,7 +48,7 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     const amount = usdToCents(campaign.totalBudgetUsd);
     if (session.currency !== "usd" || session.amount_total !== amount) throw new Error("Campaign funding amount or currency does not match.");
     const description = `Escrow deposit for ${campaign.title} (${campaign.id})`;
-    const deposits = await tx.walletTransaction.findMany({ where: { userId: campaign.developerId, type: "ESCROW_DEPOSIT", description } });
+    const deposits = await tx.walletTransaction.findMany({ where: { userId: campaign.developerId, type: "ESCROW_DEPOSIT", description, status: { in: ["PENDING", "COMPLETED"] } } });
     if (deposits.some((deposit) => deposit.status === "COMPLETED" && deposit.stripePaymentId === paymentId && deposit.amountCents === amount)) return { duplicate: true, campaignId: campaign.id };
     if (campaign.status !== "ESCROW_PENDING") throw new Error("This campaign is not awaiting funding. Reconcile the payment before changing its state.");
     if (deposits.length !== 1 || deposits[0].status !== "PENDING" || deposits[0].amountCents !== amount) throw new Error("The campaign funding ledger needs reconciliation.");
@@ -56,6 +57,7 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
       ...(serviceTax ? { invoiceSnapshot: { ...invoiceSnapshotSchema.parse(deposits[0].invoiceSnapshot), tax: serviceTax } } : {}),
     } });
     await reconcileFundingPayment(tx, paymentId);
+    if (campaign.platformFeeDiscountPercent > 0) await consumeCohortPromo(tx, campaign.id);
     if (campaign.cancelledAt) return { cancelledBeforePayment: true, campaignId: campaign.id };
     await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: "ACTIVE", ...(serviceTax ? { taxSnapshot: serviceTax } : {}) } });
     return { activated: true, campaignId: campaign.id };

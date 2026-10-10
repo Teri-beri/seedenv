@@ -7,6 +7,7 @@ import { isStoredRecording } from "@/lib/recording";
 import { deleteProofObject, getProofImageUrl, proofStorageConfigured, uploadProofRecording } from "@/lib/storage";
 import { assertProofEditable } from "@/lib/submission-lifecycle";
 import { SubmissionStatus } from "@prisma/client";
+import { canManageCohortPromos } from "@/lib/cohort-promos";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try {
     const stored = await uploadProofRecording({ buffer, contentType, path: `recordings/${submission.id}/${randomUUID()}.${extension}` });
-    const saved = await prisma.submission.updateMany({ where: { id, testerId: session.user.id, status: SubmissionStatus.PENDING }, data: { recordingUrl: stored } });
+    const saved = await prisma.submission.updateMany({ where: { id, testerId: session.user.id, status: SubmissionStatus.PENDING, denialReviewPending: false }, data: { recordingUrl: stored } });
     if (saved.count !== 1) {
       await deleteProofObject(stored);
       return NextResponse.json({ message: "This submission changed during upload." }, { status: 409, headers });
@@ -73,7 +74,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } }),
     prisma.submission.findUnique({ where: { id }, select: { testerId: true, recordingUrl: true, campaign: { select: { developerId: true } } } }),
   ]);
-  const allowed = submission && (submission.testerId === session.user.id || submission.campaign.developerId === session.user.id || viewer?.role === "ADMIN");
+  const allowed = submission && (submission.testerId === session.user.id || submission.campaign.developerId === session.user.id || (viewer && canManageCohortPromos({ id: session.user.id, role: viewer.role })));
   if (!allowed || !isStoredRecording(submission.recordingUrl)) return NextResponse.json({ message: "Recording unavailable." }, { status: 404, headers });
   const signed = await getProofImageUrl(submission.recordingUrl).catch(() => null);
   if (!signed) return NextResponse.json({ message: "Recording unavailable." }, { status: 404, headers });

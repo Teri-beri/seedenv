@@ -29,6 +29,13 @@ test("each tester screen renders only its own sections and marks the selected na
       assert.ok(!html.includes('href="#'));
       assert.ok(html.includes("Ready for cashout"));
     }
+    const heldActivity = renderToStaticMarkup(createElement(TesterConsole, { ...props, activeView: "missions", recent: [{
+      id: "held-proof", status: "PENDING", feedbackText: "Submitted work", proofImageUrl: null,
+      denialReviewPending: true, rejectionReason: "Required participation period not completed",
+      revisionRequestedAt: null, payoutCents: 400, expiresAt: new Date(0), campaign: { title: "14-day test" },
+    }] }));
+    assert.ok(heldActivity.includes("Held for manual review"));
+    assert.ok(heldActivity.includes("only that submission"));
   } finally {
     for (const moduleMock of mocks.reverse()) moduleMock.restore();
   }

@@ -16,6 +16,7 @@ import { formatCents } from "@/lib/utils";
 import { landingViews, landingViewHref } from "@/lib/landing-views";
 import TelemetryGridCanvas from "@/components/TelemetryGridCanvas";
 import { SandboxBadge, ScenarioCard, ScenarioDrawer, sandboxScenarios, useScenarioInspector, type SandboxScenario } from "@/components/telemetry-sandbox";
+import { LandingPlatformFeeOfferCard, type LandingPlatformFeeOffer } from "@/components/landing-platform-fee-offer";
 
 type Mission = {
   id: string;
@@ -60,7 +61,7 @@ const reportPreview = (scenario: SandboxScenario) => JSON.stringify({
   attachments: scenario.attachments,
 }, null, 2);
 
-export function PublicLanding({ missions, viewer, directoryUnavailable = false }: { missions: Mission[]; viewer: Viewer; directoryUnavailable?: boolean }) {
+export function PublicLanding({ missions, viewer, directoryUnavailable = false, launchOffer = null }: { missions: Mission[]; viewer: Viewer; directoryUnavailable?: boolean; launchOffer?: LandingPlatformFeeOffer | null }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [authRequest, setAuthRequest] = useState<AuthRequest | null>(null);
@@ -173,6 +174,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false }
           </div>
         </section>
 
+        {launchOffer ? <div className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 sm:pb-12 lg:px-8"><LandingPlatformFeeOfferCard offer={launchOffer} href={developerHref} /></div> : null}
         <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8" aria-label="Live validation showcase"><LiveShowcase onStartCohort={() => requestAccess({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Launch your first cohort" })} /></section>
         <section id="engine" className={`${sectionShell} ${surfaceTint}`}>
           <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />

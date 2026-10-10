@@ -118,7 +118,7 @@ export async function runMemberTool(name: string, memberId: string): Promise<unk
   }
   if (name === "list_my_testing") {
     const applications = await prisma.missionApplication.findMany({ where: { testerId: memberId }, orderBy: { createdAt: "desc" }, take: 10, select: { status: true, startBy: true, createdAt: true, campaignId: true, campaign: { select: { title: true, bountyPerTaskUsd: true } } } });
-    const submissions = await prisma.submission.findMany({ where: { testerId: memberId, campaignId: { in: applications.map((row) => row.campaignId) } }, select: { campaignId: true, status: true, submittedAt: true, payoutCents: true, rejectionReason: true, revisionRequestedAt: true } });
+    const submissions = await prisma.submission.findMany({ where: { testerId: memberId, campaignId: { in: applications.map((row) => row.campaignId) } }, select: { campaignId: true, status: true, submittedAt: true, payoutCents: true, rejectionReason: true, revisionRequestedAt: true, denialReviewPending: true } });
     return applications.map((application) => {
       const submission = submissions.find((row) => row.campaignId === application.campaignId);
       return {
@@ -127,7 +127,7 @@ export async function runMemberTool(name: string, memberId: string): Promise<unk
         applied: application.createdAt.toISOString().slice(0, 10),
         applicationStatus: application.status,
         startBy: application.startBy?.toISOString() ?? null,
-        submission: submission ? { status: submission.status, submitted: Boolean(submission.submittedAt), revisionRequested: Boolean(submission.revisionRequestedAt), payout: usd(submission.payoutCents), rejectionReason: submission.rejectionReason } : null,
+        submission: submission ? { status: submission.status, submitted: Boolean(submission.submittedAt), revisionRequested: Boolean(submission.revisionRequestedAt), denialReviewPending: submission.denialReviewPending, payout: usd(submission.payoutCents), rejectionReason: submission.rejectionReason } : null,
       };
     });
   }

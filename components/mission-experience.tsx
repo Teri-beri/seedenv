@@ -46,7 +46,7 @@ type Mission = {
 };
 
 type ProofTelemetry = { osBuild: string; deviceModel: string; screenResolution: string; appBuildVersion: string; networkType: string; recordingUrl: string; crashLogs: string; networkLogs: string };
-type Assignment = { id: string; campaign: Mission; expiresAt: string; submitted: boolean; revisionRequested?: boolean; revisionStarted?: boolean; revisionNote?: string | null; feedbackText?: string | null; proofPreviewUrl?: string | null; hasScreenshot?: boolean; hasRecording?: boolean; telemetry?: ProofTelemetry };
+type Assignment = { id: string; campaign: Mission; expiresAt: string; submitted: boolean; denialReviewPending?: boolean; revisionRequested?: boolean; revisionStarted?: boolean; revisionNote?: string | null; feedbackText?: string | null; proofPreviewUrl?: string | null; hasScreenshot?: boolean; hasRecording?: boolean; telemetry?: ProofTelemetry };
 
 const noAssignments: Assignment[] = [];
 const noCompletedCampaigns: string[] = [];
@@ -308,7 +308,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
         });
         celebrate();
         setProofSubmitted(true);
-        setMessage(`Proof submitted. ${formatCents(payoutCents)} and ${xpGain} REP are earned on approval. If the developer doesn't review it within 48 hours, it's approved automatically.`);
+        setMessage(`Proof submitted. ${formatCents(payoutCents)} and ${xpGain} REP are earned on approval. Unreviewed proof auto-approves after 48 hours unless held for denial or fraud review.`);
         router.refresh();
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Could not submit proof.");
@@ -320,9 +320,9 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
     <div className="mt-5 space-y-6">
       {mode === "missions" ? <div className="grid gap-3 sm:grid-cols-2">
         {assignments.filter((item) => item.submitted || activeAssignments.some((active) => active.id === item.id)).map((assignment) => (
-          <button key={assignment.id} type="button" disabled={isPending} onClick={() => openAssignment(assignment)} className="flex min-w-0 w-full items-center gap-3 rounded-xl border border-zinc-800 bg-black/15 p-4 text-left transition hover:border-zinc-700 disabled:opacity-50">
+          <button key={assignment.id} type="button" disabled={isPending || assignment.denialReviewPending} onClick={() => openAssignment(assignment)} className="flex min-w-0 w-full items-center gap-3 rounded-xl border border-zinc-800 bg-black/15 p-4 text-left transition hover:border-zinc-700 disabled:opacity-50">
             {assignment.submitted ? <CheckCircle2 className="size-5 shrink-0 text-emerald-400" /> : <Clock3 className="size-5 shrink-0 text-amber-400" />}
-            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{assignment.campaign.title}</span><span className="mt-1 block text-xs text-neutral-500">{assignment.revisionRequested ? assignment.revisionStarted && new Date(assignment.expiresAt).getTime() > now ? "Resume requested revision" : "Start revision / fresh 30-minute window" : assignment.submitted ? "Proof received / awaiting developer review" : "Resume your claimed mission"}</span></span>
+            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{assignment.campaign.title}</span><span className="mt-1 block text-xs text-neutral-500">{assignment.denialReviewPending ? "Reward held / manual denial review" : assignment.revisionRequested ? assignment.revisionStarted && new Date(assignment.expiresAt).getTime() > now ? "Resume requested revision" : "Start revision / fresh 30-minute window" : assignment.submitted ? "Proof received / awaiting developer review" : "Resume your claimed mission"}</span></span>
             {!assignment.submitted && (!assignment.revisionRequested || (assignment.revisionStarted && new Date(assignment.expiresAt).getTime() > now)) ? <span className="font-mono text-xs text-amber-300"><Countdown expiresAt={new Date(assignment.expiresAt)} /></span> : null}
           </button>
         ))}
@@ -387,7 +387,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                   <p className="mt-2 text-xs text-white/50">{spotsLeft} / {mission.totalSlots} spots left</p>
                   <p className="mt-2 text-xs text-neutral-400">{requiredRep.toLocaleString()} REP to apply{eligibility === "pass" ? " / Discovery Pass eligible" : ""}</p>
                 </div>
-                <p className="mt-3 flex gap-2 text-[11px] leading-5 text-zinc-500"><ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-400" /><span><span className="text-zinc-300">Reward held before you start.</span> Developers have 48h to review your proof, or the reward auto-releases to you.</span></p>
+                <p className="mt-3 flex gap-2 text-[11px] leading-5 text-zinc-500"><ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-400" /><span><span className="text-zinc-300">Reward reserved before you start.</span> Unreviewed proof auto-approves after 48h unless held for denial or fraud review. Work must meet the instructions and required participation period.</span></p>
                 {!completed && !assignment && !accepted ? (
                   application && !["DECLINED", "WITHDRAWN", "STARTED"].includes(application.status) ? <Link className="mt-4 block min-h-11 rounded-xl border border-stroke p-3 text-center text-sm text-emerald-300" href="/applications">Application: {application.status.toLowerCase()} / View</Link> : <MissionRequest missionId={mission.id} eligibility={eligibility} passes={discoveryPasses} />
                 ) : <Button className="mt-5 w-full" onClick={() => handleClaim(mission)} disabled={isPending || completed || Boolean(assignment && !resumable) || (!resumable && spotsLeft <= 0)}>

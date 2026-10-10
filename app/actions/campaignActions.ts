@@ -7,14 +7,16 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
 import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, isBundleType, MAX_TOP_UP_CENTS, quoteCampaignFunding, quoteSlotCharge, topUpForShortfall } from "@/lib/pricing";
-import { createTopUpCheckout } from "@/lib/funding-balance";
+import { billingCompanySnapshot, createTopUpCheckout } from "@/lib/funding-balance";
 import { resolveTaskMinimumRep, SEED_TASK_PRESETS } from "@/lib/micro-task-templates";
-import { billingDetailsSchema } from "@/lib/enterprise-rules";
 import { cancelCohort } from "@/lib/slot-funding";
 import { formatCents } from "@/lib/utils";
 import { serviceTaxAudit, taxLedgerFields, QA_SERVICE_TAX_CODE, stripeTaxEnabled } from "@/lib/billing/tax-policy";
 import { seedenvTaxMetadata, storedValueCheckoutTax } from "@/lib/stripe/billing";
 import { ensureStripeCustomer } from "@/lib/stripe-customer";
+import { CohortPromoError, eligibleCohortPromo, failedCohortPromoCheckout, prepareCohortPromoRetry, promoStackSchema, recordCohortPromoCheckout, reserveCohortPromo } from "@/lib/cohort-promos";
+import { billingTransaction } from "@/lib/billing-transaction";
+import Stripe from "stripe";
 
 const taskInstructionSchema = z.object({
   instructionTitle: z.string().min(3).max(90),
@@ -46,6 +48,7 @@ const campaignSchema = z.object({
   hardwareStrict: z.boolean().default(true),
   estimatedMinutes: z.number().int().min(1, "Estimate at least 1 minute.").max(240, "Keep estimates under 4 hours.").nullable().optional(),
   testerPerk: z.string().trim().max(80, "Keep the perk under 80 characters.").optional().or(z.literal("")),
+  promoCode: promoStackSchema.optional(),
 }).refine((input) => !input.discoveryAllowed || input.discoveryMinRep <= Math.max(...input.instructions.map((item) => item.minimumRep)), {
   message: "The Discovery REP floor cannot exceed the highest task requirement.",
   path: ["discoveryMinRep"],
@@ -65,8 +68,9 @@ function resolveCohortTerms(input: CampaignInput) {
   };
 }
 
-function checkoutDescription(input: CampaignInput, terms: ReturnType<typeof resolveCohortTerms>, platformFeeWaived: boolean) {
+function checkoutDescription(input: CampaignInput, terms: ReturnType<typeof resolveCohortTerms>, platformFeeWaived: boolean, discountPercent: number) {
   if (platformFeeWaived) return `${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)}; platform fee waived`;
+  if (discountPercent) return `${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)}; ${discountPercent}% off the platform fee with ${input.promoCode}`;
   if (isBundleType(input.cohortType)) {
     const bundle = COHORT_BUNDLES[input.cohortType];
     return `${bundle.name}: ${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)} plus a flat $${(bundle.platformFeeCents / 100).toFixed(2)} platform fee`;
@@ -74,10 +78,10 @@ function checkoutDescription(input: CampaignInput, terms: ReturnType<typeof reso
   return `${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)} plus a ${COHORT_PLATFORM_FEE_RATE * 100}% platform fee on the tester reward pool (minimum $${(COHORT_MIN_PLATFORM_FEE_CENTS / 100).toFixed(2)})`;
 }
 
-function buildCampaignData(input: CampaignInput, developerId: string, status: CampaignStatus, platformFeeWaived: boolean) {
+function buildCampaignData(input: CampaignInput, developerId: string, status: CampaignStatus, platformFeeWaived: boolean, discountPercent = 0) {
   const terms = resolveCohortTerms(input);
   const testerPayoutPoolUsd = terms.totalSlots * terms.bountyPerTaskUsd;
-  const { totalBudgetUsd, platformFeeUsd, escrowTotalCents } = quoteCampaignFunding(testerPayoutPoolUsd, input.cohortType, platformFeeWaived);
+  const { totalBudgetUsd, platformFeeUsd, escrowTotalCents } = quoteCampaignFunding(testerPayoutPoolUsd, input.cohortType, platformFeeWaived, discountPercent);
 
   return {
     escrowTotalCents,
@@ -93,6 +97,8 @@ function buildCampaignData(input: CampaignInput, developerId: string, status: Ca
       totalBudgetUsd,
       bountyPerTaskUsd: terms.bountyPerTaskUsd,
       platformFeeUsd,
+      platformFeeDiscountPercent: discountPercent,
+      promoCodeDraft: input.promoCode || null,
       totalSlots: terms.totalSlots,
       cohortType: input.cohortType,
       guaranteedDays: terms.guaranteedDays,
@@ -131,13 +137,15 @@ async function saveCampaignDraft(developerId: string, input: CampaignInput, plat
 
   const ownedDraft = await prisma.appCampaign.findFirst({
     where: { id: draftId, developerId, status: CampaignStatus.DRAFT },
-    select: { id: true },
+    include: { promoRedemptions: { include: { promoCode: { select: { code: true } } } } },
   });
   if (!ownedDraft) throw new Error("This saved draft is unavailable or already launched.");
+  if (ownedDraft.promoRedemptions.length && (input.promoCode || "").split(",").sort().join(",") !== ownedDraft.promoRedemptions.map((entry) => entry.promoCode.code).sort().join(",")) throw new CohortPromoError("Keep this draft's reserved promo codes to resume its funding terms.");
+  const resumedData = buildCampaignData(input, developerId, CampaignStatus.DRAFT, platformFeeWaived, ownedDraft.promoRedemptions.length ? ownedDraft.platformFeeDiscountPercent : 0).data;
 
   return prisma.$transaction(async (transaction) => {
     await transaction.taskInstruction.deleteMany({ where: { campaignId: draftId } });
-    return transaction.appCampaign.update({ where: { id: draftId }, data: draftData });
+    return transaction.appCampaign.update({ where: { id: draftId }, data: resumedData });
   });
 }
 
@@ -154,7 +162,79 @@ export async function saveTestCampaignDraft(data: CampaignInput) {
   return { campaignId: campaign.id, title: campaign.title, status: campaign.status, chargedCents: 0 };
 }
 
+async function persistLaunchCampaign(input: CampaignInput, developer: Awaited<ReturnType<typeof requireDeveloper>>, draftId: string | undefined, tax: Awaited<ReturnType<typeof serviceTaxAudit>> | null) {
+  return billingTransaction(async (tx) => {
+    const existing = draftId ? await tx.appCampaign.findFirst({
+      where: { id: draftId, developerId: developer.id, status: CampaignStatus.DRAFT },
+      include: { promoRedemptions: { include: { promoCode: { select: { code: true } } } } },
+    }) : null;
+    if (draftId && !existing) throw new Error("This saved draft is unavailable or already launched.");
+    if (input.promoCode && developer.platformFeeWaived) throw new CohortPromoError("Your account already has a full fee waiver. Remove the promo code before launching.");
+    let discountPercent = 0;
+    if (existing?.promoRedemptions.length) {
+      if (existing.promoRedemptions.some((entry) => entry.consumedAt)) throw new CohortPromoError("This promo code already funded a paid cohort. It cannot be used for another launch.");
+      if (existing.promoRedemptions.some((entry) => entry.paymentPending)) throw new CohortPromoError("The previous checkout is still pending. Try again after it has been closed.");
+      if ((input.promoCode || "").split(",").sort().join(",") !== existing.promoRedemptions.map((entry) => entry.promoCode.code).sort().join(",")) throw new CohortPromoError("This draft already reserved promo codes. Keep them to resume its agreed funding terms.");
+      discountPercent = existing.platformFeeDiscountPercent;
+    } else if (input.promoCode) {
+      const promos = await Promise.all(input.promoCode.split(",").map((code) => eligibleCohortPromo(tx, developer.id, code)));
+      if (promos.filter((entry) => !entry.ownerId).length > 1) throw new CohortPromoError("Only one public promo can be used. Stack it with your own referral credits.");
+      discountPercent = promos.reduce((sum, entry) => sum + entry.discountPercent, 0);
+      if (discountPercent > 100) throw new CohortPromoError("Discounts cannot exceed 100%. Save the extra credit for another cohort.");
+    }
+    const firstTester = quoteSlotCharge(Math.round(input.bountyPerTaskUsd * 100), 0, 0, developer.platformFeeWaived, discountPercent);
+    const custom = !isBundleType(input.cohortType);
+    const funded = custom && developer.fundingBalanceCents >= firstTester.totalCents;
+    const built = buildCampaignData(input, developer.id, funded ? CampaignStatus.ACTIVE : CampaignStatus.ESCROW_PENDING, developer.platformFeeWaived, discountPercent);
+    const campaignData = { ...built.data, fundingModel: custom ? CohortFundingModel.PAY_PER_TESTER : CohortFundingModel.PREPAID, ...(tax ? { taxSnapshot: tax } : {}) };
+    if (draftId) await tx.taskInstruction.deleteMany({ where: { campaignId: draftId } });
+    const campaign = draftId
+      ? await tx.appCampaign.update({ where: { id: draftId }, data: campaignData })
+      : await tx.appCampaign.create({ data: campaignData });
+    if (input.promoCode && !existing?.promoRedemptions.length) for (const code of input.promoCode.split(",")) await reserveCohortPromo(tx, developer.id, campaign.id, code);
+    if (input.promoCode) await tx.cohortPromoRedemption.updateMany({
+      where: { campaignId: campaign.id, consumedAt: null },
+      data: { paymentPending: !funded, checkoutSessionId: null },
+    });
+    let checkoutAttemptId: string | null = null;
+    if (!custom) {
+      const deposit = await tx.walletTransaction.create({
+        data: {
+          userId: developer.id,
+          amountCents: built.escrowTotalCents,
+          campaignId: campaign.id,
+          platformFeeCents: Math.round(campaign.platformFeeUsd * 100),
+          ...taxLedgerFields(tax),
+          invoiceSnapshot: {
+            version: 1,
+            cohortId: campaign.id,
+            cohortTitle: input.title,
+            rewardPoolCents: built.escrowTotalCents - Math.round(campaign.platformFeeUsd * 100),
+            platformFeeCents: Math.round(campaign.platformFeeUsd * 100),
+            company: await billingCompanySnapshot(tx, developer.id),
+            ...(tax ? { tax } : {}),
+          },
+          type: TransactionType.ESCROW_DEPOSIT,
+          status: TransactionStatus.PENDING,
+          description: `Escrow deposit for ${campaign.title} (${campaign.id})`,
+        },
+      });
+      checkoutAttemptId = deposit.id;
+    }
+    return { campaign, escrowTotalCents: built.escrowTotalCents, terms: built.terms, firstTester, funded, discountPercent, checkoutAttemptId };
+  });
+}
+
 export async function createCampaignWithEscrow(data: CampaignInput, draftId?: string, options?: { topUpCents?: number }) {
+  try {
+    return await launchCampaignWithEscrow(data, draftId, options);
+  } catch (error) {
+    if (error instanceof CohortPromoError) return { promoError: error.message };
+    throw error;
+  }
+}
+
+async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, options?: { topUpCents?: number }) {
   const input = campaignSchema.parse(data);
   const developer = await requireDeveloper();
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -162,23 +242,10 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
     return { campaignId: draft.id, checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true };
   }
   const tax = stripeTaxEnabled() ? await prisma.$transaction((tx) => serviceTaxAudit(tx, developer.id)) : null;
+  if (input.promoCode) for (const code of input.promoCode.split(",")) await prepareCohortPromoRetry(developer.id, code);
 
   if (!isBundleType(input.cohortType)) {
-    const firstTester = quoteSlotCharge(Math.round(input.bountyPerTaskUsd * 100), 0, 0, developer.platformFeeWaived);
-    const funded = developer.fundingBalanceCents >= firstTester.totalCents;
-    const { data: liveData } = buildCampaignData(input, developer.id, funded ? CampaignStatus.ACTIVE : CampaignStatus.ESCROW_PENDING, developer.platformFeeWaived);
-    const payPerTester = { ...liveData, fundingModel: CohortFundingModel.PAY_PER_TESTER, ...(tax ? { taxSnapshot: tax } : {}) };
-    let live;
-    if (draftId) {
-      const ownedDraft = await prisma.appCampaign.findFirst({ where: { id: draftId, developerId: developer.id, status: CampaignStatus.DRAFT }, select: { id: true } });
-      if (!ownedDraft) throw new Error("This saved draft is unavailable or already launched.");
-      live = await prisma.$transaction(async (transaction) => {
-        await transaction.taskInstruction.deleteMany({ where: { campaignId: draftId } });
-        return transaction.appCampaign.update({ where: { id: draftId }, data: payPerTester });
-      });
-    } else {
-      live = await prisma.appCampaign.create({ data: payPerTester });
-    }
+    const { campaign: live, funded, firstTester } = await persistLaunchCampaign(input, developer, draftId, tax);
     revalidatePath("/console");
     if (funded) {
       revalidatePath("/explore");
@@ -193,8 +260,16 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
         successPath: `/console?view=overview&launched=${live.id}`,
         cancelPath: `/console?view=billing&topup=cancelled&campaign=${live.id}`,
       });
+      if (input.promoCode) await recordCohortPromoCheckout(live.id, checkout.sessionId);
       return { campaignId: live.id, checkoutUrl: checkout.url, escrowTotalCents: checkout.quote.totalCents };
     } catch (error) {
+      // Once Stripe has returned a session, retain the payment lock until it is closed.
+      const pending = input.promoCode ? await prisma.balanceTopUp.findFirst({ where: { campaignId: live.id, status: "PENDING", stripeCheckoutSessionId: { not: null } } }) : null;
+      if (input.promoCode && (pending || !(error instanceof Stripe.errors.StripeInvalidRequestError))) {
+        console.error("SeedEnv promo top-up checkout outcome requires reconciliation:", live.id, error);
+        throw new CohortPromoError("Stripe checkout could not be confirmed. Your promo remains reserved; contact support before starting another payment.");
+      }
+      if (input.promoCode) await failedCohortPromoCheckout(live.id);
       await prisma.appCampaign.updateMany({ where: { id: live.id, status: CampaignStatus.ESCROW_PENDING }, data: { status: CampaignStatus.DRAFT } });
       throw error;
     }
@@ -216,46 +291,7 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
     }
   }
 
-  const profile = await prisma.billingProfile.findUnique({ where: { userId: developer.id } });
-  const company = profile ? billingDetailsSchema.parse({ ...profile, taxId: profile.taxId || "", billingEmail: profile.billingEmail || "", addressLine2: profile.addressLine2 || "", region: profile.region || "" }) : null;
-  const { data: baseCampaignData, escrowTotalCents, terms } = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING, developer.platformFeeWaived);
-  const campaignData = { ...baseCampaignData, ...(tax ? { taxSnapshot: tax } : {}) };
-  let campaign;
-  if (draftId) {
-    const ownedDraft = await prisma.appCampaign.findFirst({
-      where: { id: draftId, developerId: developer.id, status: CampaignStatus.DRAFT },
-      select: { id: true },
-    });
-    if (!ownedDraft) throw new Error("This saved draft is unavailable or already launched.");
-    campaign = await prisma.$transaction(async (transaction) => {
-      await transaction.taskInstruction.deleteMany({ where: { campaignId: draftId } });
-      return transaction.appCampaign.update({ where: { id: draftId }, data: campaignData });
-    });
-  } else {
-    campaign = await prisma.appCampaign.create({ data: campaignData });
-  }
-
-  await prisma.walletTransaction.create({
-    data: {
-      userId: developer.id,
-      amountCents: escrowTotalCents,
-      campaignId: campaign.id,
-      platformFeeCents: Math.round(campaignData.platformFeeUsd * 100),
-      ...taxLedgerFields(tax),
-      invoiceSnapshot: {
-        version: 1,
-        cohortId: campaign.id,
-        cohortTitle: input.title,
-        rewardPoolCents: escrowTotalCents - Math.round(campaignData.platformFeeUsd * 100),
-        platformFeeCents: Math.round(campaignData.platformFeeUsd * 100),
-        company,
-        ...(tax ? { tax } : {}),
-      },
-      type: TransactionType.ESCROW_DEPOSIT,
-      status: TransactionStatus.PENDING,
-      description: `Escrow deposit for ${campaign.title} (${campaign.id})`,
-    },
-  });
+  const { campaign, escrowTotalCents, terms, discountPercent, checkoutAttemptId } = await persistLaunchCampaign(input, developer, draftId, tax);
 
   const stripe = getStripe();
   let session;
@@ -275,7 +311,7 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
             product_data: {
               tax_code: QA_SERVICE_TAX_CODE,
               name: `SeedEnv escrow: ${campaign.title}`,
-              description: checkoutDescription(input, terms, developer.platformFeeWaived),
+              description: checkoutDescription(input, terms, developer.platformFeeWaived, discountPercent),
             },
           },
         },
@@ -290,14 +326,21 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
         developerId: developer.id,
         cohortType: input.cohortType,
       },
-    });
+    }, { idempotencyKey: `seedenv-campaign-${checkoutAttemptId}` });
   } catch (error) {
+    if (input.promoCode && !(error instanceof Stripe.errors.StripeInvalidRequestError)) {
+      console.error("SeedEnv promo bundle checkout outcome requires reconciliation:", campaign.id, error);
+      throw new CohortPromoError("Stripe checkout could not be confirmed. Your promo remains reserved; contact support before starting another payment.");
+    }
     await prisma.$transaction([
       prisma.appCampaign.update({ where: { id: campaign.id }, data: { status: CampaignStatus.PAUSED } }),
       prisma.walletTransaction.updateMany({ where: { description: { contains: `(${campaign.id})` }, status: TransactionStatus.PENDING }, data: { status: TransactionStatus.FAILED } }),
     ]);
+    if (input.promoCode) await failedCohortPromoCheckout(campaign.id);
     throw error;
   }
+  if (!session.url) throw new Error("Stripe did not return a checkout link.");
+  if (input.promoCode) await recordCohortPromoCheckout(campaign.id, session.id);
 
   return { campaignId: campaign.id, checkoutUrl: session.url, escrowTotalCents };
 }

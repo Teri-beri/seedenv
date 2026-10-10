@@ -85,6 +85,8 @@ export function CompactSignupForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(() => authErrorMessage(searchParams.get("error")));
   const isAuthError = Boolean(searchParams.get("error"));
+  const [developerReferral, setDeveloperReferral] = useState(searchParams.get("devref") || "");
+  const nextPath = role === "DEVELOPER" && developerReferral.trim() ? `/account?tab=profile&devref=${encodeURIComponent(developerReferral.trim())}` : getSafeCallback(searchParams.get("callbackUrl"), role);
 
   async function continueWithEmail(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -104,11 +106,11 @@ export function CompactSignupForm() {
         companyName: role === "DEVELOPER" ? `${safeName} Studio` : "",
         productUrl: "",
       });
-      const next = getSafeCallback(searchParams.get("callbackUrl"), role);
+      const next = nextPath;
       const result = await signIn("email", {
         email: profile.email,
         redirect: false,
-        callbackUrl: `/onboarding?${profile.onboardingParams}&next=${encodeURIComponent(next)}${searchParams.get("ref") ? `&ref=${encodeURIComponent(searchParams.get("ref") || "")}` : ""}`,
+        callbackUrl: `/onboarding?${profile.onboardingParams}&next=${encodeURIComponent(next)}${role === "DEVELOPER" && developerReferral.trim() ? `&devref=${encodeURIComponent(developerReferral.trim())}` : ""}${searchParams.get("ref") ? `&ref=${encodeURIComponent(searchParams.get("ref") || "")}` : ""}`,
       });
 
       setMessage(result?.error
@@ -132,7 +134,7 @@ export function CompactSignupForm() {
         email: email.trim(),
         password,
         redirect: false,
-        callbackUrl: `/onboarding?role=${role}&next=${encodeURIComponent(getSafeCallback(searchParams.get("callbackUrl"), role))}${searchParams.get("ref") ? `&ref=${encodeURIComponent(searchParams.get("ref") || "")}` : ""}`,
+        callbackUrl: `/onboarding?role=${role}&next=${encodeURIComponent(nextPath)}${role === "DEVELOPER" && developerReferral.trim() ? `&devref=${encodeURIComponent(developerReferral.trim())}` : ""}${searchParams.get("ref") ? `&ref=${encodeURIComponent(searchParams.get("ref") || "")}` : ""}`,
       });
       if (result?.error || !result?.url) {
         setMessage("Incorrect email or password. Too many attempts will temporarily lock sign-in.");
@@ -167,9 +169,9 @@ export function CompactSignupForm() {
 
     try {
       const baseCallback = provider === "github"
-        ? getOAuthCallback("/console", "DEVELOPER")
-        : getOAuthCallback(searchParams.get("callbackUrl"), role);
-      const callbackUrl = `${baseCallback}${searchParams.get("ref") ? `&ref=${encodeURIComponent(searchParams.get("ref") || "")}` : ""}`;
+        ? getOAuthCallback(developerReferral.trim() ? `/account?tab=profile&devref=${encodeURIComponent(developerReferral.trim())}` : "/console", "DEVELOPER")
+        : getOAuthCallback(nextPath, role);
+      const callbackUrl = `${baseCallback}${(provider === "github" || role === "DEVELOPER") && developerReferral.trim() ? `&devref=${encodeURIComponent(developerReferral.trim())}` : ""}${searchParams.get("ref") ? `&ref=${encodeURIComponent(searchParams.get("ref") || "")}` : ""}`;
       const result = await signIn(provider, {
         callbackUrl,
         redirect: false,
@@ -223,6 +225,7 @@ export function CompactSignupForm() {
 
       <div className="relative flex items-center justify-center"><div className="w-full border-t border-zinc-800" /><span className="absolute bg-[#0b0c10] px-3 text-xs font-mono uppercase tracking-wider text-zinc-500">or continue with email</span></div>
 
+      {role === "DEVELOPER" ? <label className="block text-sm text-zinc-300">Developer referral code (optional)<input className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 p-3 text-base" value={developerReferral} maxLength={40} onChange={(event) => setDeveloperReferral(event.target.value.toUpperCase())} placeholder="DEV_..." /><span className="mt-1 block text-xs text-zinc-500">Your code is linked after sign-in, before your first paid cohort. Eligible developers receive a non-expiring 50% platform-fee credit in Account and Budget.</span></label> : null}
       <form className="space-y-5" onSubmit={continueWithEmail} hidden={mode !== "signup"}>
         <label className="block text-sm font-medium text-zinc-300" htmlFor="signup-name">Full name<input autoComplete="name" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signup-name" onChange={(event) => setName(event.target.value)} placeholder="Alex Morgan" required value={name} /></label>
         <label className="block text-sm font-medium text-zinc-300" htmlFor="signup-email">Email address<input autoComplete="email" className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/70 px-4 py-3 text-base text-white outline-none transition-all placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20" id="signup-email" onChange={(event) => setEmail(event.target.value)} placeholder="alex@company.com" required type="email" value={email} /></label>

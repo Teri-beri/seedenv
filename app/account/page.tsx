@@ -10,6 +10,7 @@ import { authOptions } from "@/lib/auth-options";
 import AuthCheck from "@/components/AuthCheck";
 import { AnalyticsSummary, type AnalyticsExclusionState, type AnalyticsSummaryData } from "@/components/analytics-summary";
 import { AccountSettingsForm } from "@/components/account-settings-form";
+import { DeveloperReferralSettings } from "@/components/developer-referral-settings";
 import { AccountSignOutButton } from "@/components/account-signout-button";
 import { NotificationSettingsForm } from "@/components/notification-settings-form";
 import { GitHubTokenForm } from "@/components/github-token-form";
@@ -46,7 +47,7 @@ function normalizeNotificationPreferences(value: unknown): NotificationPreferenc
   };
 }
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string; draft?: string; stripePayment?: string; stripeConnect?: string; referralError?: string; range?: string }> }) {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string; draft?: string; stripePayment?: string; stripeConnect?: string; referralError?: string; range?: string; devref?: string; developerReferralError?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/auth/signin?callbackUrl=/account");
   const params = await searchParams;
@@ -69,6 +70,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         take: 8,
       },
       accounts: { select: { provider: true } },
+      developerReferralReceived: true,
+      developerReferralsSent: { where: { qualifiedAt: { not: null } }, select: { id: true } },
+      ownedPromoCodes: { orderBy: { createdAt: "asc" }, include: { redemptions: { select: { consumedAt: true } } } },
     },
   });
   if (!user) redirect("/auth/signin?callbackUrl=/account");
@@ -193,6 +197,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                   </div>
                 ) : null}
                 <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, bio: user.bio, portfolioUrl: user.portfolioUrl, companyName: user.companyName, productUrl: user.productUrl, githubUsername: user.githubUsername, discordUrl: user.discordUrl, twitterHandle: user.twitterHandle, emailVerified: Boolean(user.emailVerified), githubConnected: user.accounts.some((account) => account.provider === "github"), role: user.role }} />
+                {user.role === "DEVELOPER" ? <><p role={params.developerReferralError ? "alert" : undefined} className="text-sm text-amber-200">{params.developerReferralError}</p><DeveloperReferralSettings shareCode={user.developerReferralCode} received={Boolean(user.developerReferralReceived)} qualifiedCount={user.developerReferralsSent.length} initialCode={params.devref} credits={user.ownedPromoCodes.map((credit) => ({ code: credit.code, state: credit.redemptions.some((entry) => entry.consumedAt) ? "Used" : credit.redemptions.length ? "Reserved (unpaid)" : "Available" }))} /></> : null}
               </div>
             ) : null}
 

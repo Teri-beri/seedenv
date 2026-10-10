@@ -51,7 +51,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       where: { testerId: session.user.id },
       orderBy: { claimedAt: "desc" },
       take: 6,
-      select: { id: true, status: true, feedbackText: true, proofImageUrl: true, rejectionReason: true, revisionRequestedAt: true, payoutCents: true, expiresAt: true, campaign: { select: { title: true } } },
+      select: { id: true, status: true, feedbackText: true, proofImageUrl: true, rejectionReason: true, denialReviewPending: true, revisionRequestedAt: true, payoutCents: true, expiresAt: true, campaign: { select: { title: true } } },
     }),
     prisma.submission.findMany({
       where: { testerId: session.user.id, status: SubmissionStatus.PENDING },

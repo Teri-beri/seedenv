@@ -15,6 +15,8 @@ const protectedRoutes = [
   { prefix: "/account", role: null, strictRole: false },
   { prefix: "/dashboard", role: "TESTER", strictRole: false },
   { prefix: "/console", role: "DEVELOPER", strictRole: false },
+  { prefix: "/admin/promos", role: null, strictRole: false },
+  { prefix: "/admin/proof-reviews", role: null, strictRole: false },
   { prefix: "/admin", role: "ADMIN", strictRole: true },
 ] as const;
 

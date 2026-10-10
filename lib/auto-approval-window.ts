@@ -12,7 +12,7 @@ export function isFraudHeld(audit: AuditHoldState) {
   return audit?.status === "FLAGGED_FRAUD" && !audit.humanClearedAt;
 }
 
-export function isAutoApprovalDue(item: { status: string; submittedAt: Date | null; revisionRequestedAt: Date | null; feedbackText: string | null; proofImageUrl: string | null; audit?: AuditHoldState }, now: Date) {
+export function isAutoApprovalDue(item: { status: string; submittedAt: Date | null; revisionRequestedAt: Date | null; feedbackText: string | null; proofImageUrl: string | null; audit?: AuditHoldState; denialReviewPending?: boolean }, now: Date) {
   const deadline = autoApproveDeadlineFrom(item.submittedAt);
-  return item.status === "PENDING" && !item.revisionRequestedAt && !isFraudHeld(item.audit) && Boolean(item.feedbackText || item.proofImageUrl) && deadline !== null && deadline <= now;
+  return item.status === "PENDING" && !item.denialReviewPending && !item.revisionRequestedAt && !isFraudHeld(item.audit) && Boolean(item.feedbackText || item.proofImageUrl) && deadline !== null && deadline <= now;
 }

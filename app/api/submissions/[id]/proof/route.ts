@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { prisma } from "@/lib/prisma";
 import { getProofImageUrl } from "@/lib/storage";
+import { canManageCohortPromos } from "@/lib/cohort-promos";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const headers = { "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" };
@@ -13,7 +14,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } }),
     prisma.submission.findUnique({ where: { id }, include: { campaign: { select: { developerId: true } } } }),
   ]);
-  if (!user || !submission || (submission.testerId !== session.user.id && submission.campaign.developerId !== session.user.id && user.role !== "ADMIN")) return NextResponse.json({ message: "Proof unavailable." }, { status: 404, headers });
+  if (!user || !submission || (submission.testerId !== session.user.id && submission.campaign.developerId !== session.user.id && !canManageCohortPromos({ id: session.user.id, role: user.role }))) return NextResponse.json({ message: "Proof unavailable." }, { status: 404, headers });
   try {
     const url = await getProofImageUrl(submission.proofImageUrl);
     if (!url) return NextResponse.json({ message: "Proof image unavailable." }, { status: 404, headers });

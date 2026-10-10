@@ -24,13 +24,24 @@ async function getOptionalViewer() {
   }
 }
 
+async function getLaunchOffer() {
+  try {
+    const offer = await prisma.cohortPromoCode.findUnique({ where: { code: "FIRSTDROP" } });
+    if (!offer || !offer.enabled || offer.ownerId || offer.discountPercent !== 100 || !offer.expiresAt || offer.expiresAt <= new Date() || offer.reservedCount >= offer.maxRedemptions) return null;
+    return { code: offer.code, remaining: offer.maxRedemptions - offer.reservedCount, expiresAt: offer.expiresAt.toISOString() };
+  } catch (error) {
+    console.error("SeedEnv landing promo availability lookup failed:", error);
+    return null;
+  }
+}
+
 export default async function Home({ searchParams }: PageProps<"/">) {
   const { view } = await searchParams;
   if (typeof view === "string" && view) {
     const destination = landingViewHref(resolveLandingView(view));
     redirect(destination.startsWith("#") ? `/${destination}` : destination);
   }
-  const [directory, viewer] = await Promise.all([
+  const [directory, viewer, launchOffer] = await Promise.all([
     prisma.appCampaign.findMany({
       where: { status: CampaignStatus.ACTIVE, expiresAt: { gt: new Date() } },
       select: {
@@ -51,7 +62,8 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       return { missions: [], unavailable: true };
     }),
     getOptionalViewer(),
+    getLaunchOffer(),
   ]);
 
-  return <PublicLanding missions={directory.missions} viewer={viewer} directoryUnavailable={directory.unavailable} />;
+  return <PublicLanding missions={directory.missions} viewer={viewer} directoryUnavailable={directory.unavailable} launchOffer={launchOffer} />;
 }

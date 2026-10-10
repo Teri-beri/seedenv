@@ -10,6 +10,7 @@ import { cancelFailedRefund, operationRefund, reserveBillingOperation } from "@/
 import { storedValueCheckoutTax, storedValueProductTax, seedenvTaxMetadata, validateStoredValueCheckout } from "@/lib/stripe/billing";
 import { storedValueTaxAudit, stripeTaxEnabled, taxLedgerFields, type TaxAudit } from "@/lib/billing/tax-policy";
 import type Stripe from "stripe";
+import { consumeCohortPromo } from "@/lib/cohort-promos";
 
 export const STALE_TOP_UP_MS = 15 * 60 * 1000;
 const CHECKOUT_EXPIRY_SECONDS = 60 * 60;
@@ -46,8 +47,10 @@ export async function billingCompanySnapshot(tx: Prisma.TransactionClient, userI
 
 // A custom cohort launched together with a top-up goes live once that top-up is paid.
 async function activateFundedCohort(tx: Prisma.TransactionClient, userId: string, campaignId: string) {
-  const campaign = await tx.appCampaign.findFirst({ where: { id: campaignId, developerId: userId, status: CampaignStatus.ESCROW_PENDING, fundingModel: "PAY_PER_TESTER", cancelledAt: null }, select: { id: true } });
+  const campaign = await tx.appCampaign.findFirst({ where: { id: campaignId, developerId: userId }, select: { id: true, platformFeeDiscountPercent: true, status: true, fundingModel: true, cancelledAt: true } });
   if (!campaign) return false;
+  if (campaign.platformFeeDiscountPercent > 0) await consumeCohortPromo(tx, campaign.id);
+  if (campaign.status !== CampaignStatus.ESCROW_PENDING || campaign.fundingModel !== "PAY_PER_TESTER" || campaign.cancelledAt) return false;
   await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: CampaignStatus.ACTIVE, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) } });
   return true;
 }
@@ -117,7 +120,7 @@ export async function createTopUpCheckout(user: TopUpMember, creditCents: number
     }, { idempotencyKey: `seedenv-topup-${topUp.id}` });
     if (!session.url) throw new Error("Stripe did not return a checkout link.");
     await prisma.balanceTopUp.update({ where: { id: topUp.id }, data: { stripeCheckoutSessionId: session.id } });
-    return { url: session.url, topUpId: topUp.id, quote };
+    return { url: session.url, topUpId: topUp.id, sessionId: session.id, quote };
   } catch (error) {
     await prisma.balanceTopUp.updateMany({ where: { id: topUp.id, status: "PENDING" }, data: { status: "FAILED", failureReason: (error instanceof Error ? error.message : "Checkout failed").slice(0, 500) } });
     throw error;
