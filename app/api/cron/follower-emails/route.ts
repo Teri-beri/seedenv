@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   const secret = process.env.CRON_SECRET;
   const actual = Buffer.from(request.headers.get("authorization") || "");
   const expected = Buffer.from(`Bearer ${secret || ""}`);
-  if (!secret || secret.length < 16 || actual.length !== expected.length || !timingSafeEqual(actual, expected)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!secret || actual.length !== expected.length || !timingSafeEqual(actual, expected)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   try {
     const result = await deliverFollowerEmails();
     return NextResponse.json(result, { status: result.failed ? 503 : 200 });
