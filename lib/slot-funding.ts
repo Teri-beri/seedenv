@@ -11,6 +11,8 @@ import { allocateSlotFunding, assertCampaignFunding, reconcileFundingPayment, re
 import { escrowMissionCredits } from "@/lib/billing/ledger";
 import { taxLedgerFields, serviceTaxAudit } from "@/lib/billing/tax-policy";
 import { consumeCohortPromo } from "@/lib/cohort-promos";
+import { recordCampaignFeeBenefits, reconcileReferralMilestone, releaseUnfundedFeeBenefits } from "@/lib/services/billing.service";
+import { revokeCampaignReferralCredits } from "@/lib/services/referral.service";
 
 type CampaignWindow = { status: CampaignStatus; cancelledAt: Date | null; expiresAt: Date };
 
@@ -43,7 +45,7 @@ export type SlotChargePreview = { credit: boolean; quote: SlotChargeQuote | null
 export async function previewNextSlotCharges(campaignIds: string[]) {
   const previews = new Map<string, SlotChargePreview>();
   if (!campaignIds.length) return previews;
-  const campaigns = await prisma.appCampaign.findMany({ where: { id: { in: campaignIds }, fundingModel: "PAY_PER_TESTER" }, select: { id: true, bountyPerTaskUsd: true, claimedSlots: true, platformFeeDiscountPercent: true, developer: { select: { platformFeeWaived: true } } } });
+  const campaigns = await prisma.appCampaign.findMany({ where: { id: { in: campaignIds }, fundingModel: "PAY_PER_TESTER" }, select: { id: true, bountyPerTaskUsd: true, claimedSlots: true, platformFeeDiscountPercent: true, firstCohortFeeWaived: true, developer: { select: { platformFeeWaived: true } } } });
   await Promise.all(campaigns.map(async (campaign) => {
     const [holds, paid] = await Promise.all([
       prisma.missionApplication.count({ where: { campaignId: campaign.id, status: "ACCEPTED", startBy: { gt: new Date() } } }),
@@ -55,7 +57,7 @@ export async function previewNextSlotCharges(campaignIds: string[]) {
     }
     previews.set(campaign.id, {
       credit: false,
-      quote: quoteSlotCharge(usdToCents(campaign.bountyPerTaskUsd), paid.reduce((sum, charge) => sum + charge.stipendCents, 0), paid.reduce((sum, charge) => sum + charge.platformFeeCents, 0), campaign.developer.platformFeeWaived, campaign.platformFeeDiscountPercent),
+      quote: quoteSlotCharge(usdToCents(campaign.bountyPerTaskUsd), paid.reduce((sum, charge) => sum + charge.stipendCents, 0), paid.reduce((sum, charge) => sum + charge.platformFeeCents, 0), campaign.developer.platformFeeWaived || campaign.firstCohortFeeWaived, campaign.platformFeeDiscountPercent),
     });
   }));
   return previews;
@@ -97,7 +99,7 @@ function acceptFromBalance(developerId: string, applicationId: string) {
       usdToCents(campaign.bountyPerTaskUsd),
       paid.reduce((sum, charge) => sum + charge.stipendCents, 0),
       paid.reduce((sum, charge) => sum + charge.platformFeeCents, 0),
-      feePolicy.platformFeeWaived,
+      feePolicy.platformFeeWaived || campaign.firstCohortFeeWaived,
       campaign.platformFeeDiscountPercent,
     );
     const funding = await escrowMissionCredits(tx, developerId, quote.totalCents, campaign.id);
@@ -132,6 +134,10 @@ function acceptFromBalance(developerId: string, applicationId: string) {
     const charge = await tx.slotCharge.create({ data: { campaignId: campaign.id, applicationId: application.id, ...quote, processingFeeCents: 0, status: "SUCCEEDED", transactionId: transaction.id } });
     if (campaign.platformFeeDiscountPercent > 0) await consumeCohortPromo(tx, campaign.id);
     await allocateSlotFunding(tx, developerId, charge.id, campaign.id, quote.totalCents);
+    if (campaign.referralPolicyVersion === 1) {
+      await recordCampaignFeeBenefits(tx, campaign.id);
+      await reconcileReferralMilestone(tx, campaign.id);
+    }
     await accept();
     return { kind: "debited", quote, balanceCents };
   });
@@ -199,6 +205,7 @@ async function refundSlotCharge(chargeId: string) {
     }
     await tx.appCampaign.update({ where: { id: charge.campaignId }, data: { refundedCents: { increment: operation.amountCents } } });
     await tx.walletTransaction.create({ data: { userId: charge.campaign.developerId, amountCents: operation.amountCents, campaignId: charge.campaignId, platformFeeCents: -operation.feeCents, type: TransactionType.ESCROW_REFUND, status: TransactionStatus.COMPLETED, stripePaymentId: refund?.id ?? null, description: refund ? `Unused tester slot refunded for ${charge.campaign.title} (${charge.campaignId})` : `Unused tester place credited to balance for ${charge.campaign.title} (${charge.campaignId})` } });
+    await revokeCampaignReferralCredits(tx, charge.campaignId, "Qualifying tester escrow refunded");
     await tx.billingOperation.update({ where: { id: operation.id }, data: { state: "SETTLED", remoteId: refund?.id, error: null } });
     return operation.amountCents;
   });
@@ -249,6 +256,7 @@ async function refundPrepaidCampaign(campaignId: string) {
       await releaseReplacementFunding(tx, campaignId, operation.amountCents);
     }
     await tx.walletTransaction.create({ data: { userId: campaign.developerId, amountCents: operation.amountCents, campaignId, platformFeeCents: -operation.feeCents, type: TransactionType.ESCROW_REFUND, status: TransactionStatus.COMPLETED, stripePaymentId: refund?.id, description: `Unused escrow refunded for ${campaign.title} (${campaignId})` } });
+    await revokeCampaignReferralCredits(tx, campaignId, "Qualifying cohort escrow refunded");
     await tx.billingOperation.update({ where: { id: operation.id }, data: { state: "SETTLED", remoteId: refund?.id, error: null } });
     return operation.amountCents;
   });
@@ -258,6 +266,10 @@ async function refundPrepaidCampaign(campaignId: string) {
 export async function reconcileCampaignFunding(campaignId: string, now = new Date()) {
   const campaign = await prisma.appCampaign.findUnique({ where: { id: campaignId } });
   if (!campaign || !campaignHasEnded(campaign, now)) return { refundedCents: 0, finalized: false };
+  await serializable(async tx => {
+    if (campaign.cancelledAt || campaign.refundedCents > 0) await revokeCampaignReferralCredits(tx, campaignId, "Qualifying cohort cancelled or refunded");
+    if (campaign.referralPolicyVersion === 1 && campaign.fundingModel === "PAY_PER_TESTER" && !await tx.balanceTopUp.findFirst({ where: { campaignId, status: "PENDING" } })) await releaseUnfundedFeeBenefits(tx, campaignId);
+  });
   let refundedCents = 0;
   if (campaign.fundingModel === "PAY_PER_TESTER") {
     const [holds, paid] = await Promise.all([
@@ -318,6 +330,7 @@ export async function cancelCohort(developerId: string, campaignId: string, isAd
       if (application.passReserved) await tx.user.update({ where: { id: application.testerId }, data: { discoveryPasses: { increment: 1 } } });
     }
     await tx.appCampaign.update({ where: { id: campaignId }, data: { cancelledAt: new Date(), status: campaign.status === CampaignStatus.ACTIVE ? CampaignStatus.PAUSED : campaign.status } });
+    await revokeCampaignReferralCredits(tx, campaignId, "Qualifying cohort cancelled");
     const inProgress = await tx.submission.count({ where: { campaignId, status: "PENDING" } });
     return { closedApplications: open.length, inProgress };
   });

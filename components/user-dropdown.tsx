@@ -16,6 +16,8 @@ const itemClass = "flex items-center px-3 py-1.5 rounded-lg transition-colors";
 const workspaceLinks = [
   { label: "Launch Circle", href: "/community", mobileOnly: true },
   { label: "Tester Applications", href: "/applications" },
+  { label: "Messages & Requests", href: "/messages" },
+  { label: "Connections", href: "/account?tab=connections" },
   { label: "Clippers", href: "/clippers" },
 ] as const;
 
@@ -60,7 +62,7 @@ export function UserDropdown({ account }: { account: DropdownAccount }) {
           <div className="py-1">
             {account.publicProfileHref ? (
               <Link role="menuitem" href={account.publicProfileHref} onClick={dismiss} className={`${itemClass} justify-between text-zinc-300 hover:bg-zinc-800/70 hover:text-white`}>
-                <span>Public Developer Profile</span>
+                <span>Public Profile</span>
                 <span className="text-[10px] text-zinc-500">↗</span>
               </Link>
             ) : (

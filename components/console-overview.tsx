@@ -26,6 +26,7 @@ export type ConsoleCohort = {
   platformFeeUsd: number;
   fundingModel: "PREPAID" | "PAY_PER_TESTER";
   paidStipendCents: number | null;
+  clickCount?: number;
 };
 
 const platformLabels: Record<PlatformType, string> = {
@@ -60,7 +61,7 @@ export function ConsoleMetricStrip({ metrics }: { metrics: ConsoleMetrics }) {
 
 export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; total: number }) {
   return (
-    <section aria-labelledby="active-cohorts-heading" className="mb-10">
+    <section id="active-cohorts" aria-labelledby="active-cohorts-heading" className="mb-10 scroll-mt-20">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 id="active-cohorts-heading" className="text-sm font-semibold text-zinc-100">
           Active Cohorts {total ? <span className="ml-1 font-mono text-xs font-normal text-zinc-500">{total}</span> : null}
@@ -93,6 +94,7 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
                     <td className="max-w-xs px-4 py-3">
                       <Link href="/console?view=review-deck" className="block truncate font-medium text-zinc-100 hover:underline">{cohort.title}</Link>
                       <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">{cohort.fundingModel === "PAY_PER_TESTER" ? "Charged per accepted tester" : "Prepaid escrow"}</span>
+                      <span title="Public brief clicks from other members and visitors, counted once per visitor per UTC day. Your signed-in clicks, bots, local previews and opted-out traffic are excluded. Tracking starts with this release." className="mt-2 inline-flex rounded-md border border-emerald-400/20 bg-emerald-400/5 px-2 py-1 font-mono text-[10px] text-emerald-300">{(cohort.clickCount ?? 0).toLocaleString()} brief clicks</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-zinc-400">{platformLabels[cohort.platform]}</td>
                     <td className="px-4 py-3">

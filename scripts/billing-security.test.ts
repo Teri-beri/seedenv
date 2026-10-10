@@ -10,6 +10,7 @@ function harness() {
     user: [{ id: "dev", fundingBalanceCents: 5000 }, { id: "tester", walletBalanceCents: 0, stripeConnectAccountId: "acct_test" }],
     appCampaign: [{ id: "campaign", developerId: "dev", title: "Security fixture", fundingModel: "PREPAID", status: "PAUSED", cancelledAt: new Date(), expiresAt: new Date(0), totalSlots: 3, claimedSlots: 1, bountyPerTaskUsd: 10, platformFeeUsd: 0, refundedCents: 0, billingHoldCents: 0 }],
     balanceTopUp: [], slotCharge: [], walletTransaction: [], billingOperation: [], fundingReversal: [], fundingAllocation: [], submission: [],
+    feeCredit: [], firstCohortBenefit: [], referralAudit: [], cohortPromoRedemption: [],
   };
   const remote = {
     refunds: [] as Row[], transfers: [] as Row[], disputes: [] as Row[],

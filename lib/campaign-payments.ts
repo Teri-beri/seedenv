@@ -9,10 +9,19 @@ import { taxLedgerFields } from "@/lib/billing/tax-policy";
 import { validateServiceCheckout } from "@/lib/stripe/billing";
 import { invoiceSnapshotSchema } from "@/lib/enterprise-rules";
 import { consumeCohortPromo } from "@/lib/cohort-promos";
+import { queueFollowerEmails } from "@/lib/social-connections";
+import { recordCampaignFeeBenefits, reconcileReferralMilestone } from "@/lib/services/billing.service";
+import { releaseExpiredCampaignCheckout } from "@/lib/services/checkout-reconciliation";
 
 export type CampaignPaymentEvent = { type: string; data: { object: { id?: string } } };
 
 export async function handleStripeWebhook(event: CampaignPaymentEvent) {
+  if (event.type === "checkout.session.expired") {
+    if (!event.data.object.id) throw new Error("Expired checkout event has no session ID.");
+    const session = await getStripe().checkout.sessions.retrieve(event.data.object.id);
+    if (session.metadata?.type === "SEEDENV_BALANCE_TOPUP") return { awaitingTopUpSweep: true };
+    return releaseExpiredCampaignCheckout(session);
+  }
   if (["charge.refunded", "refund.updated", "refund.created", "refund.failed", "charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed", "charge.dispute.funds_withdrawn", "charge.dispute.funds_reinstated"].includes(event.type)) {
     if (!event.data.object.id) throw new Error("Stripe reversal event has no object ID.");
     return handleFundingReversal(event.type, event.data.object.id);
@@ -44,6 +53,7 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
   const result = await serializable(async (tx) => {
     const campaign = await tx.appCampaign.findUnique({ where: { id: metadata.campaignId } });
     if (!campaign || campaign.developerId !== metadata.developerId) throw new Error("Campaign funding ownership does not match.");
+    if (campaign.referralPolicyVersion === 1 && (!metadata.checkoutAttemptId || metadata.checkoutAttemptId !== campaign.fundingCheckoutAttemptId || campaign.fundingCheckoutSessionId && campaign.fundingCheckoutSessionId !== session.id)) throw new Error("Campaign funding does not match its current checkout attempt.");
     const serviceTax = validateServiceCheckout(session, campaign.taxSnapshot);
     const amount = usdToCents(campaign.totalBudgetUsd);
     if (session.currency !== "usd" || session.amount_total !== amount) throw new Error("Campaign funding amount or currency does not match.");
@@ -51,6 +61,7 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     const deposits = await tx.walletTransaction.findMany({ where: { userId: campaign.developerId, type: "ESCROW_DEPOSIT", description, status: { in: ["PENDING", "COMPLETED"] } } });
     if (deposits.some((deposit) => deposit.status === "COMPLETED" && deposit.stripePaymentId === paymentId && deposit.amountCents === amount)) return { duplicate: true, campaignId: campaign.id };
     if (campaign.status !== "ESCROW_PENDING") throw new Error("This campaign is not awaiting funding. Reconcile the payment before changing its state.");
+    if (campaign.referralPolicyVersion === 1 && deposits[0]?.id !== metadata.checkoutAttemptId) throw new Error("Campaign payment does not match its reserved escrow ledger.");
     if (deposits.length !== 1 || deposits[0].status !== "PENDING" || deposits[0].amountCents !== amount) throw new Error("The campaign funding ledger needs reconciliation.");
     await tx.walletTransaction.update({ where: { id: deposits[0].id }, data: {
       status: "COMPLETED", stripePaymentId: paymentId, campaignId: campaign.id, ...taxLedgerFields(serviceTax),
@@ -58,8 +69,13 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     } });
     await reconcileFundingPayment(tx, paymentId);
     if (campaign.platformFeeDiscountPercent > 0) await consumeCohortPromo(tx, campaign.id);
+    if (campaign.referralPolicyVersion === 1) await recordCampaignFeeBenefits(tx, campaign.id);
     if (campaign.cancelledAt) return { cancelledBeforePayment: true, campaignId: campaign.id };
     await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: "ACTIVE", ...(serviceTax ? { taxSnapshot: serviceTax } : {}) } });
+    if (campaign.referralPolicyVersion === 1) {
+      await reconcileReferralMilestone(tx, campaign.id);
+    }
+    await queueFollowerEmails(tx, campaign.developerId, `cohort:${campaign.id}`, `/cohorts/${campaign.id}`, "A developer you follow launched a new cohort");
     return { activated: true, campaignId: campaign.id };
   });
   // A cohort cancelled while checkout was open is refunded instead of activated.

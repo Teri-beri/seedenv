@@ -10,12 +10,14 @@ const sections = [
       { label: "Account & Authentication Information", text: "When you sign up or log in (via email magic links, GitHub, or Google OAuth), we collect your name, email address, username, and authentication identifiers." },
       { label: "Company Billing & Support", text: "Company billing records include the company name, supplied tax identifier, and billing address. Checkout receipts retain a billing snapshot. Support requests include the account identifier, role, selected category, message, application route, and browser/OS user-agent context to investigate your request." },
       { label: "Public Launch Circle", text: "Developer updates explicitly marked public, their author usernames, and visible comments are accessible without signing in. Older members-only updates remain restricted unless made public through an explicit publishing choice. Do not include confidential builds, credentials, or personal data in public discussions." },
+      { label: "Profiles, Connections & Messages", text: "Developer and tester profiles show your chosen handle, avatar, biography, links, join date, follow counts, aggregate platform statistics and visible Launch Circle activity. They do not show your email, wallet, private proof files or direct messages. We store follow relationships, per-developer email choices, message requests, conversation messages and blocks to provide member connections. Direct messages are accessible to their participants; reporting a conversation shares a disclosed recent excerpt with authorized SeedEnv support reviewers. Messages are not end-to-end encrypted. Members-only Launch Circle activity remains restricted to signed-in members." },
       { label: "Developers", text: "Organization details, project URLs, test build files/links, campaign specifications, and payout/funding preferences." },
       { label: "Testers", text: "Device specifications, operating system versions, testing hardware profiles, and feedback submissions." },
       { label: "Test Submissions & Proof Files", text: "Files uploaded to verify completed tasks, including bug reports, crash logs, system diagnostics, feedback notes, screenshots, and screen recordings." },
       { label: "Clippers & Connected Social Accounts", text: "Creator biographies, portfolio and social profile URLs, campaign room messages, private video versions, publication evidence, agreement terms, and payment references. With your authorization, TikTok provides your account identifier, display name, and selected public-video metadata. Access and refresh tokens are encrypted at rest using a dedicated application key and are never shared with other members." },
       { label: "Payment & Transaction Details", text: "Payment processing, campaign escrow, and tester reward payouts are handled by third-party payment processors (such as Stripe). We do not store complete credit card numbers or banking account credentials directly on our servers; we retain only reference transaction tokens, payout status, and invoice histories." },
       { label: "Automated Technical Data", text: "IP addresses, browser type, device identifiers, session timestamps, and interaction events recorded via server logs and privacy-preserving analytics." },
+      { label: "Cohort Brief Clicks", text: "When you click a public cohort brief, we store its cohort identifier, timestamp and a daily hashed visitor key, not your raw account ID or IP address. A cohort's developer sees only the aggregate count, deduplicated per visitor per UTC day. Signed-in owners, bots, local previews and analytics opt-outs are excluded. No tracking is triggered by prefetching or simply refreshing a brief." },
     ],
   },
   {
@@ -27,6 +29,7 @@ const sections = [
       "Managing campaign rewards, bounties, and escrow disbursement via our payment partners.",
       "Detecting, preventing, and mitigating fraudulent behavior, bot registrations, duplicate accounts, and invalid submission proofs.",
       "Sending essential service communications, such as authentication links, campaign updates, submission approvals, and security alerts.",
+      "Sending opt-in email updates about developers you follow when they launch a cohort or publish in Launch Circle. Tester follows do not send emails. You can disable emails per developer or unfollow in Account Connections, and disable new message requests or block members in Message privacy.",
     ],
   },
   {

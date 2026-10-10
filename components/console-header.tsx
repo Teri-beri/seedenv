@@ -13,6 +13,7 @@ const tabs = [
   { label: "Artifacts", href: "/console?view=asset-vault", view: "asset-vault" },
   { label: "Billing", href: "/console?view=billing", view: "billing" },
   { label: "Launch Circle", href: "/community", view: null },
+  { label: "Messages", href: "/messages", view: null },
 ] as const;
 
 export function ConsoleHeader({ activeView, paymentsMode, account }: { activeView: ConsoleView; paymentsMode: "live" | "test"; account: DropdownAccount }) {

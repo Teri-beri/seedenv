@@ -15,6 +15,7 @@ async function getOptionalViewer() {
     return await prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
+        id: true,
         role: true,
       },
     });
@@ -46,6 +47,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
       where: { status: CampaignStatus.ACTIVE, expiresAt: { gt: new Date() } },
       select: {
         id: true,
+        developerId: true,
         title: true,
         iconUrl: true,
         platform: true,

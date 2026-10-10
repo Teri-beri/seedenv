@@ -9,8 +9,10 @@ import { reconcileFundingPayment } from "@/lib/funding-reversals";
 import { cancelFailedRefund, operationRefund, reserveBillingOperation } from "@/lib/billing-operations";
 import { storedValueCheckoutTax, storedValueProductTax, seedenvTaxMetadata, validateStoredValueCheckout } from "@/lib/stripe/billing";
 import { storedValueTaxAudit, stripeTaxEnabled, taxLedgerFields, type TaxAudit } from "@/lib/billing/tax-policy";
-import type Stripe from "stripe";
 import { consumeCohortPromo } from "@/lib/cohort-promos";
+import { queueFollowerEmails } from "@/lib/social-connections";
+import { releaseUnfundedFeeBenefits } from "@/lib/services/billing.service";
+import Stripe from "stripe";
 
 export const STALE_TOP_UP_MS = 15 * 60 * 1000;
 const CHECKOUT_EXPIRY_SECONDS = 60 * 60;
@@ -47,11 +49,13 @@ export async function billingCompanySnapshot(tx: Prisma.TransactionClient, userI
 
 // A custom cohort launched together with a top-up goes live once that top-up is paid.
 async function activateFundedCohort(tx: Prisma.TransactionClient, userId: string, campaignId: string) {
-  const campaign = await tx.appCampaign.findFirst({ where: { id: campaignId, developerId: userId }, select: { id: true, platformFeeDiscountPercent: true, status: true, fundingModel: true, cancelledAt: true } });
+  const campaign = await tx.appCampaign.findFirst({ where: { id: campaignId, developerId: userId }, select: { id: true, platformFeeDiscountPercent: true, referralPolicyVersion: true, status: true, fundingModel: true, cancelledAt: true } });
   if (!campaign) return false;
   if (campaign.platformFeeDiscountPercent > 0) await consumeCohortPromo(tx, campaign.id);
   if (campaign.status !== CampaignStatus.ESCROW_PENDING || campaign.fundingModel !== "PAY_PER_TESTER" || campaign.cancelledAt) return false;
   await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: CampaignStatus.ACTIVE, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) } });
+  if (campaign.referralPolicyVersion === 1) await tx.firstCohortBenefit.updateMany({ where: { campaignId: campaign.id, fundedAt: null }, data: { fundedAt: new Date() } });
+  await queueFollowerEmails(tx, userId, `cohort:${campaign.id}`, `/cohorts/${campaign.id}`, "A developer you follow launched a new cohort");
   return true;
 }
 
@@ -118,11 +122,15 @@ export async function createTopUpCheckout(user: TopUpMember, creditCents: number
       cancel_url: `${base}${options.cancelPath}`,
       metadata: { ...seedenvTaxMetadata(), seedenvAutomaticTax: stripeTaxEnabled() ? "1" : "0", type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id, seedenvUserId: user.id },
     }, { idempotencyKey: `seedenv-topup-${topUp.id}` });
-    if (!session.url) throw new Error("Stripe did not return a checkout link.");
     await prisma.balanceTopUp.update({ where: { id: topUp.id }, data: { stripeCheckoutSessionId: session.id } });
+    if (!session.url) throw new Error("Stripe did not return a checkout link.");
     return { url: session.url, topUpId: topUp.id, sessionId: session.id, quote };
   } catch (error) {
-    await prisma.balanceTopUp.updateMany({ where: { id: topUp.id, status: "PENDING" }, data: { status: "FAILED", failureReason: (error instanceof Error ? error.message : "Checkout failed").slice(0, 500) } });
+    if (error instanceof Stripe.errors.StripeInvalidRequestError) {
+      await prisma.balanceTopUp.updateMany({ where: { id: topUp.id, status: "PENDING" }, data: { status: "FAILED", failureReason: error.message.slice(0, 500) } });
+    } else {
+      console.error("SeedEnv top-up checkout outcome requires reconciliation:", topUp.id, error);
+    }
     throw error;
   }
 }
@@ -270,12 +278,16 @@ export async function withdrawBalance(userId: string) {
 async function resolveStaleTopUp(topUp: { id: string; source: string; stripeCheckoutSessionId: string | null; campaignId: string | null; userId: string; createdAt: Date }, now: Date) {
   const stripe = getStripe();
   const markFailed = async (reason: string) => {
-    await prisma.balanceTopUp.updateMany({ where: { id: topUp.id, status: "PENDING" }, data: { status: "FAILED", failureReason: reason } });
-    // A launch that was never paid returns to an editable draft.
-    if (topUp.campaignId) await prisma.appCampaign.updateMany({ where: { id: topUp.campaignId, developerId: topUp.userId, status: CampaignStatus.ESCROW_PENDING, fundingModel: "PAY_PER_TESTER" }, data: { status: CampaignStatus.DRAFT } });
+    await serializable(async tx => {
+      const changed = await tx.balanceTopUp.updateMany({ where: { id: topUp.id, status: "PENDING" }, data: { status: "FAILED", failureReason: reason } });
+      if (!changed.count || !topUp.campaignId || await tx.balanceTopUp.findFirst({ where: { campaignId: topUp.campaignId, status: "PENDING" } })) return;
+      await tx.appCampaign.updateMany({ where: { id: topUp.campaignId, developerId: topUp.userId, status: CampaignStatus.ESCROW_PENDING, fundingModel: "PAY_PER_TESTER" }, data: { status: CampaignStatus.DRAFT } });
+      await tx.cohortPromoRedemption.updateMany({ where: { campaignId: topUp.campaignId, consumedAt: null }, data: { paymentPending: false, checkoutSessionId: null } });
+      await releaseUnfundedFeeBenefits(tx, topUp.campaignId);
+    });
   };
   if (topUp.source === "CHECKOUT") {
-    if (!topUp.stripeCheckoutSessionId) return markFailed("Checkout was never created.");
+    if (!topUp.stripeCheckoutSessionId) throw new Error(`Top-up ${topUp.id} has an unknown checkout outcome; retain its reservations for operator reconciliation.`);
     const session = await stripe.checkout.sessions.retrieve(topUp.stripeCheckoutSessionId);
     const paymentIntentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
     if (session.status === "complete" && session.payment_status === "paid" && paymentIntentId) {
@@ -284,7 +296,9 @@ async function resolveStaleTopUp(topUp: { id: string; source: string; stripeChec
     }
     if (session.status === "expired") return markFailed("Checkout expired before payment.");
     if (now.getTime() - topUp.createdAt.getTime() > CHECKOUT_LIFETIME_MS) {
-      try { await stripe.checkout.sessions.expire(session.id); } catch { /* already closed */ }
+      if (session.status !== "open") throw new Error(`Top-up ${topUp.id} is awaiting payment settlement; reservations retained.`);
+      const closed = await stripe.checkout.sessions.expire(session.id);
+      if (closed.status !== "expired") throw new Error("Checkout could not be confirmed expired; reservations retained.");
       return markFailed("Checkout was abandoned.");
     }
     return;

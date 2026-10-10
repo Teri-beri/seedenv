@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireMember } from "@/lib/member";
 import { serializable } from "@/lib/quest-ledger";
+import { queueFollowerEmails } from "@/lib/social-connections";
 
 export async function publishPost(body: string, publicVisible = false) {
   const member = await requireMember("DEVELOPER");
@@ -12,7 +13,8 @@ export async function publishPost(body: string, publicVisible = false) {
   await serializable(async (tx) => {
     const count = await tx.communityPost.count({ where: { authorId: member.id, createdAt: { gte: new Date(Date.now() - 86400000) } } });
     if (count >= 5) throw new Error("You can publish up to five app updates per rolling 24 hours.");
-    await tx.communityPost.create({ data: { authorId: member.id, body: text, publicVisible: visibility } });
+    const post = await tx.communityPost.create({ data: { authorId: member.id, body: text, publicVisible: visibility } });
+    await queueFollowerEmails(tx, member.id, `post:${post.id}`, `/community/${post.id}`, `@${member.username} posted a Launch Circle update`);
   });
   revalidatePath("/community");
   revalidatePath("/");

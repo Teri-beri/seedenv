@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { publicPageMetadata } from "@/lib/seo";
+import { CohortBriefLink } from "@/components/cohort-brief-link";
 
 export const dynamic = "force-dynamic";
 export const metadata = publicPageMetadata("Explore Beta Testing Missions", "Browse active mobile and web beta testing missions, compare tester rewards, and review feedback requirements before joining SeedEnv.", "/explore");
@@ -25,7 +26,7 @@ export default async function ExplorePage() {
           return (
             <article key={mission.id} className="py-6">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <h2 className="!mt-0 break-words">{mission.title}</h2>
+                <h2 className="!mt-0 break-words"><CohortBriefLink campaignId={mission.id}>{mission.title}</CohortBriefLink></h2>
                 <span className="font-mono font-semibold text-emerald-300">${mission.bountyPerTaskUsd.toFixed(2)} / approved task</span>
               </div>
               <p className="break-words">{mission.description}</p>

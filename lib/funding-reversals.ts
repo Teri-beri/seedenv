@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { billingTransaction as serializable } from "@/lib/billing-transaction";
 import { getStripe } from "@/lib/stripe";
+import { revokeCampaignReferralCredits } from "@/lib/services/referral.service";
 
 export function reversedFundingCents(creditCents: number, refundCents: number, disputeCents: number) {
   return Math.min(creditCents, Math.max(0, refundCents) + Math.max(0, disputeCents));
@@ -76,6 +77,14 @@ export async function reconcileFundingPayment(tx: Prisma.TransactionClient, paym
     } });
   }
   await tx.fundingReversal.update({ where: { paymentId }, data: { reversedCents: externalRefunds, disputedCents, appliedCents: reversedCents, userId, campaignId, topUpId: topUp?.id ?? null } });
+  if (externalRefunds > 0 || disputedCents > 0) {
+    const affected = new Set<string>(campaignId ? [campaignId] : []);
+    if (topUp) {
+      const allocations = await tx.fundingAllocation.findMany({ where: { topUpId: topUp.id }, select: { campaignId: true } });
+      allocations.forEach(allocation => affected.add(allocation.campaignId));
+    }
+    for (const id of affected) await revokeCampaignReferralCredits(tx, id, disputedCents > 0 ? "Stripe funding dispute" : "Stripe funding refund");
+  }
 }
 
 export async function handleFundingReversal(type: string, id: string) {

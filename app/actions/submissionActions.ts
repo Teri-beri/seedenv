@@ -21,6 +21,7 @@ import { startAcceptedApplication } from "@/lib/mission-applications";
 import { versionDirections } from "@/lib/instruction-versions";
 import { auditSubmission } from "@/lib/ai/qa-audit";
 import { assertProofEditable, rejectProof, requestProofRevision, startProofRevision } from "@/lib/submission-lifecycle";
+import { reconcileReferralMilestone } from "@/lib/services/billing.service";
 
 const proofSchema = z.object({
   proofImageBase64: z.string().max(7 * 1024 * 1024).optional(),
@@ -121,6 +122,7 @@ export async function claimTaskSlot(campaignId: string) {
         payoutCents: usdToCents(campaign.bountyPerTaskUsd),
       },
     });
+    if (campaign.referralPolicyVersion === 1) await reconcileReferralMilestone(tx, campaignId);
     return { ...submission, acceptedDirections: versionDirections(version), instructionRevision: version.revision };
   });
 }

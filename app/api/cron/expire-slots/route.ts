@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { expireSlots } from "@/app/actions/submissionActions";
 import { sweepCampaignFunding } from "@/lib/slot-funding";
+import { reconcileReferralCredits } from "@/lib/services/referral-worker";
 
 async function run() {
   const slots = await expireSlots();
-  return { ...slots, funding: await sweepCampaignFunding() };
+  return { ...slots, funding: await sweepCampaignFunding(), referrals: await reconcileReferralCredits() };
 }
 
 function authorized(request: NextRequest) {

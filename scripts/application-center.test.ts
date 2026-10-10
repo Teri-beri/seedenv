@@ -34,6 +34,6 @@ test("pending requests precede history and eligibility controls, with visible re
   }
 });
 
-test("landing anchor navigation follows developer, live cohorts, then validator sections", () => {
-  assert.deepEqual(landingViews.map((view) => view.anchor), ["top", "engine", "cohorts", "validators", "pricing", "pwa"]);
+test("landing anchor navigation follows live cohorts, developer, then validator sections", () => {
+  assert.deepEqual(landingViews.map((view) => view.anchor), ["top", "cohorts", "engine", "validators", "pricing", "pwa"]);
 });

@@ -6,6 +6,7 @@ import { billingTransaction } from "@/lib/billing-transaction";
 import { getStripe } from "@/lib/stripe";
 import { quoteCampaignFunding } from "@/lib/pricing";
 import { qualifyDeveloperReferral } from "@/lib/developer-referrals";
+import { releaseUnfundedFeeBenefits } from "@/lib/services/billing.service";
 
 export const promoCodeSchema = z.string().trim().toUpperCase().regex(/^[A-Z0-9][A-Z0-9_-]{2,39}$/, "Use 3-40 letters, numbers, hyphens or underscores.");
 export const promoStackSchema = z.string().trim().toUpperCase().max(81).transform((value) => value.split(",").map((code) => code.trim()).filter(Boolean)).pipe(z.array(promoCodeSchema).max(2).refine((codes) => new Set(codes).size === codes.length, "Each code can appear only once.")).transform((codes) => codes.join(","));
@@ -48,8 +49,10 @@ export async function reserveCohortPromo(tx: Prisma.TransactionClient, developer
       const normal = quoteCampaignFunding(old.totalSlots * old.bountyPerTaskUsd, old.cohortType);
       await tx.appCampaign.update({ where: { id: old.id }, data: {
         status: "DRAFT", platformFeeDiscountPercent: 0, promoCodeDraft: null,
+        ...(old.referralPolicyVersion === 1 ? { firstCohortFeeWaived: false, referralDiscountPercent: 0, promoDiscountPercent: 0 } : {}),
         totalBudgetUsd: normal.totalBudgetUsd, platformFeeUsd: normal.platformFeeUsd,
       } });
+      if (old.referralPolicyVersion === 1) await releaseUnfundedFeeBenefits(tx, old.id);
       const companions = await tx.cohortPromoRedemption.findMany({ where: { campaignId: old.id, id: { not: previous.id } } });
       for (const companion of companions) {
         if (companion.consumedAt || companion.paymentPending) throw new CohortPromoError("The previous cohort still has paid or pending discounts; reconcile it before moving credits.");
@@ -120,5 +123,6 @@ export async function prepareCohortPromoRetry(developerId: string, rawCode: stri
       data: { status: "FAILED" },
     });
     await tx.appCampaign.updateMany({ where: { id: current.campaignId, status: { in: ["ESCROW_PENDING", "PAUSED"] } }, data: { status: "DRAFT" } });
+    await releaseUnfundedFeeBenefits(tx, current.campaignId);
   });
 }

@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = publicPageMetadata("Launch Circle", "Developer launch updates, build notes, and discussion from the SeedEnv community.", "/community");
 
 type FeedSort = "latest" | "discussed";
-type FeedScope = "all" | "public" | "members";
+type FeedScope = "all" | "public" | "members" | "following";
 
 function feedHref(sort: FeedSort, scope: FeedScope, page = 1) {
   const query = new URLSearchParams();
@@ -30,7 +30,7 @@ function FeedFilters({ sort, scope, member }: { sort: FeedSort; scope: FeedScope
   const tab = (active: boolean) => `inline-flex min-h-9 items-center rounded-md px-3 transition-colors ${active ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white"}`;
   return <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4 font-mono text-xs">
     <nav aria-label="Sort feed" className="inline-flex rounded-lg border border-white/10 p-0.5">{([["latest", "Latest"], ["discussed", "Most discussed"]] as const).map(([value, label]) => <Link key={value} href={feedHref(value, scope)} aria-current={sort === value ? "page" : undefined} className={tab(sort === value)}>{label}</Link>)}</nav>
-    {member ? <nav aria-label="Filter feed" className="inline-flex rounded-lg border border-white/10 p-0.5">{([["all", "All"], ["public", "Public"], ["members", "Members only"]] as const).map(([value, label]) => <Link key={value} href={feedHref(sort, value)} aria-current={scope === value ? "page" : undefined} className={tab(scope === value)}>{label}</Link>)}</nav> : null}
+    {member ? <nav aria-label="Filter feed" className="inline-flex flex-wrap rounded-lg border border-white/10 p-0.5">{([["all", "All"], ["following", "Following"], ["public", "Public"], ["members", "Members only"]] as const).map(([value, label]) => <Link key={value} href={feedHref(sort, value)} aria-current={scope === value ? "page" : undefined} className={tab(scope === value)}>{label}</Link>)}</nav> : null}
   </div>;
 }
 
@@ -39,8 +39,8 @@ export default async function CommunityPage({ searchParams }: { searchParams: Pr
   const params = await searchParams;
   const page = Math.max(1, Math.min(10000, Number.parseInt(params.page || "1", 10) || 1));
   const sort: FeedSort = params.sort === "discussed" ? "discussed" : "latest";
-  const scope: FeedScope = user && (params.show === "public" || params.show === "members") ? params.show : "all";
-  const visibility = !user || scope === "public" ? { publicVisible: true } : scope === "members" ? { publicVisible: false } : {};
+  const scope: FeedScope = user && (params.show === "public" || params.show === "members" || params.show === "following") ? params.show : "all";
+  const visibility = !user || scope === "public" ? { publicVisible: true } : scope === "members" ? { publicVisible: false } : scope === "following" ? { author: { followers: { some: { followerId: user.id } } } } : {};
   const [directory, reports] = await Promise.all([
     prisma.communityPost.findMany({ where: { hidden: false, ...visibility }, orderBy: sort === "discussed" ? [{ comments: { _count: "desc" } }, { createdAt: "desc" }, { id: "desc" }] : [{ createdAt: "desc" }, { id: "desc" }], skip: (page - 1) * 20, take: 21, include: { author: { select: circleAuthorSelect }, comments: { where: { hidden: false }, orderBy: { createdAt: "desc" }, take: 5, include: { author: { select: circleAuthorSelect } } }, _count: { select: { comments: { where: { hidden: false } } } } } }).then((posts) => ({ posts, unavailable: false })).catch((error: unknown) => { console.error("SeedEnv Launch Circle feed unavailable:", error); return { posts: [], unavailable: true }; }),
     user?.role === "ADMIN" ? prisma.communityReport.findMany({ where: { resolved: false }, include: { post: true, comment: true }, orderBy: { createdAt: "asc" }, take: 50 }) : Promise.resolve([]),

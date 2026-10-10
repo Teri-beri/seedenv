@@ -1,5 +1,4 @@
 import type { MetadataRoute } from "next";
-import { UserRole } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isPublicHandle, publicProfilePath, SEED_ACCOUNT_EMAIL_SUFFIX } from "@/lib/public-profile";
 import { SITE_URL } from "@/lib/seo";
@@ -11,7 +10,7 @@ export const revalidate = 3600;
 async function developerProfiles(): Promise<MetadataRoute.Sitemap> {
   try {
     const users = await prisma.user.findMany({
-      where: { NOT: { email: { endsWith: SEED_ACCOUNT_EMAIL_SUFFIX } }, OR: [{ role: { in: [UserRole.DEVELOPER, UserRole.ADMIN] } }, { developerWorkspaceEnabled: true }] },
+      where: { NOT: { email: { endsWith: SEED_ACCOUNT_EMAIL_SUFFIX } } },
       select: { username: true, updatedAt: true },
       take: 5000,
     });

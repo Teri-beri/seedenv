@@ -1,0 +1,28 @@
+name: Deliver developer follower updates
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: follower-email-delivery
+  cancel-in-progress: false
+
+jobs:
+  follower-emails:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Deliver queued follower emails
+        env:
+          CRON_SECRET: ${{ secrets.SEEDENV_CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET"
+          curl --fail --show-error --silent --max-time 120 \
+            --request POST \
+            --header "Authorization: Bearer $CRON_SECRET" \
+            "https://seedenv.com/api/cron/follower-emails"

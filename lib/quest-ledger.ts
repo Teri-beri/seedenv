@@ -38,7 +38,7 @@ export async function saveMemberReferral(member: Pick<User, "id" | "role" | "cre
     if (Date.now() - member.createdAt.getTime() > 7 * 86400000) throw new Error("Referral codes must be entered within seven days of joining.");
     if (await tx.referral.findUnique({ where: { friendId: member.id } })) throw new Error("Your account already has an inviter.");
     if (await tx.submission.count({ where: { testerId: member.id, status: "APPROVED" } })) throw new Error("Enter your referral before your first approved task.");
-    const inviter = await tx.user.findUnique({ where: { referralCode: normalized } });
+    const inviter = await tx.user.findFirst({ where: { referralCode: { equals: normalized, mode: "insensitive" } } });
     if (!inviter || inviter.id === member.id) throw new Error("Enter another tester's valid referral code.");
     if (await tx.referral.findUnique({ where: { friendId: inviter.id }, select: { inviterId: true } }).then((entry) => entry?.inviterId === member.id)) throw new Error("Reciprocal referrals are not eligible.");
     await tx.referral.create({ data: { inviterId: inviter.id, friendId: member.id } });

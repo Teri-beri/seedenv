@@ -18,10 +18,10 @@ test("promo pricing discounts only platform fees, including the cumulative minim
     assert.equal(quoteCampaignFunding(999, "GOOGLE_PLAY_14_DAY", false, percent).payoutPoolUsd, 80);
     assert.equal(quoteCampaignFunding(999, "LIVE_STRESS_DROP", false, percent).payoutPoolUsd, 175);
   }
-  assert.equal(quoteCampaignFunding(0, "GOOGLE_PLAY_14_DAY", false, 50).escrowTotalCents, 13950);
+  assert.equal(quoteCampaignFunding(0, "GOOGLE_PLAY_14_DAY", false, 50).escrowTotalCents, 8800);
   assert.equal(quoteCampaignFunding(0, "LIVE_STRESS_DROP", false, 100).escrowTotalCents, 17500);
   assert.equal(quoteCampaignFunding(100, "STANDARD_QA", true, 50).platformFeeUsd, 0);
-  assert.equal(quoteCampaignFunding(0, "GOOGLE_PLAY_14_DAY").escrowTotalCents, 19900);
+  assert.equal(quoteCampaignFunding(0, "GOOGLE_PLAY_14_DAY").escrowTotalCents, 9600);
   assert.equal(quoteClipperFunding(50), 5250);
   assert.equal(quoteTopUp(5000).totalCents, 5000);
   for (const value of [-1, 101, 0.5, NaN]) assert.throws(() => discountedPlatformFeeCents(1500, value));
@@ -31,7 +31,7 @@ test("promo launch, paid consumption, retries, access and concurrent caps (isola
   skip: process.env.RUN_COHORT_PROMO_DB_TESTS !== "1",
 }, async () => {
   const url = new URL(process.env.DATABASE_URL || "");
-  assert.ok(url.hostname.startsWith("dpg-db4khrcs728c73flrip0-a"), "Only the isolated sandbox database is allowed.");
+  assert.ok(url.hostname.startsWith("dpg-db4khrcs728c73flrip0-a") && url.pathname === "/seedenv_staging_db", "Only the isolated sandbox database is allowed.");
   const db = new PrismaClient();
   const marker = `PROMO${randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase()}`;
   const ids: string[] = [];
@@ -63,7 +63,7 @@ test("promo launch, paid consumption, retries, access and concurrent caps (isola
           throw new Stripe.errors.StripeInvalidRequestError({ message: "Mock invalid checkout request.", type: "invalid_request_error" });
         }
         const id = `cs_mock_${sessions.size}`;
-        const session = { id, url: `https://checkout.stripe.com/mock/${id}`, mode: input.mode, status: "open", payment_status: "unpaid", currency: "usd", amount_total: input.line_items[0].price_data.unit_amount, payment_intent: `pi_${id}`, customer: input.customer, metadata: input.metadata };
+        const session = { id, url: `https://checkout.stripe.com/mock/${id}`, mode: input.mode, status: "open", payment_status: "unpaid", currency: "usd", amount_total: input.line_items.reduce((sum, item) => sum + item.price_data.unit_amount, 0), payment_intent: `pi_${id}`, customer: input.customer, metadata: input.metadata };
         sessions.set(id, session);
         if (failCheckout === "unknown") throw new Error("Mock connection lost after Stripe created Checkout.");
         return session;
@@ -104,7 +104,7 @@ test("promo launch, paid consumption, retries, access and concurrent caps (isola
     const { createCampaignWithEscrow } = await import("../app/actions/campaignActions");
     const { handleStripeWebhook } = await import("../lib/campaign-payments");
     const { acceptApplicationWithFunding, cancelCohort, reconcileCampaignFunding } = await import("../lib/slot-funding");
-    const { attachDeveloperReferral } = await import("../lib/developer-referrals");
+    const { attachDeveloperReferral, createReferralCredit } = await import("../lib/developer-referrals");
     const { rejectProof, confirmProofDenial, assertProofEditable, requestProofRevision } = await import("../lib/submission-lifecycle");
     const { approvePendingSubmission } = await import("../lib/submission-approval");
     const { isAutoApprovalDue } = await import("../lib/auto-approval-window");
@@ -133,10 +133,11 @@ test("promo launch, paid consumption, retries, access and concurrent caps (isola
     assert.equal(canManageCohortPromos({ id: "stranger", role: "DEVELOPER" }), false);
     assert.equal(canManageCohortPromos({ id: "cmtuw6sak0000fk5lkk0ceot9", role: "DEVELOPER" }), true);
     assert.throws(() => promoSettingsSchema.parse({ code: "OK50", discountPercent: 50, maxRedemptions: 1, expiresAt: new Date(0) }));
-    const createUser = async (role: "DEVELOPER" | "TESTER" | "ADMIN", balance = 10000) => {
+    const createUser = async (role: "DEVELOPER" | "TESTER" | "ADMIN", balance = 10000, previouslyFunded = true) => {
       const sequence = userSequence++;
-      const user = await db.user.create({ data: { email: `${marker}-${sequence}@example.invalid`, role, fundingBalanceCents: balance, stripeCustomerId: `cus_mock_${sequence}` } });
+      const user = await db.user.create({ data: { email: `${marker}-${sequence}@example.invalid`, role, emailVerified: new Date(), fundingBalanceCents: balance, stripeCustomerId: `cus_mock_${sequence}` } });
       ids.push(user.id);
+      if (role === "DEVELOPER" && previouslyFunded) await db.walletTransaction.create({ data: { userId: user.id, type: "ESCROW_DEPOSIT", status: "COMPLETED", amountCents: 100, description: "Prior funded legacy promotion fixture" } });
       return user;
     };
     const developer = await createUser("DEVELOPER");
@@ -197,15 +198,15 @@ test("promo launch, paid consumption, retries, access and concurrent caps (isola
     const bundleDeveloper = await createUser("DEVELOPER");
     member = bundleDeveloper;
     const bundle = await successfulLaunch({ ...input, cohortType: "GOOGLE_PLAY_14_DAY" });
-    assert.equal(bundle.escrowTotalCents, 13950);
+    assert.equal(bundle.escrowTotalCents, 8800);
     const bundleSession = [...sessions.values()].at(-1)!;
     bundleSession.status = "complete"; bundleSession.payment_status = "paid";
     await handleStripeWebhook({ type: "checkout.session.completed", data: { object: { id: bundleSession.id } } });
     await handleStripeWebhook({ type: "checkout.session.completed", data: { object: { id: bundleSession.id } } });
     assert.ok((await db.cohortPromoRedemption.findFirstOrThrow({ where: { campaignId: bundle.campaignId } })).consumedAt);
     const receipt = await db.walletTransaction.findFirstOrThrow({ where: { campaignId: bundle.campaignId, status: "COMPLETED" } });
-    assert.equal(receipt.platformFeeCents, 5950);
-    assert.equal(receipt.amountCents, 13950);
+    assert.equal(receipt.platformFeeCents, 800);
+    assert.equal(receipt.amountCents, 8800);
 
     member = await createUser("DEVELOPER");
     failCheckout = "invalid";
@@ -290,11 +291,13 @@ test("promo launch, paid consumption, retries, access and concurrent caps (isola
     const inviter = await createUser("DEVELOPER");
     await db.user.update({ where: { id: inviter.id }, data: { developerReferralCode: `${marker}DEV` } });
     await assert.rejects(billingTransaction((tx) => attachDeveloperReferral(tx, inviter.id, `${marker}DEV`)), /refer yourself/);
-    const referred = await createUser("DEVELOPER");
+    const referred = await createUser("DEVELOPER", 10000, false);
     await assert.rejects(billingTransaction((tx) => attachDeveloperReferral(tx, referred.id, "invalid code")), /valid developer referral/);
     const referral = await billingTransaction((tx) => attachDeveloperReferral(tx, referred.id, `${marker}DEV`));
-    await assert.rejects(billingTransaction((tx) => attachDeveloperReferral(tx, referred.id, `${marker}DEV`)), /already linked/);
-    const welcome = await db.cohortPromoCode.findFirstOrThrow({ where: { ownerId: referred.id } });
+    await assert.rejects(billingTransaction((tx) => attachDeveloperReferral(tx, referred.id, `${marker}DEV`)), /permanently linked/);
+    assert.equal(await db.cohortPromoCode.count({ where: { ownerId: referred.id } }), 0, "New signups do not mint legacy welcome codes.");
+    const welcome = await billingTransaction(tx => createReferralCredit(tx, referred.id, referral.id, "WELCOME"));
+    await db.walletTransaction.create({ data: { userId: referred.id, type: "ESCROW_DEPOSIT", status: "COMPLETED", amountCents: 100, description: "Historical funding for grandfathered credit fixture" } });
     assert.equal(welcome.expiresAt, null);
     assert.equal(await db.cohortPromoCode.count({ where: { ownerId: inviter.id } }), 0, "Signup does not reward the inviter.");
     member = referred;
@@ -308,25 +311,29 @@ test("promo launch, paid consumption, retries, access and concurrent caps (isola
     assert.equal(await db.cohortPromoCode.count({ where: { ownerId: inviter.id } }), 0, "Launching with existing balance alone is not a paid tester debit.");
     const stackedApp = await db.missionApplication.create({ data: { campaignId: stacked.campaignId, testerId: tester.id, note: "Referral test." } });
     assert.equal((await acceptApplicationWithFunding(referred.id, stackedApp.id)).charged?.totalCents, 400);
-    const match = await db.cohortPromoCode.findFirstOrThrow({ where: { ownerId: inviter.id } });
+    assert.equal(await db.feeCredit.count({ where: { sourceReferralId: referred.id } }), 0, "One $4 tester debit cannot qualify a new referral.");
+    const match = await billingTransaction(tx => createReferralCredit(tx, inviter.id, referral.id, "MATCH"));
     assert.equal(match.expiresAt, null);
     assert.equal(match.discountPercent, 50);
-    assert.ok((await db.developerReferral.findUniqueOrThrow({ where: { id: referral.id } })).qualifiedAt);
+    assert.equal((await db.developerReferral.findUniqueOrThrow({ where: { id: referral.id } })).qualifiedAt, null);
     await billingTransaction((tx) => consumeCohortPromo(tx, stacked.campaignId));
     assert.equal(await db.cohortPromoCode.count({ where: { ownerId: inviter.id } }), 1, "Payment replay does not duplicate matching credits.");
     member = contenders[1];
     const stolen = await previewCohortPromo(match.code);
     assert.ok(!stolen.ok);
-    const secondReferred = await createUser("DEVELOPER");
+    const secondReferred = await createUser("DEVELOPER", 10000, false);
     const secondReferral = await billingTransaction((tx) => attachDeveloperReferral(tx, secondReferred.id, `${marker}DEV`));
-    const secondWelcome = await db.cohortPromoCode.findFirstOrThrow({ where: { ownerId: secondReferred.id } });
+    const secondWelcome = await billingTransaction(tx => createReferralCredit(tx, secondReferred.id, secondReferral.id, "WELCOME"));
+    await db.walletTransaction.create({ data: { userId: secondReferred.id, type: "ESCROW_DEPOSIT", status: "COMPLETED", amountCents: 100, description: "Historical funding for second grandfathered credit fixture" } });
     member = secondReferred;
     const fundedBundle = await successfulLaunch({ ...input, cohortType: "GOOGLE_PLAY_14_DAY", promoCode: secondWelcome.code });
     const referralBundleSession = [...sessions.values()].at(-1)!;
     referralBundleSession.status = "complete"; referralBundleSession.payment_status = "paid";
     await handleStripeWebhook({ type: "checkout.session.completed", data: { object: { id: referralBundleSession.id } } });
-    assert.equal(await db.cohortPromoCode.count({ where: { ownerId: inviter.id } }), 2, "Each distinct paid referral grants a matched credit.");
-    assert.ok((await db.developerReferral.findUniqueOrThrow({ where: { id: secondReferral.id } })).qualifiedAt);
+    assert.equal((await db.feeCredit.findUniqueOrThrow({ where: { sourceReferralId: secondReferred.id } })).status, "PENDING", "Funding alone cannot vest a new referral.");
+    await billingTransaction(tx => createReferralCredit(tx, inviter.id, secondReferral.id, "MATCH"));
+    assert.equal(await db.cohortPromoCode.count({ where: { ownerId: inviter.id } }), 2, "Previously issued matched credits preserve grandfathered stacking.");
+    assert.equal((await db.developerReferral.findUniqueOrThrow({ where: { id: secondReferral.id } })).qualifiedAt, null);
     member = inviter;
     const matchingCodes = await db.cohortPromoCode.findMany({ where: { ownerId: inviter.id } });
     assert.equal((await validPreview(matchingCodes.map((entry) => entry.code).join(","))).discountPercent, 100);
@@ -394,9 +401,14 @@ test("promo launch, paid consumption, retries, access and concurrent caps (isola
   } finally {
     await db.$transaction(async (tx) => {
       await tx.billingOperation.deleteMany({ where: { userId: { in: ids } } });
+      await tx.feeCredit.deleteMany({ where: { userId: { in: ids } } });
+      await tx.firstCohortBenefit.deleteMany({ where: { userId: { in: ids } } });
+      await tx.testFlightBuild.deleteMany({ where: { developerId: { in: ids } } });
+      await tx.referralAudit.deleteMany({ where: { userId: { in: ids } } });
       await tx.cohortPromoRedemption.deleteMany({ where: { developerId: { in: ids } } });
       await tx.developerReferral.deleteMany({ where: { developerId: { in: ids } } });
       await tx.cohortPromoCode.deleteMany({ where: { OR: [{ id: { in: codeIds } }, { ownerId: { in: ids } }] } });
+      await tx.user.deleteMany({ where: { id: { in: ids }, referredById: { not: null } } });
       await tx.user.deleteMany({ where: { id: { in: ids } } });
     });
     await db.$disconnect();

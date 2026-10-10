@@ -23,10 +23,10 @@ test("flat bundles ignore custom pools and reconcile to their advertised totals"
     assert.equal(quote.escrowTotalCents, bundle.totalCents);
     assert.equal(bundle.slots * bundle.bountyCents + bundle.platformFeeCents, bundle.totalCents);
   }
-  assert.equal(COHORT_BUNDLES.GOOGLE_PLAY_14_DAY.totalCents, 19900);
-  assert.equal(COHORT_BUNDLES.LIVE_STRESS_DROP.totalCents, 34900);
+  assert.equal(COHORT_BUNDLES.GOOGLE_PLAY_14_DAY.totalCents, 9600);
+  assert.equal(COHORT_BUNDLES.LIVE_STRESS_DROP.totalCents, 21000);
   const gp = calculateCohortEscrow(0, 0, "GOOGLE_PLAY_14_DAY");
-  assert.deepEqual(gp, { validatorPool: 80, platformFee: 119, stripeProcessingEstimate: 6.07, netPlatformMargin: 112.93, totalAuthorized: 199 });
+  assert.deepEqual(gp, { validatorPool: 80, platformFee: 16, stripeProcessingEstimate: 3.08, netPlatformMargin: 12.92, totalAuthorized: 96 });
   assert.equal(calculateCohortEscrow(10, 2).platformFee, 15);
 });
 
@@ -34,12 +34,13 @@ test("campaign saves enforce automatic REP and preserve the Discovery exception"
   const previousOwner = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL;
   process.env.SEEDENV_ANALYTICS_OWNER_EMAIL = "rep-policy@example.invalid";
   const savedInstructions: Array<{ minimumRep: number; presetId?: string }> = [];
+  const draftDb = { appCampaign: { create: async ({ data }: { data: { title: string; instructions: { create: Array<{ minimumRep: number; presetId?: string }> } } }) => {
+    savedInstructions.push(...data.instructions.create);
+    return { id: "rep-policy-draft", title: data.title, status: "DRAFT" };
+  } } };
   const modules = [
     mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "rep-policy-developer", role: "DEVELOPER", username: "teriberi", email: "rep-policy@example.invalid" }) } }),
-    mock.module("../lib/prisma.ts", { namedExports: { prisma: { appCampaign: { create: async ({ data }: { data: { title: string; instructions: { create: Array<{ minimumRep: number; presetId?: string }> } } }) => {
-      savedInstructions.push(...data.instructions.create);
-      return { id: "rep-policy-draft", title: data.title, status: "DRAFT" };
-    } } } } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: { ...draftDb, $transaction: async (callback: (tx: typeof draftDb) => Promise<unknown>) => callback(draftDb) } } }),
   ];
   try {
     const { saveTestCampaignDraft } = await import(`../app/actions/campaignActions.ts?rep-policy=${randomUUID()}`);
@@ -99,6 +100,12 @@ test("missing Stripe configuration or funding method saves a draft without creat
     } },
   };
   const modules = [
+    mock.module("../lib/services/billing.service.ts", { namedExports: { reserveAutomaticFeeBenefits: async (_tx: unknown, _user: string, _campaign: string, _waived: boolean, discount: number) => ({ firstCohortFeeWaived: false, referralDiscountPercent: 0, effectiveDiscountPercent: discount }), releaseUnfundedFeeBenefits: async () => undefined } }),
+    mock.module("../lib/social-connections.ts", { namedExports: { queueFollowerEmails: async (_tx: unknown, authorId: string, eventKey: string, path: string) => {
+      assert.equal(authorId, "payment-test-developer");
+      assert.ok(eventKey.startsWith("cohort:"));
+      assert.ok(path.startsWith("/cohorts/"));
+    } } }),
     mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "payment-test-developer", role: "DEVELOPER", stripeCustomerId: null, platformFeeWaived, fundingBalanceCents: 400 }) } }),
     mock.module("next/cache", { namedExports: { revalidatePath: () => {} } }),
     mock.module("../lib/billing-transaction.ts", { namedExports: { billingTransaction: async (work: (tx: typeof transaction) => Promise<unknown>) => work(transaction) } }),
@@ -147,7 +154,7 @@ test("missing Stripe configuration or funding method saves a draft without creat
     assert.equal(created[2].platformFeeUsd, 0);
     const launched = await createCampaignWithEscrow(input);
     assert.equal(launched.launched, true, "A waived account only needs the $4 first reward, not the $15 fee floor.");
-    assert.equal(created[3].status, "ACTIVE");
+    assert.equal(updated.at(-1)?.status, "ACTIVE");
     assert.equal(created[3].totalBudgetUsd, 100);
     assert.equal(created[3].platformFeeUsd, 0);
   } finally {

@@ -28,10 +28,11 @@ test("only authenticated members write; public updates/comments invalidate the l
   const writes: Array<Record<string, unknown>> = [];
   const refreshed: string[] = [];
   const tx = {
-    communityPost: { count: async () => 0, create: async ({ data }: { data: Record<string, unknown> }) => { writes.push(data); }, findUnique: async () => ({ id: "post-test", hidden: false, publicVisible: true }) },
+    communityPost: { count: async () => 0, create: async ({ data }: { data: Record<string, unknown> }) => { writes.push(data); return { id: "post-test" }; }, findUnique: async () => ({ id: "post-test", hidden: false, publicVisible: true }) },
     communityComment: { count: async () => 0, create: async ({ data }: { data: Record<string, unknown> }) => { writes.push(data); } },
   };
   const modules = [
+    mock.module("../lib/social-connections.ts", { namedExports: { queueFollowerEmails: async () => {} } }),
     mock.module("../lib/member.ts", { namedExports: { requireMember: async (required?: string) => { if (!signedIn || required && role !== required) throw new Error("Sign in with the required workspace."); return { id: "real-member", role }; } } }),
     mock.module("../lib/quest-ledger.ts", { namedExports: { serializable: async (work: (db: typeof tx) => Promise<unknown>) => work(tx) } }),
     mock.module("next/cache", { namedExports: { revalidatePath: (path: string) => refreshed.push(path) } }),

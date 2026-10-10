@@ -11,6 +11,9 @@ import AuthCheck from "@/components/AuthCheck";
 import { AnalyticsSummary, type AnalyticsExclusionState, type AnalyticsSummaryData } from "@/components/analytics-summary";
 import { AccountSettingsForm } from "@/components/account-settings-form";
 import { DeveloperReferralSettings } from "@/components/developer-referral-settings";
+import { MessageInbox } from "@/components/message-inbox";
+import { MessageSettings } from "@/components/message-settings";
+import { ConnectionSettings } from "@/components/connection-settings";
 import { AccountSignOutButton } from "@/components/account-signout-button";
 import { NotificationSettingsForm } from "@/components/notification-settings-form";
 import { GitHubTokenForm } from "@/components/github-token-form";
@@ -32,6 +35,9 @@ const accountTabs = [
   { id: "profile", label: "Profile" },
   { id: "security", label: "Security" },
   { id: "notifications", label: "Notifications" },
+  { id: "messages", label: "Messages" },
+  { id: "message-settings", label: "Message privacy" },
+  { id: "connections", label: "Connections" },
   { id: "portfolio", label: "Portfolio / Billing" },
 ] as const;
 
@@ -47,7 +53,7 @@ function normalizeNotificationPreferences(value: unknown): NotificationPreferenc
   };
 }
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string; draft?: string; stripePayment?: string; stripeConnect?: string; referralError?: string; range?: string; devref?: string; developerReferralError?: string }> }) {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string; draft?: string; stripePayment?: string; stripeConnect?: string; referralError?: string; range?: string; devref?: string; developerReferralError?: string; box?: string; thread?: string; to?: string; page?: string; before?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/auth/signin?callbackUrl=/account");
   const params = await searchParams;
@@ -73,6 +79,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       developerReferralReceived: true,
       developerReferralsSent: { where: { qualifiedAt: { not: null } }, select: { id: true } },
       ownedPromoCodes: { orderBy: { createdAt: "asc" }, include: { redemptions: { select: { consumedAt: true } } } },
+      feeCredits: { orderBy: { createdAt: "desc" }, take: 100 },
     },
   });
   if (!user) redirect("/auth/signin?callbackUrl=/account");
@@ -94,6 +101,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const activeTab: VisibleAccountTab = visibleTabs.some((tab) => tab.id === params.tab)
     ? params.tab as VisibleAccountTab
     : "profile";
+  const blocks = activeTab === "message-settings" ? await prisma.userBlock.findMany({ where: { blockerId: user.id }, include: { blocked: { select: { id: true, username: true } } }, orderBy: { createdAt: "desc" } }) : [];
 
   const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
   let paymentMethodSaved = false;
@@ -186,7 +194,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
             {activeTab === "profile" ? (
               <div className="max-w-3xl space-y-4">
-                {(user.role !== UserRole.TESTER || user.developerWorkspaceEnabled) && isPublicHandle(user.username) ? (
+                {isPublicHandle(user.username) ? (
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs">
                       <span className="uppercase tracking-wider text-zinc-500">Public profile</span>
@@ -197,7 +205,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                   </div>
                 ) : null}
                 <AccountSettingsForm initial={{ email: user.email, name: user.name, username: user.username, avatarUrl: user.avatarUrl || user.image, bio: user.bio, portfolioUrl: user.portfolioUrl, companyName: user.companyName, productUrl: user.productUrl, githubUsername: user.githubUsername, discordUrl: user.discordUrl, twitterHandle: user.twitterHandle, emailVerified: Boolean(user.emailVerified), githubConnected: user.accounts.some((account) => account.provider === "github"), role: user.role }} />
-                {user.role === "DEVELOPER" ? <><p role={params.developerReferralError ? "alert" : undefined} className="text-sm text-amber-200">{params.developerReferralError}</p><DeveloperReferralSettings shareCode={user.developerReferralCode} received={Boolean(user.developerReferralReceived)} qualifiedCount={user.developerReferralsSent.length} initialCode={params.devref} credits={user.ownedPromoCodes.map((credit) => ({ code: credit.code, state: credit.redemptions.some((entry) => entry.consumedAt) ? "Used" : credit.redemptions.length ? "Reserved (unpaid)" : "Available" }))} /></> : null}
+                {user.role === "DEVELOPER" ? <><p role={params.developerReferralError ? "alert" : undefined} className="text-sm text-amber-200">{params.developerReferralError}</p><DeveloperReferralSettings shareCode={user.developerReferralCode} received={Boolean(user.developerReferralReceived)} qualifiedCount={user.developerReferralsSent.length} initialCode={params.devref} feeCredits={user.feeCredits.map(credit => ({ id: credit.id, status: credit.status, expiresAt: credit.expiresAt?.toISOString() ?? null, reserved: Boolean(credit.reservedDropId) }))} credits={user.ownedPromoCodes.map((credit) => ({ code: credit.code, state: credit.redemptions.some((entry) => entry.consumedAt) ? "Used" : credit.redemptions.length ? "Reserved (unpaid)" : "Available" }))} /></> : null}
               </div>
             ) : null}
 
@@ -221,6 +229,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 {user.role !== UserRole.TESTER || user.developerWorkspaceEnabled ? <GitHubTokenForm connected={Boolean(user.githubTokenEncrypted)} /> : null}
               </div>
             ) : null}
+            {activeTab === "messages" ? <MessageInbox memberId={user.id} params={params} /> : null}
+            {activeTab === "message-settings" ? <MessageSettings enabled={user.messageRequestsEnabled} blocks={blocks.map(block => block.blocked)} /> : null}
+            {activeTab === "connections" ? <ConnectionSettings memberId={user.id} page={Math.max(1, Math.min(10000, Number.parseInt(params.page || "1", 10) || 1))} /> : null}
 
             {activeTab === "site-performance" && sitePerformance && analyticsExclusion ? (
               <div className="space-y-4">

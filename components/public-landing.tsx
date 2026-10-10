@@ -17,9 +17,11 @@ import { landingViews, landingViewHref } from "@/lib/landing-views";
 import TelemetryGridCanvas from "@/components/TelemetryGridCanvas";
 import { SandboxBadge, ScenarioCard, ScenarioDrawer, sandboxScenarios, useScenarioInspector, type SandboxScenario } from "@/components/telemetry-sandbox";
 import { LandingPlatformFeeOfferCard, type LandingPlatformFeeOffer } from "@/components/landing-platform-fee-offer";
+import { CohortBriefLink } from "@/components/cohort-brief-link";
 
 type Mission = {
   id: string;
+  developerId?: string;
   title: string;
   iconUrl: string | null;
   platform: "TESTFLIGHT" | "PLAY_STORE" | "WEB_STAGING";
@@ -32,6 +34,7 @@ type Mission = {
 };
 
 type Viewer = {
+  id?: string;
   role: "TESTER" | "DEVELOPER" | "ADMIN";
 } | null;
 
@@ -174,20 +177,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
           </div>
         </section>
 
-        {launchOffer ? <div className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 sm:pb-12 lg:px-8"><LandingPlatformFeeOfferCard offer={launchOffer} href={developerHref} /></div> : null}
-        <section className="mx-auto w-full max-w-7xl px-4 pb-12 sm:px-6 sm:pb-16 lg:px-8" aria-label="Live validation showcase"><LiveShowcase onStartCohort={() => requestAccess({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Launch your first cohort" })} /></section>
-        <section id="engine" className={`${sectionShell} ${surfaceTint}`}>
-          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />
-          <div className={sectionClass}>
-            <p className={labelClass}>For developers</p>
-            <h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">A validation pipeline, not a comment box.</h2>
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <WorkflowStep number="01" icon={<Code2 className="size-5" />} title="Define Test Scenarios" text="Provide a TestFlight, Play Console, or web build. Specify target devices and acceptance criteria in your brief, then choose focused testing scenarios." />
-              <WorkflowStep number="02" icon={<LockKeyhole className="size-5" />} title="Escrow & Automated Distribution" text="Fund tester rewards plus a transparent platform fee, or pick a flat-priced bundle. Reviewed, approved submissions enter the Stripe transfer workflow; payment status stays visible." />
-              <WorkflowStep number="03" icon={<FileText className="size-5" />} title="Structured Reports & Export" text="Review reproduction videos, device context, and crash or network logs when provided. Export approved proof and attach reproducible evidence to your GitHub issues or release tracker." />
-            </div>
-          </div>
-        </section>
+        {launchOffer ? <div id="launch-offer" className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 sm:pb-12 lg:px-8"><LandingPlatformFeeOfferCard offer={launchOffer} href={developerHref} /></div> : null}
         <section id="cohorts" className={sectionShell}>
           <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />
           <div className={sectionClass}><div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 sm:p-8">
@@ -202,7 +192,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
               </div>
             </div>
             {visibleMissions.length ? (
-              <div className="mt-6 overflow-x-auto rounded-lg border border-zinc-800/80"><table className="w-full min-w-[850px] text-left text-sm" aria-label="Live cohort directory"><thead className="bg-[#12161F] text-zinc-400"><tr>{["App / Target OS", "Test Scenario", "Validator Stipend", "Available Slots", "Participation"].map((label) => <th key={label} scope="col" className="px-4 py-4 font-mono text-xs font-normal uppercase">{label}</th>)}</tr></thead><tbody className="divide-y divide-zinc-800/80">{visibleMissions.map((mission) => <CohortRow key={mission.id} mission={mission} signedIn={signedIn && (role === "TESTER" || role === "ADMIN")} onJoin={() => requestAccess({ role: "TESTER", callbackUrl: `/dashboard?claim=${encodeURIComponent(mission.id)}`, title: `Join ${mission.title}` })} />)}</tbody></table></div>
+              <div className="mt-6 overflow-x-auto rounded-lg border border-zinc-800/80"><table className="w-full min-w-[850px] text-left text-sm" aria-label="Live cohort directory"><thead className="bg-[#12161F] text-zinc-400"><tr>{["App / Target OS", "Test Scenario", "Validator Stipend", "Available Slots", "Participation"].map((label) => <th key={label} scope="col" className="px-4 py-4 font-mono text-xs font-normal uppercase">{label}</th>)}</tr></thead><tbody className="divide-y divide-zinc-800/80">{visibleMissions.map((mission) => <CohortRow key={mission.id} mission={mission} own={Boolean(mission.developerId && mission.developerId === (viewer?.id || session?.user?.id))} signedIn={signedIn && (role === "TESTER" || role === "ADMIN")} onJoin={() => requestAccess({ role: "TESTER", callbackUrl: `/dashboard?claim=${encodeURIComponent(mission.id)}`, title: `Join ${mission.title}` })} />)}</tbody></table></div>
             ) : (
               <div className="mt-6 border-y border-white/10 py-10 text-center" role="status">
                 <p className="text-sm font-medium text-zinc-200">{directoryUnavailable ? "Cohort directory temporarily unavailable" : missions.length ? "No cohorts match these filters" : "No cohorts are currently accepting applications"}</p>
@@ -211,6 +201,19 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
               </div>
             )}
           </div></div>
+        </section>
+        <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8" aria-label="Live validation showcase"><LiveShowcase onStartCohort={() => requestAccess({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Launch your first cohort" })} /></section>
+        <section id="engine" className={`${sectionShell} ${surfaceTint}`}>
+          <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />
+          <div className={sectionClass}>
+            <p className={labelClass}>For developers</p>
+            <h2 className="mt-3 text-xl font-semibold text-zinc-100 sm:text-2xl">A validation pipeline, not a comment box.</h2>
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
+              <WorkflowStep number="01" icon={<Code2 className="size-5" />} title="Define Test Scenarios" text="Provide a TestFlight, Play Console, or web build. Specify target devices and acceptance criteria in your brief, then choose focused testing scenarios." />
+              <WorkflowStep number="02" icon={<LockKeyhole className="size-5" />} title="Escrow & Automated Distribution" text="Fund tester rewards plus a transparent platform fee, or pick a flat-priced bundle. Reviewed, approved submissions enter the Stripe transfer workflow; payment status stays visible." />
+              <WorkflowStep number="03" icon={<FileText className="size-5" />} title="Structured Reports & Export" text="Review reproduction videos, device context, and crash or network logs when provided. Export approved proof and attach reproducible evidence to your GitHub issues or release tracker." />
+            </div>
+          </div>
         </section>
         <section id="validators" className={`${sectionShell} ${surfaceTint}`}><div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" /><div className={sectionClass}>
           <div className="flex flex-wrap items-end justify-between gap-5">
@@ -308,7 +311,7 @@ function WorkflowStep({ number, icon, title, text }: { number: string; icon: Rea
   return <div className="min-w-0 rounded-xl border border-zinc-800/80 bg-zinc-900/50 p-6 transition-colors hover:border-zinc-700"><div className="flex items-start justify-between"><span className="mb-3 block font-mono text-xs font-semibold text-emerald-400">{number}</span><span className="text-emerald-400" aria-hidden="true">{icon}</span></div><h3 className="text-base font-semibold text-white">{title}</h3><p className="mt-3 text-sm leading-7 text-zinc-400">{text}</p></div>;
 }
 
-function CohortRow({ mission, signedIn, onJoin }: { mission: Mission; signedIn: boolean; onJoin: () => void }) {
+function CohortRow({ mission, signedIn, own, onJoin }: { mission: Mission; signedIn: boolean; own: boolean; onJoin: () => void }) {
   const [imageFailed, setImageFailed] = useState(false);
   const slots = availableSlots(mission);
   let iconUrl = "";
@@ -317,12 +320,12 @@ function CohortRow({ mission, signedIn, onJoin }: { mission: Mission; signedIn: 
     <tr className="bg-[#0A0D12] transition-colors hover:bg-[#12161F]">
       <td className="w-64 px-4 py-5"><div className="flex items-start gap-3">
         <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-[#0F1117]">{iconUrl && !imageFailed ? <Image src={iconUrl} alt="" width={44} height={44} className="size-11 object-cover" unoptimized onError={() => setImageFailed(true)} /> : mission.platform === "WEB_STAGING" ? <Globe className="size-5 text-zinc-400" /> : <Smartphone className="size-5 text-zinc-400" />}</span>
-        <div className="min-w-0"><h3 className="break-words text-base font-semibold text-white">{mission.title}</h3><p className="mt-1 font-mono text-xs text-emerald-400">{platformLabels[mission.platform]}</p></div>
+        <div className="min-w-0"><h3 className="break-words text-base font-semibold text-white"><CohortBriefLink className="hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400" campaignId={mission.id}>{mission.title}</CohortBriefLink></h3><p className="mt-1 font-mono text-xs text-emerald-400">{platformLabels[mission.platform]}</p><CohortBriefLink className="mt-2 inline-flex min-h-9 items-center text-xs text-zinc-400 hover:text-emerald-300" campaignId={mission.id}>View full brief <ArrowRight className="ml-1 size-3" /></CohortBriefLink></div>
       </div></td>
       <td className="max-w-sm px-4 py-5"><p className="line-clamp-2 text-sm leading-6 text-zinc-200">{mission.instructions.map((item) => item.instructionTitle).join(" / ") || "Acceptance criteria in the cohort brief"}</p><p className="mt-2 line-clamp-2 text-xs leading-5 text-zinc-500">{mission.description}</p></td>
       <td className="whitespace-nowrap px-4 py-5"><span className="font-mono text-base text-amber-300">{formatCents(Math.round(mission.bountyPerTaskUsd * 100))}</span><p className="mt-2 text-xs text-zinc-500">Per approved report</p></td>
       <td className="whitespace-nowrap px-4 py-5 font-mono text-xs text-zinc-400">{slots} / {mission.totalSlots}</td>
-      <td className="px-4 py-5"><button type="button" disabled={slots === 0} className={`${secondaryAction} whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50`} onClick={onJoin}>{slots === 0 ? "Cohort full" : signedIn ? "Join Cohort" : "Sign in to Claim"}<ArrowRight className="size-4" /></button></td>
+      <td className="px-4 py-5">{own ? <Link href="/console#active-cohorts" className={`${secondaryAction} whitespace-nowrap`}>Manage active cohorts <ArrowRight className="size-4" /></Link> : <button type="button" disabled={slots === 0} className={`${secondaryAction} whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50`} onClick={onJoin}>{slots === 0 ? "Cohort full" : signedIn ? "Join Cohort" : "Sign in to Claim"}<ArrowRight className="size-4" /></button>}</td>
     </tr>
   );
 }

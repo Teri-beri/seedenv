@@ -8,8 +8,8 @@ import { formatCents } from "@/lib/utils";
 
 const tabs: Array<{ type: CohortTypeKey; label: string; price: string }> = [
   { type: "STANDARD_QA", label: "Custom Mission Drop", price: "Pay per tester" },
-  { type: "GOOGLE_PLAY_14_DAY", label: "Google Play 14-Day", price: "$199 flat" },
-  { type: "LIVE_STRESS_DROP", label: "Flash Concurrency", price: "$349 flat" },
+  { type: "GOOGLE_PLAY_14_DAY", label: "Google Play 14-Day", price: `${formatCents(COHORT_BUNDLES.GOOGLE_PLAY_14_DAY.totalCents)} flat` },
+  { type: "LIVE_STRESS_DROP", label: "Flash Concurrency", price: `${formatCents(COHORT_BUNDLES.LIVE_STRESS_DROP.totalCents)} flat` },
 ];
 
 const minFeeUsd = COHORT_MIN_PLATFORM_FEE_CENTS / 100;
@@ -68,7 +68,7 @@ export function PricingCalculator({ href }: { href: string }) {
           <dl className="mt-6 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 border-t border-zinc-800 pt-5 text-sm">
             <dt className="text-zinc-400">Tester reward pool ({bundle.slots} × {formatCents(bundle.bountyCents)})</dt>
             <dd className="text-right font-mono text-emerald-400">{formatCents(Math.round(quote.payoutPoolUsd * 100))}</dd>
-            <dt className="text-zinc-400">Platform fee (flat)</dt>
+            <dt className="text-zinc-400">Platform fee ({feePercent}% of tester rewards)</dt>
             <dd className="text-right font-mono text-zinc-200">{formatCents(feeCents)}</dd>
             <dt className="border-t border-zinc-800 pt-3 font-medium text-zinc-100">Total due at checkout</dt>
             <dd className="border-t border-zinc-800 pt-3 text-right font-mono font-medium text-zinc-100">{formatCents(quote.escrowTotalCents)}</dd>

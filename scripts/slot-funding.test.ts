@@ -214,6 +214,8 @@ async function withMocks<T>(harness: ReturnType<typeof fundingHarness>, work: (m
   const { mock } = await import("node:test");
   const { randomUUID } = await import("node:crypto");
   const mocks = [
+    mock.module("../lib/services/referral.service.ts", { namedExports: { revokeCampaignReferralCredits: async () => undefined } }),
+    mock.module("../lib/services/billing.service.ts", { namedExports: { releaseUnfundedFeeBenefits: async () => undefined } }),
     mock.module("../lib/ai/campaign-synthesis.ts", { namedExports: { synthesizeCampaign: async () => ({ status: "skipped" }) } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: harness.db } }),
     mock.module("../lib/quest-ledger.ts", { namedExports: { serializable: (work: (tx: typeof harness.db) => Promise<unknown>) => work(harness.db) } }),

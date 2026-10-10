@@ -26,6 +26,7 @@ import { COHORT_PLATFORM_FEE_RATE } from "@/lib/pricing";
 import Link from "next/link";
 import { launchDraftKey, launchWizardDraftsSchema } from "@/lib/launch-wizard-draft";
 import { canManageCohortPromos } from "@/lib/cohort-promos";
+import { automaticFeeBenefits } from "@/lib/services/billing.service";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   if (session.user.role !== "DEVELOPER") redirect("/");
   const params = await searchParams;
   const activeView: ConsoleView = consoleViews.includes(params.view as ConsoleView) ? params.view as ConsoleView : "overview";
+  const feeBenefits = activeView === "new-drop" ? await prisma.$transaction(tx => automaticFeeBenefits(tx, session.user.id, new Date(), params.draft)) : undefined;
 
   const security = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -97,7 +99,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       where: activeCampaignScope,
       orderBy: { createdAt: "desc" },
       take: overview ? 10 : 0,
-      select: { id: true, title: true, platform: true, totalBudgetUsd: true, platformFeeUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true, fundingModel: true, slotCharges: { where: { status: "SUCCEEDED" }, select: { stipendCents: true } } },
+      select: { id: true, title: true, platform: true, totalBudgetUsd: true, platformFeeUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true, fundingModel: true, _count: { select: { clicks: true } }, slotCharges: { where: { status: "SUCCEEDED" }, select: { stipendCents: true } } },
     }),
     prisma.walletTransaction.groupBy({
       by: ["type"],
@@ -140,7 +142,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   ]);
   const escrowSum = (type: TransactionType) => completedEscrow.find((row) => row.type === type)?._sum.amountCents || 0;
   const completedEscrowCents = Math.max(0, escrowSum(TransactionType.ESCROW_DEPOSIT) - escrowSum(TransactionType.ESCROW_REFUND));
-  const cohortRows = campaigns.map(({ slotCharges, ...campaign }) => ({ ...campaign, paidStipendCents: campaign.fundingModel === "PAY_PER_TESTER" ? slotCharges.reduce((sum, charge) => sum + charge.stipendCents, 0) : null }));
+  const cohortRows = campaigns.map(({ slotCharges, _count, ...campaign }) => ({ ...campaign, clickCount: _count.clicks, paidStipendCents: campaign.fundingModel === "PAY_PER_TESTER" ? slotCharges.reduce((sum, charge) => sum + charge.stipendCents, 0) : null }));
   const checkoutCampaign = activeView === "billing" && params.campaign
     ? await prisma.appCampaign.findFirst({ where: { id: params.campaign, developerId: session.user.id }, select: { title: true, status: true } })
     : null;
@@ -215,7 +217,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
           <ActiveCohorts cohorts={cohortRows} total={activeCohortCount} />
           <ReleaseReports rows={releaseReports} />
         </> : null}
-        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}`} userId={session.user.id} savedWizard={savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft ? { ...launchDraft, promoCode: launchDraft.promoRedemptions.map((entry) => entry.promoCode.code).join(",") || launchDraft.promoCodeDraft || undefined, promoReserved: Boolean(launchDraft.promoRedemptions.length) } : undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
+        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}`} userId={session.user.id} automaticBenefits={feeBenefits} savedWizard={savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft ? { ...launchDraft, promoCode: launchDraft.promoRedemptions.map((entry) => entry.promoCode.code).join(",") || launchDraft.promoCodeDraft || undefined, promoReserved: Boolean(launchDraft.promoRedemptions.length) } : undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
         {heldDenials.length ? <section className="mt-6 space-y-3 rounded-xl border border-amber-500/30 p-5">
           <h2 className="font-semibold text-amber-200">Denials awaiting manual review</h2>
           <p className="text-sm text-zinc-400">Oldest 100 cases. These places and unpaid rewards stay reserved until SeedEnv approves the work or confirms denial. They cannot auto-approve, be edited, or be reused while held.</p>

@@ -112,6 +112,16 @@ model User {
   discordUrl                String?              @map("discord_url")
   twitterHandle             String?              @map("twitter_handle")
   notificationPreferences   Json                 @default("{\"email_tester_feedback\":true,\"email_ledger_updates\":true,\"email_announcements\":false}") @map("notification_preferences")
+  messageRequestsEnabled    Boolean              @default(true)
+  following                 UserFollow[]         @relation("Following")
+  followers                 UserFollow[]         @relation("Followers")
+  blocks                    UserBlock[]          @relation("Blocker")
+  blockedBy                 UserBlock[]          @relation("Blocked")
+  conversationsA            DirectConversation[] @relation("ParticipantA")
+  conversationsB            DirectConversation[] @relation("ParticipantB")
+  directMessages            DirectMessage[]
+  followerEmails            FollowerEmail[]       @relation("EmailRecipient")
+  authoredFollowerEmails    FollowerEmail[]       @relation("EmailAuthor")
   discordWebhookUrl         String?              @map("discord_webhook_url")
   githubTokenEncrypted      String?              @map("github_token_encrypted")
   walletBalanceCents        Int                  @default(0)
@@ -130,7 +140,13 @@ model User {
   stripeConnectAccountId    String?
   questXp                   Int                  @default(0)
   discoveryPasses           Int                  @default(0)
-  referralCode              String?              @unique
+  referralCode              String               @unique @default(cuid())
+  referredById              String?
+  referredBy                User?                @relation("UserReferrals", fields: [referredById], references: [id], onDelete: Restrict)
+  referrals                 User[]               @relation("UserReferrals")
+  feeCredits                FeeCredit[]
+  firstCohortBenefit        FirstCohortBenefit?
+  testFlightBuilds          TestFlightBuild[]
   developerReferralCode     String?              @unique @map("developer_referral_code")
   developerReferralsSent    DeveloperReferral[]  @relation("DeveloperReferrer")
   developerReferralReceived DeveloperReferral?   @relation("DeveloperReferred")
@@ -162,6 +178,86 @@ model User {
 
   @@index([role])
   @@index([rankTier, xpPoints])
+}
+
+enum DirectConversationStatus {
+  REQUESTED
+  ACCEPTED
+  DECLINED
+}
+
+model UserFollow {
+  followerId  String
+  followingId String
+  emailUpdates Boolean @default(false)
+  createdAt DateTime @default(now())
+  follower User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId, createdAt])
+}
+
+model UserBlock {
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId, blockerId])
+}
+
+model DirectConversation {
+  id String @id @default(cuid())
+  participantAId String
+  participantBId String
+  requesterId String
+  status DirectConversationStatus @default(REQUESTED)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  participantA User @relation("ParticipantA", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantB User @relation("ParticipantB", fields: [participantBId], references: [id], onDelete: Cascade)
+  messages DirectMessage[]
+
+  @@unique([participantAId, participantBId])
+  @@index([participantAId, updatedAt])
+  @@index([participantBId, updatedAt])
+  @@index([requesterId, createdAt])
+}
+
+model DirectMessage {
+  id String @id @default(cuid())
+  conversationId String
+  senderId String
+  body String @db.VarChar(2000)
+  createdAt DateTime @default(now())
+  conversation DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt, id])
+  @@index([senderId, createdAt])
+}
+
+model FollowerEmail {
+  id String @id @default(cuid())
+  eventKey String
+  recipientId String
+  authorId String
+  path String
+  subject String
+  sentAt DateTime?
+  cancelledAt DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  lastError String?
+  createdAt DateTime @default(now())
+  recipient User @relation("EmailRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  author User @relation("EmailAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@unique([eventKey, recipientId])
+  @@index([sentAt, cancelledAt, nextAttemptAt])
 }
 
 model Account {
@@ -246,10 +342,27 @@ model AppCampaign {
   platformFeeDiscountPercent Int                @default(0) @map("platform_fee_discount_percent")
   promoCodeDraft   String?              @map("promo_code_draft") @db.VarChar(81)
   promoRedemptions CohortPromoRedemption[]
+  clicks           CohortClick[]
+  referralPolicyVersion Int @default(0)
+  firstCohortFeeWaived Boolean @default(false)
+  referralDiscountPercent Int @default(0)
+  promoDiscountPercent Int @default(0)
+  fundingCheckoutSessionId String? @unique
+  fundingCheckoutAttemptId String?
 
   @@index([developerId, status])
   @@index([status, expiresAt])
   @@index([platform])
+}
+
+model CohortClick {
+  campaignId String
+  visitorKey String
+  day String @db.VarChar(10)
+  createdAt DateTime @default(now())
+  campaign AppCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, visitorKey, day])
 }
 
 model CohortPromoCode {
@@ -293,6 +406,70 @@ model DeveloperReferral {
   qualifiedAt   DateTime? @map("qualified_at")
   qualifiedCampaignId String? @map("qualified_campaign_id")
   createdAt     DateTime  @default(now()) @map("created_at")
+}
+
+enum CreditStatus {
+  PENDING
+  VESTED
+  REDEEMED
+  REVOKED
+  EXPIRED
+}
+
+model FeeCredit {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  amountCents Int @default(0)
+  discountType String @default("PERCENTAGE")
+  percentageRate Float? @default(0.5)
+  status CreditStatus @default(PENDING)
+  sourceReferralId String @unique
+  qualifyingDropId String
+  reservedDropId String?
+  redeemedDropId String?
+  redeemedDiscountCents Int @default(0)
+  clawbackCents Int @default(0)
+  createdAt DateTime @default(now())
+  vestedAt DateTime?
+  redeemedAt DateTime?
+  expiresAt DateTime?
+  reviewedAt DateTime @default(now())
+
+  @@index([userId, status])
+  @@index([status, reviewedAt])
+  @@index([qualifyingDropId])
+  @@index([reservedDropId])
+  @@index([redeemedDropId])
+}
+
+model FirstCohortBenefit {
+  userId String @id
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  campaignId String @unique
+  fundedAt DateTime?
+  createdAt DateTime @default(now())
+}
+
+model TestFlightBuild {
+  joinToken String @id
+  developerId String
+  developer User @relation(fields: [developerId], references: [id], onDelete: Restrict)
+  originalCampaignId String?
+  createdAt DateTime @default(now())
+}
+
+model ReferralAudit {
+  id String @id @default(cuid())
+  eventKey String @unique
+  userId String
+  campaignId String?
+  creditId String?
+  amountCents Int @default(0)
+  reason String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
 }
 
 // One off-session card charge that funds a single tester slot on a pay-per-tester cohort.

@@ -20,6 +20,7 @@ import { COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE
 import { emptyAiDraftInputs, type LaunchWizardDraft } from "@/lib/launch-wizard-draft";
 import { useLaunchAutosave } from "@/components/use-launch-autosave";
 import { CohortPromoInput, type AppliedCohortPromo } from "@/components/cohort-promo-input";
+import { CheckoutSummaryModal } from "@/components/campaign/CheckoutSummaryModal";
 
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
@@ -100,7 +101,7 @@ const optionStyle = { backgroundColor: "#0E1017", color: "#F8FAFC" };
 
 export type DeveloperStudioView = "overview" | "new-drop" | "review-deck" | "asset-vault";
 
-export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0, platformFeeWaived = false, userId, savedWizard, draftRevision }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number; platformFeeWaived?: boolean; userId: string; savedWizard?: LaunchWizardDraft; draftRevision: number }) {
+export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0, platformFeeWaived = false, automaticBenefits, userId, savedWizard, draftRevision }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number; platformFeeWaived?: boolean; automaticBenefits?: { firstCohort: boolean; referralDiscountPercent: number }; userId: string; savedWizard?: LaunchWizardDraft; draftRevision: number }) {
   const router = useRouter();
   const [step, setStep] = useState(savedWizard?.step ?? 1);
   const [highestStep, setHighestStep] = useState(savedWizard?.highestStep ?? 1);
@@ -156,7 +157,10 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   const [isPending, startTransition] = useTransition();
   const [appliedPromo, setAppliedPromo] = useState<AppliedCohortPromo | null>(null);
   const normalizedPromo = form.promoCode?.split(",").map((code) => code.trim().toUpperCase()).filter(Boolean).join(",");
-  const promoDiscountPercent = appliedPromo?.code === normalizedPromo ? appliedPromo?.discountPercent ?? 0 : 0;
+  const manualDiscountPercent = appliedPromo?.code === normalizedPromo ? appliedPromo?.discountPercent ?? 0 : 0;
+  const firstCohortWaived = Boolean(automaticBenefits?.firstCohort && !initialDraft?.promoReserved && !platformFeeWaived);
+  const automaticReferralPercent = !firstCohortWaived && !platformFeeWaived && !initialDraft?.promoReserved && manualDiscountPercent < 75 ? automaticBenefits?.referralDiscountPercent ?? 0 : 0;
+  const promoDiscountPercent = firstCohortWaived ? 100 : automaticReferralPercent && manualDiscountPercent < 75 ? Math.round(Math.min(75, 100 - (100 - manualDiscountPercent) * (1 - automaticReferralPercent / 100))) : manualDiscountPercent;
 
   const payoutPool = useMemo(() => form.totalSlots * form.bountyPerTaskUsd, [form.totalSlots, form.bountyPerTaskUsd]);
   const fundingQuote = useMemo(() => quoteCampaignFunding(payoutPool, form.cohortType, platformFeeWaived, promoDiscountPercent), [payoutPool, form.cohortType, platformFeeWaived, promoDiscountPercent]);
@@ -342,7 +346,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     startTransition(async () => {
       try {
         await autosave.flush();
-        const result = await createCampaignWithEscrow(form, draftId, needsTopUp && chosenTopUp ? { topUpCents: chosenTopUp.creditCents } : undefined);
+        const result = await createCampaignWithEscrow(form, draftId, { ...(needsTopUp && chosenTopUp ? { topUpCents: chosenTopUp.creditCents } : {}), expectedPlatformFeeCents: Math.round(platformFee * 100) });
         if ("promoError" in result) {
           setMessage(result.promoError);
           return;
@@ -425,7 +429,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
       {createdCampaignUrl ? <p role="status" className="text-sm text-emerald-300">Your campaign has already been created. <a className="underline" href={createdCampaignUrl}>Continue to your campaign or checkout</a>. Do not launch it again.</p> : null}
       {view === "overview" ? <DeveloperInsights submissions={auditReports} /> : null}
       {view === "new-drop" ? (
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 transition-all hover:border-zinc-700">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -460,7 +464,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               <fieldset className="md:col-span-2">
                 <legend className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Cohort type</legend>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                  {([["STANDARD_QA", "Custom Drop", platformFeeWaived ? "Platform fee waived" : `${COHORT_PLATFORM_FEE_RATE * 100}% fee · $${COHORT_MIN_PLATFORM_FEE_CENTS / 100} min`], ["GOOGLE_PLAY_14_DAY", COHORT_BUNDLES.GOOGLE_PLAY_14_DAY.shortName, platformFeeWaived ? "$80 · 20 testers · fee waived" : "$199 flat · 20 testers"], ["LIVE_STRESS_DROP", COHORT_BUNDLES.LIVE_STRESS_DROP.shortName, platformFeeWaived ? "$175 · 35 testers · fee waived" : "$349 flat · 35 testers"]] as const).map(([type, label, detail]) => (
+                  {([["STANDARD_QA", "Custom Drop", platformFeeWaived ? "Platform fee waived" : `${COHORT_PLATFORM_FEE_RATE * 100}% fee · $${COHORT_MIN_PLATFORM_FEE_CENTS / 100} min`], ["GOOGLE_PLAY_14_DAY", COHORT_BUNDLES.GOOGLE_PLAY_14_DAY.shortName, platformFeeWaived ? "$80 · 20 testers · fee waived" : `${formatCents(COHORT_BUNDLES.GOOGLE_PLAY_14_DAY.totalCents)} flat · 20 testers`], ["LIVE_STRESS_DROP", COHORT_BUNDLES.LIVE_STRESS_DROP.shortName, platformFeeWaived ? "$175 · 35 testers · fee waived" : `${formatCents(COHORT_BUNDLES.LIVE_STRESS_DROP.totalCents)} flat · 35 testers`]] as const).map(([type, label, detail]) => (
                     <button aria-pressed={form.cohortType === type} className={`rounded-lg border p-3 text-left transition-colors ${form.cohortType === type ? "border-emerald-500/50 bg-emerald-500/[0.06]" : "border-zinc-800 bg-zinc-950/40 hover:border-zinc-700"}`} key={type} onClick={() => selectCohortType(type)} type="button">
                       <span className="block text-sm font-semibold text-zinc-100">{label}</span>
                       <span className="mt-1 block font-mono text-[11px] text-zinc-500">{detail}</span>
@@ -597,11 +601,14 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
 
           {step === 3 && (
             <div className="mt-6 space-y-5">
+              <CheckoutSummaryModal testerBountyEscrowCents={Math.round(fundingQuote.payoutPoolUsd * 100)} basePlatformFeeCents={Math.round(undiscountedQuote.platformFeeUsd * 100)} platformTakeRateCents={Math.round(platformFee * 100)} firstCohort={firstCohortWaived} referralDiscountPercent={automaticReferralPercent} />
+              {firstCohortWaived ? <p className="text-sm text-emerald-300">Your first funded cohort receives a one-time full platform-fee waiver. Leave promo codes empty to save them for a later cohort. Cancelling or refunding a funded cohort does not reset this benefit.</p> : null}
+              {automaticReferralPercent > 0 ? <p className="text-sm text-emerald-300">Vested referral credits are applied automatically, earliest expiry first. Two 50% credits reduce the fee by 75%, not 100%; extra credits stay on your account.</p> : null}
               <CohortPromoInput code={form.promoCode || ""} waived={platformFeeWaived} draftId={draftId} reserved={initialDraft?.promoReserved} onCodeChange={(code) => {
                 setAppliedPromo(null);
                 updateFormField("promoCode", code);
               }} onApplied={setAppliedPromo} />
-              {promoDiscountPercent > 0 ? <p role="status" className="text-sm text-emerald-300">Promo savings: ${(undiscountedQuote.platformFeeUsd - platformFee).toFixed(2)} in platform fees if all places fill. {promoDiscountPercent}% discount locked to this cohort at launch.</p> : null}
+              {promoDiscountPercent > 0 ? <p role="status" className="text-sm text-emerald-300">Fee savings: ${(undiscountedQuote.platformFeeUsd - platformFee).toFixed(2)} in platform fees if all places fill. {promoDiscountPercent}% discount locked to this cohort at launch.</p> : null}
               {activeBundle ? (
                 <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
                   <p className="font-mono text-[11px] uppercase tracking-wider text-emerald-400">{activeBundle.name} · flat ${totalEscrow.toFixed(2)}</p>
@@ -616,7 +623,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               {activeBundle ? (
                 <>
                   <div className="grid gap-3 md:grid-cols-3">
-                    <Metric label={`Tester payout escrow (${testerFundingShare}%)`} value={`$${payoutPool.toFixed(2)}`} />
+                    <Metric label={`Tester payout escrow (${testerFundingShare}%)`} value={`$${fundingQuote.payoutPoolUsd.toFixed(2)}`} />
                     <Metric label={platformFeeWaived ? "Platform fee waived" : promoDiscountPercent ? `Platform fee (${promoDiscountPercent}% off)` : "Flat platform fee"} value={`$${platformFee.toFixed(2)}`} />
                     <Metric label="Total escrow" value={`$${totalEscrow.toFixed(2)}`} gold />
                   </div>

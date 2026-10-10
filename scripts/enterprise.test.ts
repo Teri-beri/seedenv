@@ -117,11 +117,14 @@ async function launchCustom(balanceCents: number, topUpCents?: number) {
   process.env.STRIPE_SECRET_KEY = "mocked-provider-config";
   const seen = { created: {} as Record<string, unknown>, deposits: 0, topUps: [] as Array<Record<string, unknown>>, checkout: null as null | { line_items: Array<{ price_data: { unit_amount: number } }>; metadata: Record<string, string>; cancel_url: string } };
   const modules = [
+    mock.module("../lib/services/billing.service.ts", { namedExports: { reserveAutomaticFeeBenefits: async (_tx: unknown, _user: string, _campaign: string, _waived: boolean, discount: number) => ({ firstCohortFeeWaived: false, referralDiscountPercent: 0, effectiveDiscountPercent: discount }), releaseUnfundedFeeBenefits: async () => undefined } }),
+    mock.module("../lib/billing-transaction.ts", { namedExports: { billingTransaction: async (work: (tx: typeof import("../lib/prisma").prisma) => Promise<unknown>) => work((await import("../lib/prisma")).prisma) } }),
+    mock.module("../lib/social-connections.ts", { namedExports: { queueFollowerEmails: async () => undefined } }),
     mock.module("next/cache", { namedExports: { revalidatePath: () => undefined } }),
     mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "owner", role: "DEVELOPER", email: "dev@example.invalid", name: "Dev", username: "dev", stripeCustomerId: "cus_test", fundingBalanceCents: balanceCents }) } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: {
       billingProfile: { findUnique: async () => ({ ...company }) },
-      appCampaign: { create: async ({ data }: { data: Record<string, unknown> }) => { seen.created = data; return { id: "cohort-test", ...data }; }, updateMany: async () => ({ count: 1 }) },
+      appCampaign: { create: async ({ data }: { data: Record<string, unknown> }) => { seen.created = data; return { id: "cohort-test", ...data }; }, update: async ({ data }: { data: Record<string, unknown> }) => { seen.created = { ...seen.created, ...data }; return { id: "cohort-test", ...seen.created }; }, updateMany: async () => ({ count: 1 }) },
       walletTransaction: { create: async () => { seen.deposits += 1; return { id: "deposit-test" }; } },
       balanceTopUp: {
         create: async ({ data }: { data: Record<string, unknown> }) => { seen.topUps.push(data); return { id: "topup-test", ...data }; },
@@ -139,7 +142,7 @@ async function launchCustom(balanceCents: number, topUpCents?: number) {
     const balance = await import(`../lib/funding-balance.ts?custom=${randomUUID()}`);
     modules.push(mock.module("../lib/funding-balance.ts", { namedExports: balance }));
     const { createCampaignWithEscrow } = await import(`../app/actions/campaignActions.ts?custom=${randomUUID()}`);
-    const result = await createCampaignWithEscrow({ title: "TestFlight QA", platform: "TESTFLIGHT", appUrl: "https://example.invalid", targetVibe: "Developer Tools", description: "A safe test of company invoice details at checkout.", totalSlots: 25, bountyPerTaskUsd: 4, instructions: [{ instructionTitle: "Onboarding", instructionDetail: "Follow signup and record any confusing steps.", proofType: "SCREENSHOT", minimumRep: 0 }], discoveryAllowed: false, discoveryMinRep: 0 }, undefined, topUpCents ? { topUpCents } : undefined);
+    const result = await createCampaignWithEscrow({ title: "Web QA", platform: "WEB_STAGING", appUrl: "https://example.invalid", targetVibe: "Developer Tools", description: "A safe test of company invoice details at checkout.", totalSlots: 25, bountyPerTaskUsd: 4, instructions: [{ instructionTitle: "Onboarding", instructionDetail: "Follow signup and record any confusing steps.", proofType: "SCREENSHOT", minimumRep: 0 }], discoveryAllowed: false, discoveryMinRep: 0 }, undefined, topUpCents ? { topUpCents } : undefined);
     return { result, seen };
   } finally {
     for (const item of modules.reverse()) item.restore();
@@ -188,13 +191,15 @@ test("flat bundles override client slots, rewards, and platform at checkout", as
   let written: Record<string, unknown> = {};
   let line = "";
   const modules = [
+    mock.module("../lib/services/billing.service.ts", { namedExports: { reserveAutomaticFeeBenefits: async (_tx: unknown, _user: string, _campaign: string, _waived: boolean, discount: number) => ({ firstCohortFeeWaived: false, referralDiscountPercent: 0, effectiveDiscountPercent: discount }), releaseUnfundedFeeBenefits: async () => undefined } }),
+    mock.module("../lib/billing-transaction.ts", { namedExports: { billingTransaction: async (work: (tx: typeof import("../lib/prisma").prisma) => Promise<unknown>) => work((await import("../lib/prisma")).prisma) } }),
     mock.module("../lib/auth.ts", { namedExports: { getCurrentUser: async () => ({ id: "owner", role: "DEVELOPER", stripeCustomerId: "cus_test" }) } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: {
       billingProfile: { findUnique: async () => null },
-      appCampaign: { create: async ({ data }: { data: Record<string, unknown> }) => { campaign = data; return { id: "bundle-test", ...data }; } },
+      appCampaign: { create: async ({ data }: { data: Record<string, unknown> }) => { campaign = data; return { id: "bundle-test", ...data }; }, update: async ({ data }: { data: Record<string, unknown> }) => { campaign = { ...campaign, ...data }; return { id: "bundle-test", ...campaign }; } },
       walletTransaction: { create: async ({ data }: { data: Record<string, unknown> }) => { written = data; return { id: "deposit-bundle" }; } },
     } } }),
-    mock.module("../lib/stripe.ts", { namedExports: { getStripe: () => ({ customers: { retrieve: async () => ({ deleted: false, invoice_settings: { default_payment_method: "pm_test" } }) }, checkout: { sessions: { create: async (args: { line_items: Array<{ price_data: { product_data: { description: string } } }> }) => { line = args.line_items[0].price_data.product_data.description; return { url: "https://checkout.stripe.com/mock" }; } } } }) } }),
+    mock.module("../lib/stripe.ts", { namedExports: { getStripe: () => ({ customers: { retrieve: async () => ({ deleted: false, invoice_settings: { default_payment_method: "pm_test" } }) }, checkout: { sessions: { create: async (args: { line_items: Array<{ price_data: { unit_amount: number; product_data: { description: string } } }> }) => { line = args.line_items.map(item => item.price_data.product_data.description).join(" "); assert.deepEqual(args.line_items.map(item => item.price_data.unit_amount), [8000, 1600]); return { url: "https://checkout.stripe.com/mock" }; } } } }) } }),
   ];
   try {
     const { createCampaignWithEscrow } = await import(`../app/actions/campaignActions.ts?bundle=${randomUUID()}`);
@@ -203,11 +208,11 @@ test("flat bundles override client slots, rewards, and platform at checkout", as
     assert.equal(campaign.bountyPerTaskUsd, 4);
     assert.equal(campaign.platform, "PLAY_STORE");
     assert.equal(campaign.guaranteedDays, 14);
-    assert.equal(campaign.totalBudgetUsd, 199);
-    assert.equal(written.amountCents, 19900);
-    assert.equal(written.platformFeeCents, 11900);
-    assert.equal(invoiceTotalMatches(invoiceSnapshotSchema.parse(written.invoiceSnapshot), 19900), true);
-    assert.match(line, /flat \$119\.00 platform fee/);
+    assert.equal(campaign.totalBudgetUsd, 96);
+    assert.equal(written.amountCents, 9600);
+    assert.equal(written.platformFeeCents, 1600);
+    assert.equal(invoiceTotalMatches(invoiceSnapshotSchema.parse(written.invoiceSnapshot), 9600), true);
+    assert.match(line, /flat \$16\.00 platform fee/);
   } finally {
     for (const item of modules.reverse()) item.restore();
     if (priorKey === undefined) delete process.env.STRIPE_SECRET_KEY;

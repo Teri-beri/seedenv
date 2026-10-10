@@ -17,6 +17,10 @@ import { ensureStripeCustomer } from "@/lib/stripe-customer";
 import { CohortPromoError, eligibleCohortPromo, failedCohortPromoCheckout, prepareCohortPromoRetry, promoStackSchema, recordCohortPromoCheckout, reserveCohortPromo } from "@/lib/cohort-promos";
 import { billingTransaction } from "@/lib/billing-transaction";
 import Stripe from "stripe";
+import { queueFollowerEmails } from "@/lib/social-connections";
+import { REFERRAL_RULES } from "@/lib/config/referral";
+import { releaseUnfundedFeeBenefits, reserveAutomaticFeeBenefits } from "@/lib/services/billing.service";
+import { assertTestFlightOwner, isTestFlightUrl, TestFlightOwnershipError } from "@/lib/services/testflight-ownership.service";
 
 const taskInstructionSchema = z.object({
   instructionTitle: z.string().min(3).max(90),
@@ -70,7 +74,7 @@ function resolveCohortTerms(input: CampaignInput) {
 
 function checkoutDescription(input: CampaignInput, terms: ReturnType<typeof resolveCohortTerms>, platformFeeWaived: boolean, discountPercent: number) {
   if (platformFeeWaived) return `${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)}; platform fee waived`;
-  if (discountPercent) return `${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)}; ${discountPercent}% off the platform fee with ${input.promoCode}`;
+  if (discountPercent) return `${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)}; ${discountPercent}% off the platform fee${input.promoCode ? ` with ${input.promoCode}` : " through referral benefits"}`;
   if (isBundleType(input.cohortType)) {
     const bundle = COHORT_BUNDLES[input.cohortType];
     return `${bundle.name}: ${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)} plus a flat $${(bundle.platformFeeCents / 100).toFixed(2)} platform fee`;
@@ -132,8 +136,14 @@ async function requireDeveloper() {
 }
 
 async function saveCampaignDraft(developerId: string, input: CampaignInput, platformFeeWaived: boolean, draftId?: string) {
+  const needsOwnership = resolveCohortTerms(input).platform === PlatformType.TESTFLIGHT || isTestFlightUrl(input.appUrl);
   const { data: draftData } = buildCampaignData(input, developerId, CampaignStatus.DRAFT, platformFeeWaived);
-  if (!draftId) return prisma.appCampaign.create({ data: draftData });
+  if (!draftId) return billingTransaction(async tx => {
+    const draft = await tx.appCampaign.create({ data: draftData });
+    if (!needsOwnership) return draft;
+    const appUrl = await assertTestFlightOwner(tx, developerId, input.appUrl, draft.id, true);
+    return tx.appCampaign.update({ where: { id: draft.id }, data: { appUrl } });
+  });
 
   const ownedDraft = await prisma.appCampaign.findFirst({
     where: { id: draftId, developerId, status: CampaignStatus.DRAFT },
@@ -143,7 +153,8 @@ async function saveCampaignDraft(developerId: string, input: CampaignInput, plat
   if (ownedDraft.promoRedemptions.length && (input.promoCode || "").split(",").sort().join(",") !== ownedDraft.promoRedemptions.map((entry) => entry.promoCode.code).sort().join(",")) throw new CohortPromoError("Keep this draft's reserved promo codes to resume its funding terms.");
   const resumedData = buildCampaignData(input, developerId, CampaignStatus.DRAFT, platformFeeWaived, ownedDraft.promoRedemptions.length ? ownedDraft.platformFeeDiscountPercent : 0).data;
 
-  return prisma.$transaction(async (transaction) => {
+  return billingTransaction(async (transaction) => {
+    if (needsOwnership) resumedData.appUrl = await assertTestFlightOwner(transaction, developerId, input.appUrl, draftId, true);
     await transaction.taskInstruction.deleteMany({ where: { campaignId: draftId } });
     return transaction.appCampaign.update({ where: { id: draftId }, data: resumedData });
   });
@@ -157,12 +168,11 @@ export async function saveTestCampaignDraft(data: CampaignInput) {
     throw new Error("Test drafts are only available to the SeedEnv owner account.");
   }
 
-  const { data: campaignData } = buildCampaignData(input, developer.id, CampaignStatus.DRAFT, developer.platformFeeWaived);
-  const campaign = await prisma.appCampaign.create({ data: campaignData });
+  const campaign = await saveCampaignDraft(developer.id, input, developer.platformFeeWaived);
   return { campaignId: campaign.id, title: campaign.title, status: campaign.status, chargedCents: 0 };
 }
 
-async function persistLaunchCampaign(input: CampaignInput, developer: Awaited<ReturnType<typeof requireDeveloper>>, draftId: string | undefined, tax: Awaited<ReturnType<typeof serviceTaxAudit>> | null) {
+async function persistLaunchCampaign(input: CampaignInput, developer: Awaited<ReturnType<typeof requireDeveloper>>, draftId: string | undefined, tax: Awaited<ReturnType<typeof serviceTaxAudit>> | null, expectedPlatformFeeCents?: number) {
   return billingTransaction(async (tx) => {
     const existing = draftId ? await tx.appCampaign.findFirst({
       where: { id: draftId, developerId: developer.id, status: CampaignStatus.DRAFT },
@@ -182,15 +192,33 @@ async function persistLaunchCampaign(input: CampaignInput, developer: Awaited<Re
       discountPercent = promos.reduce((sum, entry) => sum + entry.discountPercent, 0);
       if (discountPercent > 100) throw new CohortPromoError("Discounts cannot exceed 100%. Save the extra credit for another cohort.");
     }
-    const firstTester = quoteSlotCharge(Math.round(input.bountyPerTaskUsd * 100), 0, 0, developer.platformFeeWaived, discountPercent);
     const custom = !isBundleType(input.cohortType);
-    const funded = custom && developer.fundingBalanceCents >= firstTester.totalCents;
-    const built = buildCampaignData(input, developer.id, funded ? CampaignStatus.ACTIVE : CampaignStatus.ESCROW_PENDING, developer.platformFeeWaived, discountPercent);
+    let built = buildCampaignData(input, developer.id, CampaignStatus.ESCROW_PENDING, developer.platformFeeWaived, discountPercent);
     const campaignData = { ...built.data, fundingModel: custom ? CohortFundingModel.PAY_PER_TESTER : CohortFundingModel.PREPAID, ...(tax ? { taxSnapshot: tax } : {}) };
     if (draftId) await tx.taskInstruction.deleteMany({ where: { campaignId: draftId } });
-    const campaign = draftId
+    let campaign = draftId
       ? await tx.appCampaign.update({ where: { id: draftId }, data: campaignData })
       : await tx.appCampaign.create({ data: campaignData });
+    if (built.terms.platform === PlatformType.TESTFLIGHT || isTestFlightUrl(input.appUrl)) {
+      const appUrl = await assertTestFlightOwner(tx, developer.id, input.appUrl, campaign.id, true);
+      campaign = await tx.appCampaign.update({ where: { id: campaign.id }, data: { appUrl } });
+    }
+    const benefits = await reserveAutomaticFeeBenefits(tx, developer.id, campaign.id, developer.platformFeeWaived || Boolean(existing?.promoRedemptions.length), discountPercent);
+    const firstTester = quoteSlotCharge(Math.round(input.bountyPerTaskUsd * 100), 0, 0, developer.platformFeeWaived || benefits.firstCohortFeeWaived, benefits.effectiveDiscountPercent);
+    const funded = custom && developer.fundingBalanceCents >= firstTester.totalCents;
+    built = buildCampaignData(input, developer.id, funded ? CampaignStatus.ACTIVE : CampaignStatus.ESCROW_PENDING, developer.platformFeeWaived || benefits.firstCohortFeeWaived, benefits.effectiveDiscountPercent);
+    const finalQuote = quoteCampaignFunding(built.terms.totalSlots * built.terms.bountyPerTaskUsd, input.cohortType, developer.platformFeeWaived || benefits.firstCohortFeeWaived, benefits.effectiveDiscountPercent);
+    if (expectedPlatformFeeCents !== undefined && Math.round(finalQuote.platformFeeUsd * 100) !== expectedPlatformFeeCents) throw new CohortPromoError("Your fee benefits changed in another tab or expired. Refresh Budget and review the new total before launching; no payment was created.");
+    campaign = await tx.appCampaign.update({ where: { id: campaign.id }, data: {
+      status: funded ? CampaignStatus.ACTIVE : CampaignStatus.ESCROW_PENDING,
+      referralPolicyVersion: REFERRAL_RULES.POLICY_VERSION, firstCohortFeeWaived: benefits.firstCohortFeeWaived,
+      referralDiscountPercent: benefits.referralDiscountPercent, promoDiscountPercent: discountPercent,
+      platformFeeDiscountPercent: benefits.effectiveDiscountPercent, platformFeeUsd: finalQuote.platformFeeUsd, totalBudgetUsd: finalQuote.totalBudgetUsd,
+    } });
+    // An automatic first-cohort waiver leaves manual codes and legacy vouchers unused.
+    if (benefits.firstCohortFeeWaived && input.promoCode && !existing?.promoRedemptions.length) {
+      throw new CohortPromoError("Your first cohort already receives a full platform-fee waiver. Remove the promo codes to save them for a later cohort.");
+    }
     if (input.promoCode && !existing?.promoRedemptions.length) for (const code of input.promoCode.split(",")) await reserveCohortPromo(tx, developer.id, campaign.id, code);
     if (input.promoCode) await tx.cohortPromoRedemption.updateMany({
       where: { campaignId: campaign.id, consumedAt: null },
@@ -220,23 +248,28 @@ async function persistLaunchCampaign(input: CampaignInput, developer: Awaited<Re
         },
       });
       checkoutAttemptId = deposit.id;
+      await tx.appCampaign.update({ where: { id: campaign.id }, data: { fundingCheckoutAttemptId: deposit.id, fundingCheckoutSessionId: null } });
     }
-    return { campaign, escrowTotalCents: built.escrowTotalCents, terms: built.terms, firstTester, funded, discountPercent, checkoutAttemptId };
+    if (funded) {
+      await queueFollowerEmails(tx, developer.id, `cohort:${campaign.id}`, `/cohorts/${campaign.id}`, "A developer you follow launched a new cohort");
+    }
+    return { campaign, escrowTotalCents: built.escrowTotalCents, terms: built.terms, firstTester, funded, discountPercent: benefits.effectiveDiscountPercent, checkoutAttemptId };
   });
 }
 
-export async function createCampaignWithEscrow(data: CampaignInput, draftId?: string, options?: { topUpCents?: number }) {
+export async function createCampaignWithEscrow(data: CampaignInput, draftId?: string, options?: { topUpCents?: number; expectedPlatformFeeCents?: number }) {
   try {
     return await launchCampaignWithEscrow(data, draftId, options);
   } catch (error) {
-    if (error instanceof CohortPromoError) return { promoError: error.message };
+    if (error instanceof CohortPromoError || error instanceof TestFlightOwnershipError) return { promoError: error.message };
     throw error;
   }
 }
 
-async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, options?: { topUpCents?: number }) {
+async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, options?: { topUpCents?: number; expectedPlatformFeeCents?: number }) {
   const input = campaignSchema.parse(data);
   const developer = await requireDeveloper();
+  const expectedPlatformFeeCents = options?.expectedPlatformFeeCents === undefined ? undefined : z.number().int().min(0).max(100000000).parse(options.expectedPlatformFeeCents);
   if (!process.env.STRIPE_SECRET_KEY) {
     const draft = await saveCampaignDraft(developer.id, input, developer.platformFeeWaived, draftId);
     return { campaignId: draft.id, checkoutUrl: null, escrowTotalCents: 0, requiresPaymentSetup: true };
@@ -245,7 +278,7 @@ async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, o
   if (input.promoCode) for (const code of input.promoCode.split(",")) await prepareCohortPromoRetry(developer.id, code);
 
   if (!isBundleType(input.cohortType)) {
-    const { campaign: live, funded, firstTester } = await persistLaunchCampaign(input, developer, draftId, tax);
+    const { campaign: live, funded, firstTester } = await persistLaunchCampaign(input, developer, draftId, tax, expectedPlatformFeeCents);
     revalidatePath("/console");
     if (funded) {
       revalidatePath("/explore");
@@ -264,13 +297,14 @@ async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, o
       return { campaignId: live.id, checkoutUrl: checkout.url, escrowTotalCents: checkout.quote.totalCents };
     } catch (error) {
       // Once Stripe has returned a session, retain the payment lock until it is closed.
-      const pending = input.promoCode ? await prisma.balanceTopUp.findFirst({ where: { campaignId: live.id, status: "PENDING", stripeCheckoutSessionId: { not: null } } }) : null;
-      if (input.promoCode && (pending || !(error instanceof Stripe.errors.StripeInvalidRequestError))) {
-        console.error("SeedEnv promo top-up checkout outcome requires reconciliation:", live.id, error);
-        throw new CohortPromoError("Stripe checkout could not be confirmed. Your promo remains reserved; contact support before starting another payment.");
+      const pending = await prisma.balanceTopUp.findFirst({ where: { campaignId: live.id, status: "PENDING" } });
+      if (pending || !(error instanceof Stripe.errors.StripeInvalidRequestError)) {
+        console.error("SeedEnv top-up checkout outcome requires reconciliation:", live.id, error);
+        throw new CohortPromoError("Stripe checkout could not be confirmed. Your fee benefits remain reserved; contact support before starting another payment.");
       }
       if (input.promoCode) await failedCohortPromoCheckout(live.id);
       await prisma.appCampaign.updateMany({ where: { id: live.id, status: CampaignStatus.ESCROW_PENDING }, data: { status: CampaignStatus.DRAFT } });
+      await billingTransaction(tx => releaseUnfundedFeeBenefits(tx, live.id));
       throw error;
     }
   }
@@ -291,13 +325,14 @@ async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, o
     }
   }
 
-  const { campaign, escrowTotalCents, terms, discountPercent, checkoutAttemptId } = await persistLaunchCampaign(input, developer, draftId, tax);
+  const { campaign, escrowTotalCents, terms, discountPercent, checkoutAttemptId } = await persistLaunchCampaign(input, developer, draftId, tax, expectedPlatformFeeCents);
 
   const stripe = getStripe();
   let session;
   try {
     session = await stripe.checkout.sessions.create({
       mode: "payment",
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
       customer: stripeTaxEnabled() ? await ensureStripeCustomer(developer) : developer.stripeCustomerId || undefined,
       ...storedValueCheckoutTax(),
       payment_method_types: ["card"],
@@ -306,15 +341,28 @@ async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, o
           quantity: 1,
           price_data: {
             currency: "usd",
-            unit_amount: escrowTotalCents,
+            unit_amount: Math.round(terms.totalSlots * terms.bountyPerTaskUsd * 100),
             tax_behavior: "exclusive",
             product_data: {
               tax_code: QA_SERVICE_TAX_CODE,
-              name: `SeedEnv escrow: ${campaign.title}`,
-              description: checkoutDescription(input, terms, developer.platformFeeWaived, discountPercent),
+              name: `Tester bounty escrow: ${campaign.title}`,
+              description: `${terms.totalSlots} tester slots at $${terms.bountyPerTaskUsd.toFixed(2)}. Reserved entirely for tester compensation.`,
             },
           },
         },
+        ...(campaign.platformFeeUsd > 0 ? [{
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: Math.round(campaign.platformFeeUsd * 100),
+            tax_behavior: "exclusive" as const,
+            product_data: {
+              tax_code: QA_SERVICE_TAX_CODE,
+              name: `SeedEnv platform servicing: ${campaign.title}`,
+              description: checkoutDescription(input, terms, developer.platformFeeWaived || campaign.firstCohortFeeWaived, discountPercent),
+            },
+          },
+        }] : []),
       ],
       success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?view=billing&escrow=success&campaign=${campaign.id}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?view=billing&escrow=cancelled&campaign=${campaign.id}`,
@@ -325,21 +373,24 @@ async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, o
         campaignId: campaign.id,
         developerId: developer.id,
         cohortType: input.cohortType,
+        checkoutAttemptId: checkoutAttemptId!,
       },
     }, { idempotencyKey: `seedenv-campaign-${checkoutAttemptId}` });
   } catch (error) {
-    if (input.promoCode && !(error instanceof Stripe.errors.StripeInvalidRequestError)) {
-      console.error("SeedEnv promo bundle checkout outcome requires reconciliation:", campaign.id, error);
-      throw new CohortPromoError("Stripe checkout could not be confirmed. Your promo remains reserved; contact support before starting another payment.");
+    if (!(error instanceof Stripe.errors.StripeInvalidRequestError)) {
+      console.error("SeedEnv bundle checkout outcome requires reconciliation:", campaign.id, error);
+      throw new CohortPromoError("Stripe checkout could not be confirmed. Your fee benefits remain reserved; contact support before starting another payment.");
     }
     await prisma.$transaction([
       prisma.appCampaign.update({ where: { id: campaign.id }, data: { status: CampaignStatus.PAUSED } }),
       prisma.walletTransaction.updateMany({ where: { description: { contains: `(${campaign.id})` }, status: TransactionStatus.PENDING }, data: { status: TransactionStatus.FAILED } }),
     ]);
     if (input.promoCode) await failedCohortPromoCheckout(campaign.id);
+    await billingTransaction(tx => releaseUnfundedFeeBenefits(tx, campaign.id));
     throw error;
   }
-  if (!session.url) throw new Error("Stripe did not return a checkout link.");
+  await prisma.appCampaign.update({ where: { id: campaign.id }, data: { fundingCheckoutSessionId: session.id } });
+  if (!session.url) throw new Error("Stripe did not return a checkout link. Your fee benefits remain reserved until payment reconciliation.");
   if (input.promoCode) await recordCohortPromoCheckout(campaign.id, session.id);
 
   return { campaignId: campaign.id, checkoutUrl: session.url, escrowTotalCents };

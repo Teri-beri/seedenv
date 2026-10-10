@@ -3,6 +3,7 @@ import { SubmissionStatus } from "@prisma/client";
 import { ArrowRight, Award, CheckCircle2, Clock3, Medal, Settings, ShieldCheck, Sparkles, Trophy } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { ProfileLink } from "@/components/profile-link";
 import { FlightDeckCashout } from "@/components/flight-deck-cashout";
 import { MissionExperience } from "@/components/mission-experience";
 import { TesterBottomNav } from "@/components/navigation";
@@ -103,6 +104,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
           <nav aria-label="Tester opportunities" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Link href="/dashboard?view=missions" className={shortcut}>My missions<span className={shortcutDetail}>{active.length} in progress · {inReview.length} in review</span></Link>
             <Link href="/applications" className={shortcut}>Applications<span className={shortcutDetail}>Requests & accepted missions</span></Link>
+            <Link href="/messages" className={shortcut}>Messages<span className={shortcutDetail}>Private inbox & message requests</span></Link>
             <Link href="/quests" className={shortcut}>{questXp.toLocaleString("en-US")} Quest XP<span className={shortcutDetail}>{discoveryPasses} passes · daily quests</span></Link>
             <Link href="/clippers" className={shortcut}>Clippers<span className={shortcutDetail}>Creator briefs & paid videos</span></Link>
           </nav>
@@ -171,7 +173,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
               <div className="flex items-center justify-between"><h2 className="text-lg font-semibold tracking-tight">Community standouts</h2><Trophy className="size-5 text-amber-400" /></div>
               <p className="mt-2 text-sm text-neutral-400">Top contributors by lifetime reputation.</p>
               <ol className="mt-5 space-y-2">
-                {leaderboard.map((user, index) => <li key={user.id} className={`flex items-center gap-3 rounded-xl p-3 ${user.id === tester.id ? "border border-emerald-500/25 bg-emerald-500/5" : "bg-black/10"}`}><span className={`w-6 text-center font-mono text-sm font-bold ${index === 0 ? "text-amber-400" : "text-neutral-500"}`}>{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm font-semibold">{user.username}{user.id === tester.id ? <span className="ml-2 text-xs font-normal text-emerald-400">You</span> : null}</span><span className="font-mono text-xs text-amber-300">{user.xpPoints.toLocaleString()} REP</span></li>)}
+                {leaderboard.map((user, index) => <li key={user.id} className={`flex items-center gap-3 rounded-xl p-3 ${user.id === tester.id ? "border border-emerald-500/25 bg-emerald-500/5" : "bg-black/10"}`}><span className={`w-6 text-center font-mono text-sm font-bold ${index === 0 ? "text-amber-400" : "text-neutral-500"}`}>{index + 1}</span><span className="min-w-0 flex-1 truncate text-sm font-semibold"><ProfileLink username={user.username} />{user.id === tester.id ? <span className="ml-2 text-xs font-normal text-emerald-400">You</span> : null}</span><span className="font-mono text-xs text-amber-300">{user.xpPoints.toLocaleString()} REP</span></li>)}
               </ol>
               {!leaderboard.length ? <p className="mt-6 text-sm text-neutral-500">The leaderboard starts with the first approved mission. Help set the pace.</p> : null}
               <div className="mt-6 rounded-xl border border-zinc-800 p-4"><p className="flex items-center gap-2 text-sm font-semibold"><ShieldCheck className="size-4 text-emerald-400" /> Quality over quantity</p><p className="mt-2 text-xs leading-6 text-neutral-500">Describe what you tried, what you expected, and what happened. Original screenshots and reproducible feedback help developers make better products.</p></div>

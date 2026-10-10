@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
+import { assertReferralAcyclic, queueReferralCredit, vestCampaignReferralCredits } from "@/lib/services/referral.service";
 
 export class DeveloperReferralError extends Error {}
 
@@ -18,28 +19,26 @@ export async function attachDeveloperReferral(tx: Prisma.TransactionClient, deve
   const code = parsed.data;
   const developer = await tx.user.findUniqueOrThrow({ where: { id: developerId } });
   if (developer.role !== "DEVELOPER") throw new DeveloperReferralError("Switch to your developer workspace first.");
-  if (await tx.developerReferral.findUnique({ where: { developerId } })) throw new DeveloperReferralError("A developer referral is already linked to this account.");
+  if (developer.referredById || await tx.developerReferral.findUnique({ where: { developerId } })) throw new DeveloperReferralError("A developer referral is permanently linked to this account already.");
   const inviter = await tx.user.findUnique({ where: { developerReferralCode: code } });
-  if (!inviter || (!inviter.developerWorkspaceEnabled && inviter.role !== "DEVELOPER")) throw new DeveloperReferralError("This developer referral code is invalid.");
+  if (!inviter || (!inviter.developerWorkspaceEnabled && inviter.role !== "DEVELOPER") || !inviter.emailVerified) throw new DeveloperReferralError("This developer referral code is invalid or its owner has not verified their account.");
   if (inviter.id === developerId) throw new DeveloperReferralError("You cannot refer yourself.");
   if (await tx.developerReferral.findFirst({ where: { inviterId: developerId, developerId: inviter.id } })) throw new DeveloperReferralError("Reciprocal developer referrals are not allowed.");
-  if (await tx.walletTransaction.findFirst({ where: { userId: developerId, type: "ESCROW_DEPOSIT", status: "COMPLETED" } }) || await tx.balanceTopUp.findFirst({ where: { userId: developerId, campaignId: { not: null }, status: "SUCCEEDED" } })) throw new DeveloperReferralError("Link your referral before your first paid cohort.");
+  if (await tx.walletTransaction.findFirst({ where: { userId: developerId, type: "ESCROW_DEPOSIT", status: "COMPLETED" } }) || await tx.balanceTopUp.findFirst({ where: { userId: developerId, campaignId: { not: null }, status: { in: ["SUCCEEDED", "REFUNDED"] } } })) throw new DeveloperReferralError("Link your referral before your first paid cohort.");
+  try { await assertReferralAcyclic(tx, developerId, inviter.id); }
+  catch (error) {
+    if (error instanceof Error && /Circular or reciprocal/.test(error.message)) throw new DeveloperReferralError(error.message);
+    throw error;
+  }
+  await tx.user.update({ where: { id: developerId }, data: { referredById: inviter.id } });
   const referral = await tx.developerReferral.create({ data: { id: randomUUID().replaceAll("-", "").slice(0, 20), inviterId: inviter.id, developerId } });
-  await createReferralCredit(tx, developerId, referral.id, "WELCOME");
   return referral;
 }
 
 // Called in the same transaction as a successful cohort payment/debit, not signup or preview.
 export async function qualifyDeveloperReferral(tx: Prisma.TransactionClient, developerId: string, campaignId: string) {
-  const referral = await tx.developerReferral.findUnique({ where: { developerId } });
-  if (!referral || referral.qualifiedAt) return;
-  const used = await tx.cohortPromoRedemption.findFirst({ where: { developerId, campaignId, consumedAt: { not: null }, promoCode: { code: `REF_WELCOME_${referral.id.toUpperCase()}` } } });
-  if (!used) return;
-  const paid = await tx.walletTransaction.findFirst({ where: { userId: developerId, campaignId, type: "ESCROW_DEPOSIT", status: "COMPLETED", amountCents: { gt: 0 } } });
-  if (!paid && !await tx.balanceTopUp.findFirst({ where: { userId: developerId, campaignId, status: "SUCCEEDED", creditCents: { gt: 0 } } })) return;
-  const updated = await tx.developerReferral.updateMany({
-    where: { id: referral.id, qualifiedAt: null },
-    data: { qualifiedAt: new Date(), qualifiedCampaignId: campaignId },
-  });
-  if (updated.count === 1) await createReferralCredit(tx, referral.inviterId, referral.id, "MATCH");
+  const campaign = await tx.appCampaign.findUniqueOrThrow({ where: { id: campaignId }, select: { developerId: true } });
+  if (campaign.developerId !== developerId) throw new Error("Referral qualification ownership does not match.");
+  await queueReferralCredit(tx, campaignId);
+  await vestCampaignReferralCredits(tx, campaignId);
 }
