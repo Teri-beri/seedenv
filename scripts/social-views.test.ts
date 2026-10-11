@@ -18,6 +18,7 @@ test("message pages preserve request gates, private history membership and seria
   const b = { ...a, id: "tester", username: "Tester", role: "TESTER", developerWorkspaceEnabled: false, testerWorkspaceEnabled: true };
   let status = "REQUESTED";
   const reads: Prisma.DirectConversationFindFirstArgs[] = [];
+  const listReads: Prisma.DirectConversationFindManyArgs[] = [];
   const modules = [
     mock.module("next/navigation", { namedExports: { notFound: () => { throw new Error("NOT_FOUND"); } } }),
     mock.module("next/link", { defaultExport: ({ children, ...props }: Record<string, unknown>) => createElement("a", props, children as string) }),
@@ -30,7 +31,7 @@ test("message pages preserve request gates, private history membership and seria
     mock.module("../components/message-refresh.tsx", { namedExports: { MessageRefresh: () => createElement("button", null, "Refresh inbox") } }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: {
       directConversation: {
-        findMany: async () => [],
+        findMany: async (query: Prisma.DirectConversationFindManyArgs) => { listReads.push(query); return []; },
         count: async () => 1,
         findFirst: async (query: Prisma.DirectConversationFindFirstArgs) => {
           reads.push(query);
@@ -59,5 +60,29 @@ test("message pages preserve request gates, private history membership and seria
     assert.match(renderToStaticMarkup(accepted), /aria-label="Composer"/);
     status = "DECLINED";
     assert.doesNotMatch(renderToStaticMarkup(await MessageInbox({ memberId: a.id, params: { thread: "thread" } })), /aria-label="Composer"/);
+
+    const searched = renderToStaticMarkup(await MessageInbox({
+      memberId: a.id,
+      params: { box: "inbox", q: "tester" },
+      contacts: [{ id: b.id, username: b.username, avatarUrl: null, campaignTitle: "Goddesses Beta" }],
+    }));
+    assert.match(searched, /<form[^>]*action="\/messages"/);
+    assert.match(searched, /<form[^>]*method="get"/);
+    assert.match(searched, /name="q"/);
+    assert.match(searched, /value="tester"/);
+    assert.match(searched, /New Conversation/);
+    assert.match(searched, /Message Cohort Tester/);
+    assert.deepEqual(listReads.at(-1)?.where, {
+      status: "ACCEPTED",
+      AND: [
+        { OR: [{ participantAId: a.id }, { participantBId: a.id }] },
+        {
+          OR: [
+            { participantAId: a.id, participantB: { username: { contains: "tester", mode: "insensitive" } } },
+            { participantBId: a.id, participantA: { username: { contains: "tester", mode: "insensitive" } } },
+          ],
+        },
+      ],
+    });
   } finally { for (const item of modules.reverse()) item.restore(); }
 });

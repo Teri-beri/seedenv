@@ -22,5 +22,14 @@ export function MessageRefresh() {
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [router]);
-  return <button type="button" className="min-h-11 text-xs text-zinc-500 hover:text-emerald-300" onClick={() => router.refresh()}>Refresh inbox / auto-updates while visible</button>;
+  return (
+    <button
+      type="button"
+      onClick={() => router.refresh()}
+      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 px-2.5 py-1.5 text-[11px] font-mono text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+      Live Sync Active
+    </button>
+  );
 }

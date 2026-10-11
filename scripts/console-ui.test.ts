@@ -48,6 +48,16 @@ test("admin cohort tools collapse into one menu and stay hidden from non-admins"
     const plain = renderToStaticMarkup(createElement(ConsoleHeader, { activeView: "overview", paymentsMode: "test", account }));
     assert.ok(!plain.includes("Cohort Rules"));
     assert.equal(renderToStaticMarkup(createElement(CohortRulesMenu, { links: [] })), "");
+
+    const messages = renderToStaticMarkup(createElement(ConsoleHeader, { activeView: "messages", paymentsMode: "live", account }));
+    const messagesLink = messages.slice(messages.indexOf('href="/messages"') - 200, messages.indexOf('href="/messages"') + 300);
+    const consoleLink = messages.slice(messages.indexOf('href="/console"') - 100, messages.indexOf('href="/console"') + 250);
+    assert.ok(messagesLink.includes('aria-current="page"'));
+    assert.ok(messagesLink.includes("Messages"));
+    assert.ok(!consoleLink.includes('aria-current="page"'));
+    const messagesPageSource = await import("node:fs/promises").then((fs) => fs.readFile("app/messages/page.tsx", "utf8"));
+    assert.match(messagesPageSource, /<ConsoleHeader activeView="messages"/);
+    assert.doesNotMatch(messagesPageSource, /<ConsoleHeader activeView="overview"/);
   } finally { for (const item of modules.reverse()) item.restore(); }
 });
 

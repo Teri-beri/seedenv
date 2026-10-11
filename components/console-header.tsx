@@ -5,7 +5,7 @@ import Link from "next/link";
 import { UserDropdown, type DropdownAccount } from "@/components/user-dropdown";
 import { useDismissableMenu } from "@/components/use-dismissable-menu";
 
-export type ConsoleView = "overview" | "new-drop" | "review-deck" | "asset-vault" | "billing";
+export type ConsoleView = "overview" | "new-drop" | "review-deck" | "asset-vault" | "billing" | "messages";
 
 export type CohortRuleLink = { label: string; href: string; tone?: "default" | "caution" };
 
@@ -16,7 +16,7 @@ const tabs = [
   { label: "Artifacts", href: "/console?view=asset-vault", view: "asset-vault" },
   { label: "Billing", href: "/console?view=billing", view: "billing" },
   { label: "Launch Circle", href: "/launch-circle", view: null },
-  { label: "Messages", href: "/messages", view: null },
+  { label: "Messages", href: "/messages", view: "messages" },
 ] as const;
 
 export function CohortRulesMenu({ links }: { links: ReadonlyArray<CohortRuleLink> }) {
