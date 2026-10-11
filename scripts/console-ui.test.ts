@@ -110,7 +110,7 @@ test("the submission queue uses one status filter bar and an actionable cohort e
     const markup = renderToStaticMarkup(createElement(DeveloperStudio, {
       submissions, assets: [], auditReports: [], reviewPage: 1, reviewTotalPages: 1, reviewTotalCount: 3,
       approvedSubmissionCount: 4,
-      reviewCohort: { id: "cohort-1", title: "Goddesses", platform: "TESTFLIGHT", claimedSlots: 0, totalSlots: 5 },
+      activeCohort: { id: "cohort-1", title: "Goddesses", platform: "TESTFLIGHT", claimedSlots: 0, totalSlots: 5 },
       canSaveTestDraft: false, view: "review-deck", userId: "dev", draftRevision: 0,
     }));
     assert.ok(!markup.includes("Submission views"));
@@ -128,7 +128,7 @@ test("the submission queue uses one status filter bar and an actionable cohort e
     const empty = renderToStaticMarkup(createElement(DeveloperStudio, {
       submissions: [], assets: [], auditReports: [], reviewPage: 1, reviewTotalPages: 1, reviewTotalCount: 0,
       approvedSubmissionCount: 0,
-      reviewCohort: { id: "cohort-1", title: "Goddesses", platform: "TESTFLIGHT", claimedSlots: 0, totalSlots: 5 },
+      activeCohort: { id: "cohort-1", title: "Goddesses", platform: "TESTFLIGHT", claimedSlots: 0, totalSlots: 5 },
       canSaveTestDraft: false, view: "review-deck", userId: "dev", draftRevision: 0,
     }));
     assert.ok(empty.includes("Queue cleared (0)"));
@@ -139,5 +139,55 @@ test("the submission queue uses one status filter bar and an actionable cohort e
     assert.ok(empty.includes("Inspect Cohort Status"));
     assert.ok(empty.includes("/console#active-cohorts"));
     assert.ok(!empty.includes("Open Audit Hub"));
+  } finally { for (const item of modules.reverse()) item.restore(); }
+});
+
+test("the audit vault handles recordings, logs, telemetry, and a cohort-grounded empty state", async () => {
+  const modules = [
+    mock.module("next/link", anchorMock),
+    mock.module("next/image", { defaultExport: Empty }),
+    mock.module("next/navigation", { namedExports: { useRouter: () => ({ refresh: () => {} }) } }),
+    mock.module("framer-motion", { namedExports: { motion: new Proxy({}, { get: () => ({ children }: { children: ReactNode }) => createElement("div", null, children) }) } }),
+    mock.module("../app/actions/submissionActions.ts", { namedExports: { approveSubmission: async () => ({}), rejectSubmission: async () => ({}), requestSubmissionRevision: async () => ({}) } }),
+    mock.module("../app/actions/campaignActions.ts", { namedExports: { createCampaignWithEscrow: async () => ({}), saveTestCampaignDraft: async () => ({}) } }),
+  ];
+  try {
+    const { DeveloperStudio } = await import(`../components/developer-studio.tsx?vault=${randomUUID()}`);
+    const shared = { submissions: [], auditReports: [], reviewPage: 1, reviewTotalPages: 1, reviewTotalCount: 0, canSaveTestDraft: false, view: "asset-vault" as const, userId: "dev", draftRevision: 0 };
+    const asset = {
+      id: "approved-1", proofImageUrl: null, recordingUrl: "/api/submissions/approved-1/recording", feedbackText: "Payment sheet stalls after 3DS.",
+      osBuild: "iOS 18.2", deviceModel: "iPhone 15 Pro", screenResolution: "1179x2556", appBuildVersion: "1.0.4", networkType: "Wi-Fi",
+      crashLogs: "SIGABRT PaymentCoordinator", networkLogs: "POST /confirm 504",
+      tester: { username: "nova" }, campaign: { id: "cohort-1", title: "Goddesses" },
+    };
+    const populated = renderToStaticMarkup(createElement(DeveloperStudio, { ...shared, assets: [asset] }));
+    assert.ok(populated.includes("Artifacts &amp; Audit Vault"));
+    assert.ok(populated.includes("Reproduction recordings, crash logs, and verified telemetry"));
+    assert.ok(populated.includes("All campaigns"));
+    assert.ok(populated.includes("Screen recordings"));
+    assert.ok(populated.includes("Device logs"));
+    assert.ok(populated.includes("Crash traces"));
+    assert.ok(populated.includes("All validators"));
+    assert.ok(populated.includes("Export Bundle (ZIP + JSON)"));
+    assert.ok(populated.includes("Recording"));
+    assert.ok(populated.includes("Device trace"));
+    assert.ok(populated.includes("Crash log"));
+    assert.ok(populated.includes("Network log"));
+    assert.ok(populated.includes("JSON included in export"));
+
+    const empty = renderToStaticMarkup(createElement(DeveloperStudio, {
+      ...shared,
+      assets: [],
+      activeCohort: { id: "cohort-1", title: "Goddesses", platform: "TESTFLIGHT", claimedSlots: 0, totalSlots: 5 },
+    }));
+    assert.ok(empty.includes("No validated artifacts archived yet"));
+    assert.ok(empty.includes("Verified reproduction media, crash traces, network logs, and device telemetry"));
+    assert.ok(empty.includes("Goddesses · iOS TestFlight · 0/5 slots claimed"));
+    assert.ok(empty.includes("Go to Active Cohort"));
+    assert.ok(empty.includes("/console#active-cohorts"));
+    assert.ok(empty.includes("Evidence bundle"));
+    assert.ok(!empty.includes("Open Submissions"));
+    assert.ok(!empty.includes("Approved tester screenshots"));
+    assert.ok(empty.includes("disabled"));
   } finally { for (const item of modules.reverse()) item.restore(); }
 });

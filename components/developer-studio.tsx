@@ -2,7 +2,7 @@
 
 import { PlatformType, TaskProofType } from "@prisma/client";
 import { motion } from "framer-motion";
-import { ArrowDown, ArrowUp, BadgeDollarSign, Boxes, CheckCircle2, Download, ExternalLink, ImageIcon, ImagePlus, LoaderCircle, Plus, Trash2, XCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, BadgeDollarSign, Boxes, CheckCircle2, ExternalLink, FileJson, ImageIcon, ImagePlus, LoaderCircle, Play, Plus, RotateCcw, Terminal, Trash2, XCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,6 +21,7 @@ import { emptyAiDraftInputs, type LaunchWizardDraft } from "@/lib/launch-wizard-
 import { useLaunchAutosave } from "@/components/use-launch-autosave";
 import { CohortPromoInput, type AppliedCohortPromo } from "@/components/cohort-promo-input";
 import { CheckoutSummaryModal } from "@/components/campaign/CheckoutSummaryModal";
+import { ArtifactsToolbar, type ArtifactFilter } from "@/components/console/ArtifactsToolbar";
 
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
@@ -57,7 +58,15 @@ type ReviewSubmission = {
 type Asset = {
   id: string;
   proofImageUrl: string | null;
+  recordingUrl: string | null;
   feedbackText: string | null;
+  osBuild: string | null;
+  deviceModel: string | null;
+  screenResolution: string | null;
+  appBuildVersion: string | null;
+  networkType: string | null;
+  crashLogs: string | null;
+  networkLogs: string | null;
   tester: { username: string };
   campaign: { id: string; title: string };
 };
@@ -109,7 +118,7 @@ const optionStyle = { backgroundColor: "#0E1017", color: "#F8FAFC" };
 
 export type DeveloperStudioView = "overview" | "new-drop" | "review-deck" | "asset-vault";
 
-export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, approvedSubmissionCount = 0, reviewCohort = null, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0, platformFeeWaived = false, automaticBenefits, userId, savedWizard, draftRevision }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; approvedSubmissionCount?: number; reviewCohort?: ReviewCohort | null; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number; platformFeeWaived?: boolean; automaticBenefits?: { firstCohort: boolean; referralDiscountPercent: number }; userId: string; savedWizard?: LaunchWizardDraft; draftRevision: number }) {
+export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, approvedSubmissionCount = 0, activeCohort = null, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0, platformFeeWaived = false, automaticBenefits, userId, savedWizard, draftRevision }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; approvedSubmissionCount?: number; activeCohort?: ReviewCohort | null; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number; platformFeeWaived?: boolean; automaticBenefits?: { firstCohort: boolean; referralDiscountPercent: number }; userId: string; savedWizard?: LaunchWizardDraft; draftRevision: number }) {
   const router = useRouter();
   const [step, setStep] = useState(savedWizard?.step ?? 1);
   const [highestStep, setHighestStep] = useState(savedWizard?.highestStep ?? 1);
@@ -690,8 +699,8 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
         <LaunchPreview form={form} />
         </div>
       ) : null}
-      {view === "review-deck" ? <ReviewDeck submissions={submissions} onReview={review} isPending={isPending} page={reviewPage} totalPages={reviewTotalPages} totalCount={reviewTotalCount} approvedCount={approvedSubmissionCount} cohort={reviewCohort} /> : null}
-      {view === "asset-vault" ? <AssetVault assets={assets} /> : null}
+      {view === "review-deck" ? <ReviewDeck submissions={submissions} onReview={review} isPending={isPending} page={reviewPage} totalPages={reviewTotalPages} totalCount={reviewTotalCount} approvedCount={approvedSubmissionCount} cohort={activeCohort} /> : null}
+      {view === "asset-vault" ? <AssetVault assets={assets} cohort={activeCohort} /> : null}
     </section>
   );
 }
@@ -995,39 +1004,117 @@ function platformLabel(platform: PlatformType) {
   return "Web staging";
 }
 
-function AssetVault({ assets }: { assets: Asset[] }) {
+function hasDeviceEvidence(asset: Asset) {
+  return Boolean(asset.deviceModel || asset.osBuild || asset.screenResolution || asset.appBuildVersion || asset.networkType || asset.networkLogs);
+}
+
+function matchesArtifactType(asset: Asset, type: ArtifactFilter) {
+  if (type === "recording") return Boolean(asset.recordingUrl);
+  if (type === "screen") return Boolean(asset.proofImageUrl);
+  if (type === "device") return hasDeviceEvidence(asset);
+  if (type === "crash") return Boolean(asset.crashLogs);
+  return true;
+}
+
+function AssetVault({ assets, cohort }: { assets: Asset[]; cohort: ReviewCohort | null }) {
+  const [campaign, setCampaign] = useState("all");
+  const [validator, setValidator] = useState("all");
+  const [artifactType, setArtifactType] = useState<ArtifactFilter>("all");
+  const campaigns = Array.from(new Map(assets.map((asset) => [asset.campaign.id, { value: asset.campaign.id, label: asset.campaign.title }])).values());
+  const validators = Array.from(new Set(assets.map((asset) => asset.tester.username))).sort().map((username) => ({ value: username, label: `@${username}` }));
+  const visible = assets.filter((asset) =>
+    (campaign === "all" || asset.campaign.id === campaign)
+    && (validator === "all" || asset.tester.username === validator)
+    && matchesArtifactType(asset, artifactType)
+  );
+  const resetFilters = () => {
+    setCampaign("all");
+    setValidator("all");
+    setArtifactType("all");
+  };
+
   return (
     <section className="space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Approved tester proof</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight">Artifacts</h2>
-          <p className="mt-1 text-sm text-neutral-400">Screenshots approved across your campaigns.</p>
-        </div>
-        {assets.length ? <Button asChild variant="outline"><a href="/api/assets/download"><Download className="size-4" /> Download all campaigns (.zip)</a></Button> : null}
+      <header>
+        <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Approved validation evidence</p>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight">Artifacts &amp; Audit Vault</h2>
+        <p className="mt-1 text-sm text-neutral-400">Reproduction recordings, crash logs, and verified telemetry from approved validation runs.</p>
       </header>
-      {assets.length ? (
+      <ArtifactsToolbar
+        campaigns={campaigns}
+        validators={validators}
+        campaign={campaign}
+        validator={validator}
+        artifactType={artifactType}
+        hasArtifacts={assets.length > 0}
+        onCampaignChange={setCampaign}
+        onValidatorChange={setValidator}
+        onTypeChange={setArtifactType}
+      />
+      {visible.length ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {assets.map((asset) => (
+          {visible.map((asset) => (
             <article key={asset.id} className="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/40 transition hover:border-zinc-700">
-              <a aria-label={`Open ${asset.campaign.title} proof image from ${asset.tester.username}`} className="group relative block h-52 bg-black/30" href={asset.proofImageUrl || undefined} rel="noreferrer" target="_blank">
-                {asset.proofImageUrl ? <Image alt={`Approved proof for ${asset.campaign.title}`} className="object-cover transition group-hover:scale-[1.02]" fill sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" src={asset.proofImageUrl} unoptimized /> : <div className="grid h-full place-items-center text-neutral-500"><ImageIcon className="size-8" /></div>}
-                <span className="absolute bottom-3 right-3 grid size-8 place-items-center rounded-full bg-black/70 text-white opacity-0 transition group-hover:opacity-100"><ExternalLink className="size-4" /></span>
-              </a>
+              <div className="relative h-52 bg-black/30">
+                {asset.proofImageUrl ? (
+                  <a aria-label={`Open ${asset.campaign.title} proof image from ${asset.tester.username}`} className="group relative block h-full" href={asset.proofImageUrl} rel="noreferrer" target="_blank">
+                    <Image alt={`Approved proof for ${asset.campaign.title}`} className="object-cover transition group-hover:scale-[1.02]" fill sizes="(min-width: 1280px) 33vw, (min-width: 640px) 50vw, 100vw" src={asset.proofImageUrl} unoptimized />
+                    <span className="absolute bottom-3 right-3 grid size-8 place-items-center rounded-full bg-black/70 text-white opacity-0 transition group-hover:opacity-100"><ExternalLink className="size-4" /></span>
+                  </a>
+                ) : asset.recordingUrl ? (
+                  <video className="h-full w-full object-contain" controls preload="metadata" src={asset.recordingUrl} />
+                ) : (
+                  <div className="grid h-full place-items-center text-zinc-600"><Terminal className="size-9" /></div>
+                )}
+              </div>
               <div className="p-4">
                 <p className="truncate font-bold text-white">{asset.campaign.title}</p>
-                <p className="mt-1 text-xs text-neutral-500">Tester: {asset.tester.username}</p>
+                <p className="mt-1 text-xs text-neutral-500">Validator: @{asset.tester.username}</p>
+                <div className="mt-3 flex flex-wrap gap-1.5 font-mono text-[10px] uppercase tracking-wider">
+                  {asset.proofImageUrl ? <span className="rounded border border-zinc-700 px-2 py-1 text-zinc-300">Screenshot</span> : null}
+                  {asset.recordingUrl ? <span className="inline-flex items-center gap-1 rounded border border-violet-500/25 bg-violet-500/5 px-2 py-1 text-violet-300"><Play className="size-3" /> Recording</span> : null}
+                  {hasDeviceEvidence(asset) ? <span className="rounded border border-sky-500/25 bg-sky-500/5 px-2 py-1 text-sky-300">Device trace</span> : null}
+                  {asset.crashLogs ? <span className="rounded border border-rose-500/25 bg-rose-500/5 px-2 py-1 text-rose-300">Crash log</span> : null}
+                  {asset.networkLogs ? <span className="rounded border border-amber-500/25 bg-amber-500/5 px-2 py-1 text-amber-300">Network log</span> : null}
+                </div>
+                {asset.deviceModel || asset.osBuild || asset.appBuildVersion ? <p className="mt-3 font-mono text-[11px] text-zinc-500">{[asset.deviceModel, asset.osBuild, asset.appBuildVersion ? `Build ${asset.appBuildVersion}` : null].filter(Boolean).join(" · ")}</p> : null}
                 {asset.feedbackText ? <p className="mt-3 line-clamp-3 text-sm leading-5 text-neutral-400">{asset.feedbackText}</p> : null}
+                <div className="mt-4 flex flex-wrap gap-3 font-mono text-xs">
+                  {asset.recordingUrl && asset.proofImageUrl ? <a className="text-emerald-400 hover:text-emerald-300" href={asset.recordingUrl} rel="noreferrer" target="_blank">Open recording ↗</a> : null}
+                  <span className="inline-flex items-center gap-1 text-zinc-500"><FileJson className="size-3.5" /> JSON included in export</span>
+                </div>
               </div>
             </article>
           ))}
         </div>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-[#3A3F4C] bg-[#0E1017]/65 p-8 text-center">
+      ) : assets.length ? (
+        <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-950/40 p-8 text-center">
           <Boxes className="mx-auto size-8 text-zinc-600" />
-          <h3 className="mt-3 text-lg font-bold text-white">No approved proof yet</h3>
-          <p className="mt-2 text-sm text-neutral-400">Approved tester screenshots will collect here, ready to review and download.</p>
-          <Link className="mt-5 inline-flex text-sm font-semibold text-emerald-400 hover:text-emerald-300" href="/console?view=review-deck">Open Submissions <ArrowDown className="ml-2 size-4 rotate-[-45deg]" /></Link>
+          <h3 className="mt-3 text-lg font-bold text-white">No evidence matches these filters</h3>
+          <p className="mt-2 text-sm text-neutral-400">Reset the app, validator, and evidence-type filters to restore the complete vault.</p>
+          <button className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-400 hover:text-emerald-300" type="button" onClick={resetFilters}><RotateCcw className="size-4" /> Reset filters</button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-dashed border-[#3A3F4C] bg-[#0E1017]/65 p-8 text-center">
+            <Boxes className="mx-auto size-8 text-zinc-600" />
+            <h3 className="mt-3 text-lg font-bold text-white">No validated artifacts archived yet</h3>
+            <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-neutral-400">Verified reproduction media, crash traces, network logs, and device telemetry from approved submissions collect here.</p>
+            {cohort ? (
+              <>
+                <p className="mx-auto mt-4 w-fit rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 font-mono text-xs text-zinc-300">{cohort.title} · {platformLabel(cohort.platform)} · {cohort.claimedSlots}/{cohort.totalSlots} slots claimed</p>
+                <Link className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console#active-cohorts">Go to Active Cohort <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
+              </>
+            ) : (
+              <Link className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console?view=new-drop">Deploy New Scenario <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
+            )}
+          </div>
+          <div aria-hidden="true" className="overflow-hidden rounded-xl border border-zinc-800/70 opacity-50">
+            <div className="grid grid-cols-[1.2fr_.8fr_.8fr_.5fr] gap-3 border-b border-zinc-800 bg-zinc-900/50 px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-zinc-600">
+              <span>Evidence bundle</span><span>Validator</span><span>Device / Build</span><span>Export</span>
+            </div>
+            {[0, 1, 2].map((row) => <div key={row} className="grid grid-cols-[1.2fr_.8fr_.8fr_.5fr] gap-3 border-b border-zinc-800/70 px-4 py-4 last:border-0"><span className="h-3 rounded bg-zinc-800" /><span className="h-3 rounded bg-zinc-900" /><span className="h-3 rounded bg-zinc-900" /><span className="h-3 rounded bg-zinc-900" /></div>)}
+          </div>
         </div>
       )}
     </section>

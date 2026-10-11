@@ -64,11 +64,22 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     campaign: campaignScope,
     OR: [{ proofImageUrl: { not: null } }, { feedbackText: { not: null } }],
   };
+  const approvedEvidenceWhere = {
+    status: SubmissionStatus.APPROVED,
+    campaign: campaignScope,
+    OR: [
+      { proofImageUrl: { not: null } },
+      { recordingUrl: { not: null } },
+      { crashLogs: { not: null } },
+      { networkLogs: { not: null } },
+      { feedbackText: { not: null } },
+    ],
+  };
   const overview = activeView === "overview";
   const activeCampaignScope = { ...campaignScope, status: CampaignStatus.ACTIVE };
   const [pendingReviewCount, approvedSubmissionCount, activeCohortCount, runsInProgress, verifiedValidators] = await Promise.all([
     activeView === "review-deck" || overview ? prisma.submission.count({ where: pendingReviewWhere }) : 0,
-    activeView === "review-deck" ? prisma.submission.count({ where: { status: SubmissionStatus.APPROVED, proofImageUrl: { not: null }, campaign: campaignScope } }) : 0,
+    activeView === "review-deck" ? prisma.submission.count({ where: approvedEvidenceWhere }) : 0,
     overview ? prisma.appCampaign.count({ where: activeCampaignScope }) : 0,
     overview ? prisma.submission.count({ where: { status: SubmissionStatus.PENDING, campaign: activeCampaignScope, proofImageUrl: null, feedbackText: null } }) : 0,
     overview ? prisma.submission.groupBy({ by: ["testerId"], where: { status: SubmissionStatus.APPROVED, campaign: campaignScope } }).then((rows) => rows.length) : 0,
@@ -89,16 +100,16 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       take: reviewPageSize,
       orderBy: { createdAt: "asc" },
     }),
-    prisma.submission.findMany({
-      where: { status: SubmissionStatus.APPROVED, proofImageUrl: { not: null }, campaign: campaignScope },
+    activeView === "asset-vault" ? prisma.submission.findMany({
+      where: approvedEvidenceWhere,
       include: { tester: { select: { username: true, avatarUrl: true } }, campaign: { select: { id: true, title: true } } },
-      take: 12,
+      take: 50,
       orderBy: { reviewedAt: "desc" },
-    }),
+    }) : [],
     prisma.appCampaign.findMany({
       where: activeCampaignScope,
       orderBy: { createdAt: "desc" },
-      take: overview ? 10 : activeView === "review-deck" ? 1 : 0,
+      take: overview ? 10 : activeView === "review-deck" || activeView === "asset-vault" ? 1 : 0,
       select: { id: true, title: true, platform: true, iconUrl: true, totalBudgetUsd: true, platformFeeUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true, fundingModel: true, _count: { select: { clicks: true } }, slotCharges: { where: { status: "SUCCEEDED" }, select: { stipendCents: true } } },
     }),
     prisma.walletTransaction.groupBy({
@@ -215,7 +226,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
           <ActiveCohorts cohorts={cohortRows} total={activeCohortCount} />
           <ReleaseReports rows={releaseReports} />
         </> : null}
-        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}`} userId={session.user.id} automaticBenefits={feeBenefits} savedWizard={savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} approvedSubmissionCount={approvedSubmissionCount} reviewCohort={activeView === "review-deck" && campaigns[0] ? { id: campaigns[0].id, title: campaigns[0].title, platform: campaigns[0].platform, totalSlots: campaigns[0].totalSlots, claimedSlots: campaigns[0].claimedSlots } : null} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft ? { ...launchDraft, promoCode: launchDraft.promoRedemptions.map((entry) => entry.promoCode.code).join(",") || launchDraft.promoCodeDraft || undefined, promoReserved: Boolean(launchDraft.promoRedemptions.length) } : undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
+        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}`} userId={session.user.id} automaticBenefits={feeBenefits} savedWizard={savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} approvedSubmissionCount={approvedSubmissionCount} activeCohort={(activeView === "review-deck" || activeView === "asset-vault") && campaigns[0] ? { id: campaigns[0].id, title: campaigns[0].title, platform: campaigns[0].platform, totalSlots: campaigns[0].totalSlots, claimedSlots: campaigns[0].claimedSlots } : null} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft ? { ...launchDraft, promoCode: launchDraft.promoRedemptions.map((entry) => entry.promoCode.code).join(",") || launchDraft.promoCodeDraft || undefined, promoReserved: Boolean(launchDraft.promoRedemptions.length) } : undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
         {heldDenials.length ? <section className="mt-6 space-y-3 rounded-xl border border-amber-500/30 p-5">
           <h2 className="font-semibold text-amber-200">Denials awaiting manual review</h2>
           <p className="text-sm text-zinc-400">Oldest 100 cases. These places and unpaid rewards stay reserved until SeedEnv approves the work or confirms denial. They cannot auto-approve, be edited, or be reused while held.</p>
