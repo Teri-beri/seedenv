@@ -92,12 +92,29 @@ test("mission discovery includes an honest three-column completed-cohort preview
 
 test("mission desk consolidates status and empty states without changing timer semantics", async () => {
   const source = await readFile(new URL("../components/mission-experience.tsx", import.meta.url), "utf8");
-  assert.match(source, /\["progress", "In Progress", inProgressAssignments\.length\]/);
-  assert.match(source, /\["review", "Under Review", reviewAssignments\.length\]/);
-  assert.match(source, /\["revisions", "Revisions", revisionAssignments\.length\]/);
-  assert.match(source, /\["history", "History", completedHistory\.length\]/);
+  assert.match(source, /\{ id: "progress", label: "In Progress", badge: inProgressAssignments\.length \}/);
+  assert.match(source, /\{ id: "review", label: "Under Review", badge: reviewAssignments\.length \}/);
+  assert.match(source, /\{ id: "revisions", label: "Revisions", badge: revisionAssignments\.length \}/);
+  assert.match(source, /\{ id: "history", label: "History", badge: completedHistory\.length \}/);
   assert.match(source, /No active validation runs/);
   assert.match(source, /Accepted invitations remain available for up to 24 hours; the 30-minute proof timer starts only after you begin\./);
   assert.match(source, /href="\/dashboard\?view=discover">Browse Open Missions/);
   assert.doesNotMatch(source, /Your next contribution|No missions in progress yet/);
+});
+
+test("segmented tabs animate a per-group indicator and keep every group id unique", async () => {
+  const component = await readFile(new URL("../components/ui/SegmentedTabs.tsx", import.meta.url), "utf8");
+  assert.match(component, /layoutId=\{`segmented-tabs-\$\{groupId\}`\}/);
+  assert.match(component, /useReducedMotion/);
+  assert.match(component, /reduceMotion \? \{ duration: 0 \} : \{ type: "spring", stiffness: 450, damping: 35 \}/);
+  assert.doesNotMatch(component, /zinc-850/);
+
+  const callSites = ["mission-experience.tsx", "public-landing.tsx", "tester/LeaderboardTable.tsx"];
+  const groupIds: string[] = [];
+  for (const file of callSites) {
+    const source = await readFile(new URL(`../components/${file}`, import.meta.url), "utf8");
+    for (const match of source.matchAll(/groupId="([^"]+)"/g)) groupIds.push(match[1]);
+  }
+  assert.ok(groupIds.length >= 4, "expected the segmented tabs to replace the static tab button maps");
+  assert.equal(new Set(groupIds).size, groupIds.length, `duplicate groupId would glide the pill between groups: ${groupIds.join(", ")}`);
 });

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { claimTaskSlot, startSubmissionRevision, submitTaskProof } from "@/app/actions/submissionActions";
 import { collectHardwareSignals } from "@/lib/hardware-integrity";
 import { Button } from "@/components/ui/button";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { xpForBounty } from "@/lib/rank";
 import { availableSlots, discoverMissions, type MissionFilter, type MissionSort } from "@/lib/tester-console";
 import { formatCents } from "@/lib/utils";
@@ -350,18 +351,18 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   return (
     <div className="mt-5 space-y-6">
       {mode === "missions" ? <div className="space-y-4">
-        <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Mission status">
-          {([
-            ["progress", "In Progress", inProgressAssignments.length],
-            ["review", "Under Review", reviewAssignments.length],
-            ["revisions", "Revisions", revisionAssignments.length],
-            ["history", "History", completedHistory.length],
-          ] as const).map(([id, label, count]) => (
-            <button key={id} type="button" role="tab" aria-selected={missionView === id} onClick={() => { setMissionView(id); setActiveMission(null); setMessage(null); }} className={`shrink-0 rounded-lg border px-3 py-2 font-mono text-[11px] transition ${missionView === id ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-200" : "border-zinc-800 bg-zinc-950/40 text-zinc-500 hover:text-zinc-300"}`}>
-              {label} ({count})
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          groupId="mission-status"
+          label="Mission status"
+          activeId={missionView}
+          tabs={[
+            { id: "progress", label: "In Progress", badge: inProgressAssignments.length },
+            { id: "review", label: "Under Review", badge: reviewAssignments.length },
+            { id: "revisions", label: "Revisions", badge: revisionAssignments.length },
+            { id: "history", label: "History", badge: completedHistory.length },
+          ]}
+          onChange={(id) => { setMissionView(id); setActiveMission(null); setMessage(null); }}
+        />
         {missionView !== "history" && visibleAssignments.length ? <div className="grid gap-3 sm:grid-cols-2">
           {visibleAssignments.map((assignment) => (
             <button key={assignment.id} type="button" disabled={isPending || assignment.denialReviewPending} onClick={() => openAssignment(assignment)} className="flex min-w-0 w-full items-center gap-3 rounded-xl border border-zinc-800 bg-black/15 p-4 text-left transition hover:border-zinc-700 disabled:opacity-50">
@@ -397,13 +398,14 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
           <label className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-zinc-800 bg-black/15 px-3"><Search className="size-4 shrink-0 text-neutral-500" /><span className="sr-only">Search missions</span><input className="min-w-0 w-full bg-transparent py-3 text-sm text-white outline-none placeholder:text-neutral-500" placeholder="Search apps, briefs, or interests..." value={query} onChange={(event) => setQuery(event.target.value)} /></label>
           <label className="shrink-0"><span className="sr-only">Sort missions</span><select value={sort} onChange={(event) => setSort(event.target.value === "slots" ? "slots" : "reward")} className="w-full rounded-xl border border-zinc-800 bg-[#0E1017] px-3 py-3 text-sm text-neutral-300"><option value="reward">Highest reward</option><option value="slots">Most open spots</option></select></label>
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {filters.map((item) => (
-            <button key={item.id} aria-pressed={filter === item.id} onClick={() => setFilter(item.id)} className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition ${filter === item.id ? "border-zinc-600 bg-zinc-800/80 text-emerald-300" : "border-stroke bg-white/5 text-neutral-400 hover:text-white"}`} type="button">
-              {item.label}
-            </button>
-          ))}
-        </div>
+        <SegmentedTabs
+          groupId="mission-platform-filter"
+          label="Mission platform filter"
+          semantics="pressed"
+          activeId={filter}
+          tabs={filters}
+          onChange={setFilter}
+        />
         <p className="text-xs text-neutral-500" role="status">{filteredMissions.length} {filteredMissions.length === 1 ? "mission" : "missions"} matching your interests</p>
         {!filteredMissions.length ? <div className="rounded-2xl border border-dashed border-zinc-800 px-5 py-10 text-center"><Compass className="mx-auto size-8 text-emerald-400" /><h3 className="mt-3 font-semibold">{missions.length ? "No matches just yet" : "New missions are on the way"}</h3><p className="mt-2 text-sm text-neutral-500">{missions.length ? "Try another platform or broaden your search." : "Check back for your next opportunity to help a developer launch."}</p>{missions.length ? <button type="button" onClick={() => { setFilter("all"); setQuery(""); }} className="mt-4 text-sm font-semibold text-zinc-300 hover:text-white">Clear filters</button> : null}</div> : null}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

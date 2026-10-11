@@ -2,6 +2,7 @@
 
 import type { RankTier, SubmissionStatus } from "@prisma/client";
 import { useMemo, useState } from "react";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import Image from "next/image";
 import Link from "next/link";
 import { rankThresholds } from "@/lib/rank";
@@ -78,9 +79,7 @@ export function LeaderboardTable({ entries, currentUser }: { entries: Leaderboar
 
   return (
     <div className="mt-5">
-      <div className="flex gap-2 overflow-x-auto pb-2" role="tablist" aria-label="Leaderboard ranking">
-        {boardTabs.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={mode === tab.id} onClick={() => setMode(tab.id)} className={`shrink-0 rounded-lg border px-3 py-2 font-mono text-[11px] transition ${mode === tab.id ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-200" : "border-zinc-800 bg-black/15 text-zinc-500 hover:text-zinc-300"}`}>{tab.label}</button>)}
-      </div>
+      <SegmentedTabs groupId="leaderboard-mode" label="Leaderboard ranking" activeId={mode} tabs={boardTabs} onChange={setMode} />
       {!hasCompetitors ? <p className="mt-3 rounded-lg border border-dashed border-zinc-800 px-3 py-2 text-xs text-zinc-500"><span className="font-semibold text-zinc-300">Benchmark examples</span> · These rows illustrate competitive targets and are not live SeedEnv activity.</p> : null}
       <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[680px] border-separate border-spacing-y-2 text-left">

@@ -18,6 +18,7 @@ import TelemetryGridCanvas from "@/components/TelemetryGridCanvas";
 import { SandboxBadge, ScenarioCard, ScenarioDrawer, sandboxScenarios, useScenarioInspector, type SandboxScenario } from "@/components/telemetry-sandbox";
 import { LandingPlatformFeeOfferCard, type LandingPlatformFeeOffer } from "@/components/landing-platform-fee-offer";
 import { CohortBriefLink } from "@/components/cohort-brief-link";
+import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 
 type Mission = {
   id: string;
@@ -187,9 +188,21 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
             </div>
             <div className="mt-7 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <label className="relative block w-full md:max-w-sm"><span className="sr-only">Search cohorts</span><Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-zinc-500" /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search apps or scenarios" className="min-h-11 w-full rounded-lg border border-white/10 bg-[#0F1117] py-2 pl-10 pr-3 text-sm text-white outline-none focus:border-emerald-400" /></label>
-              <div className="grid grid-cols-4 gap-1 rounded-lg border border-white/10 bg-[#0F1117] p-1" role="group" aria-label="Cohort platform filter">
-                {([['all', 'All'], ['TESTFLIGHT', 'iOS TestFlight'], ['PLAY_STORE', 'Android Play Internal'], ['WEB_STAGING', 'Web PWA']] as const).map(([value, title]) => <button key={value} type="button" aria-pressed={filter === value} onClick={() => setFilter(value)} className={`min-h-11 rounded-md px-2 py-2 text-xs leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 sm:px-3 sm:text-sm ${filter === value ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"}`}>{title}</button>)}
-              </div>
+              <SegmentedTabs
+                groupId="landing-cohort-platform"
+                label="Cohort platform filter"
+                semantics="pressed"
+                fullWidth
+                className="md:w-auto"
+                activeId={filter}
+                tabs={[
+                  { id: "all", label: "All" },
+                  { id: "TESTFLIGHT", label: "iOS TestFlight" },
+                  { id: "PLAY_STORE", label: "Android Play Internal" },
+                  { id: "WEB_STAGING", label: "Web PWA" },
+                ]}
+                onChange={setFilter}
+              />
             </div>
             {visibleMissions.length ? (
               <div className="mt-6 overflow-x-auto rounded-lg border border-zinc-800/80"><table className="w-full min-w-[850px] text-left text-sm" aria-label="Live cohort directory"><thead className="bg-[#12161F] text-zinc-400"><tr>{["App / Target OS", "Test Scenario", "Validator Stipend", "Available Slots", "Participation"].map((label) => <th key={label} scope="col" className="px-4 py-4 font-mono text-xs font-normal uppercase">{label}</th>)}</tr></thead><tbody className="divide-y divide-zinc-800/80">{visibleMissions.map((mission) => <CohortRow key={mission.id} mission={mission} own={Boolean(mission.developerId && mission.developerId === (viewer?.id || session?.user?.id))} signedIn={signedIn && (role === "TESTER" || role === "ADMIN")} onJoin={() => requestAccess({ role: "TESTER", callbackUrl: `/dashboard?claim=${encodeURIComponent(mission.id)}`, title: `Join ${mission.title}` })} />)}</tbody></table></div>
@@ -409,5 +422,5 @@ function MobileSetupGuide() {
   const steps = platform === "ios"
     ? [["Open in Safari", "Open seedenv.com directly in Safari on your iPhone or iPad."], ["Add to Home Screen", "Open Share and choose Add to Home Screen from the action menu."], ["Open SeedEnv", "Confirm Add, then launch SeedEnv from the Home Screen and sign in to your workspace."]]
     : [["Open in Chrome", "Open seedenv.com directly in Chrome on your Android device."], ["Install the console", "Open Chrome's menu and choose Install app or Add to Home screen."], ["Open SeedEnv", "Confirm installation, then launch SeedEnv and sign in to your workspace."]];
-  return <div className="w-full border-t border-zinc-800/80 pt-7"><div className="inline-grid grid-cols-2 rounded-lg border border-zinc-800 bg-[#0A0D12] p-1" role="group" aria-label="PWA setup platform">{(["ios", "android"] as const).map((value) => <button key={value} type="button" aria-pressed={platform === value} className={`relative min-h-11 rounded-md px-4 text-sm ${platform === value ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"}`} onClick={() => setPlatform(value)}>{value === "ios" ? "iOS / Safari" : "Android / Chrome"}{platform === value ? <span aria-hidden="true" className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-emerald-400" /> : null}</button>)}</div><ol className="mt-6 grid gap-6 md:grid-cols-3" aria-label={`${platform === "ios" ? "iOS" : "Android"} installation steps`}>{steps.map(([title, detail], index) => <li key={title}><span className="font-mono text-xs text-emerald-400">0{index + 1}</span><h3 className="mt-3 text-sm font-semibold">{title}</h3><p className="mt-2 text-sm leading-7 text-zinc-400">{detail}</p></li>)}</ol></div>;
+  return <div className="w-full border-t border-zinc-800/80 pt-7"><SegmentedTabs groupId="pwa-setup-platform" label="PWA setup platform" semantics="pressed" activeId={platform} tabs={[{ id: "ios", label: "iOS / Safari" }, { id: "android", label: "Android / Chrome" }]} onChange={setPlatform} /><ol className="mt-6 grid gap-6 md:grid-cols-3" aria-label={`${platform === "ios" ? "iOS" : "Android"} installation steps`}>{steps.map(([title, detail], index) => <li key={title}><span className="font-mono text-xs text-emerald-400">0{index + 1}</span><h3 className="mt-3 text-sm font-semibold">{title}</h3><p className="mt-2 text-sm leading-7 text-zinc-400">{detail}</p></li>)}</ol></div>;
 }
