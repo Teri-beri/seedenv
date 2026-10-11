@@ -70,6 +70,7 @@ function AuditDocument({
   end,
   uniqueDevices,
   verificationHash,
+  complete,
 }: {
   campaign: { title: string };
   compliance: { targetDays: number; requiredTesters: number; status: string };
@@ -79,6 +80,7 @@ function AuditDocument({
   end: Date;
   uniqueDevices: number;
   verificationHash: string;
+  complete: boolean;
 }) {
   const osCounts = new Map<string, number>();
   const deviceCounts = new Map<string, number>();
@@ -92,7 +94,7 @@ function AuditDocument({
       <Page size="A4" orientation="landscape" style={styles.page}>
         <Text style={styles.eyebrow}>TERIMUS LLC · SEEDENV QUALITY OPERATIONS</Text>
         <Text style={styles.title}>Google Play Closed Testing Audit Summary</Text>
-        <Text style={styles.subtitle}>Prepared for production-access review · tester-reported session log</Text>
+        <Text style={styles.subtitle}>{complete ? "Final audit export" : "IN-PROGRESS PREVIEW · NOT READY FOR PRODUCTION-ACCESS SUBMISSION"} · tester-reported session log</Text>
 
         <View style={styles.metadata}>
           <View style={styles.metadataCell}><Text style={styles.label}>Campaign</Text><Text style={styles.value}>{campaign.title}</Text></View>
@@ -151,7 +153,7 @@ function AuditDocument({
 
         <View style={styles.stamp}>
           <Text style={styles.hash}>Verification hash: {verificationHash}</Text>
-          <Text style={styles.signature}>OPERATIONAL SIGNATURE · TERIMUS-SEEDENV · {compliance.status}</Text>
+          <Text style={styles.signature}>{complete ? "OPERATIONAL SIGNATURE" : "IN-PROGRESS PREVIEW"} · TERIMUS-SEEDENV · {compliance.status}</Text>
         </View>
         <View style={styles.footer}><Text>TERIMUS LLC · Google Play Closed Testing Audit Summary</Text><Text>Generated from SeedEnv session records</Text></View>
       </Page>
@@ -170,6 +172,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!campaign?.compliance) return Response.json({ message: "This cohort does not have a Google Play audit kit." }, { status: 404, headers: privateHeaders });
 
   const pings = campaign.compliance.dailyPings;
+  const complete = Array.from({ length: campaign.compliance.targetDays }, (_, index) => index + 1).every(
+    (day) => new Set(pings.filter((ping) => ping.dayNumber === day).map((ping) => ping.validatorId)).size >= campaign.compliance!.requiredTesters,
+  );
   const start = pings[0]?.timestamp ?? campaign.createdAt;
   const end = new Date(start.getTime() + (campaign.compliance.targetDays - 1) * 86_400_000);
   const uniqueDevices = new Set(pings.map((ping) => `${ping.validatorId}:${ping.deviceModel}`)).size;
@@ -187,10 +192,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       end={end}
       uniqueDevices={uniqueDevices}
       verificationHash={verificationHash}
+      complete={complete}
     />,
   );
 
   return new Response(new Uint8Array(bytes), {
-    headers: { ...privateHeaders, "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="seedenv-google-play-audit-${campaign.id}.pdf"` },
+    headers: { ...privateHeaders, "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="seedenv-google-play-${complete ? "audit" : "preview"}-${campaign.id}.pdf"` },
   });
 }

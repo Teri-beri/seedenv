@@ -21,7 +21,7 @@ test("pricing calculator applies the active landing promo to its default estimat
     href: "/auth/signin?role=DEVELOPER&callbackUrl=%2Fconsole%3Fview%3Dnew-drop",
     promoCode: "FIRSTDROP",
   }));
-  for (const text of ["Apply FIRSTDROP", "0% platform fee", "$0.00", "Unused escrow refundable anytime", "No card transaction surcharges", "$15 minimum fee before discounts"]) assert.ok(html.includes(text), text);
+  for (const text of ["Apply FIRSTDROP", "0% platform fee", "$0.00", "Unused escrow balance refundable to card at any time", "Zero card processing fees on top-ups", "$15 minimum platform fee before discounts"]) assert.ok(html.includes(text), text);
   assert.ok(html.includes('aria-pressed="true"'));
   assert.ok(html.includes("line-through"));
 });
