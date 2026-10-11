@@ -24,15 +24,17 @@ export function cohortLaunchHref(baseHref: string, type: CohortTypeKey) {
   return baseHref;
 }
 
-export function PricingCalculator({ href }: { href: string }) {
+export function PricingCalculator({ href, promoCode }: { href: string; promoCode?: string }) {
   const [type, setType] = useState<CohortTypeKey>("STANDARD_QA");
   const [validators, setValidators] = useState(25);
   const [stipend, setStipend] = useState(6);
+  const [promoApplied, setPromoApplied] = useState(Boolean(promoCode));
   const bundle = isBundleType(type) ? COHORT_BUNDLES[type] : null;
   const quote = quoteCampaignFunding(validators * stipend, type);
   const feeCents = Math.round(quote.platformFeeUsd * 100);
   const floorApplied = !bundle && feeCents === COHORT_MIN_PLATFORM_FEE_CENTS;
-  const perTester = projectPerTesterCharges(validators, Math.round(stipend * 100));
+  const standardPerTester = projectPerTesterCharges(validators, Math.round(stipend * 100));
+  const perTester = projectPerTesterCharges(validators, Math.round(stipend * 100), promoApplied);
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/40">
@@ -61,6 +63,10 @@ export function PricingCalculator({ href }: { href: string }) {
           <div className="space-y-5">
             <RangeField id="pricing-validators" label="Testers" max={500} min={5} step={1} value={validators} display={`${validators}`} onChange={setValidators} />
             <RangeField id="pricing-stipend" label="Reward per tester" max={100} min={1} step={0.5} value={stipend} display={formatCents(Math.round(stipend * 100))} onChange={setStipend} />
+            {promoCode ? <button type="button" aria-pressed={promoApplied} onClick={() => setPromoApplied((current) => !current)} className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${promoApplied ? "border-emerald-400/40 bg-emerald-400/10 text-emerald-200" : "border-zinc-800 bg-zinc-950/40 text-zinc-300 hover:border-zinc-700"}`}>
+              <span className="flex items-center gap-2 text-sm font-medium"><span className={`grid size-5 place-items-center rounded border ${promoApplied ? "border-emerald-400 bg-emerald-400 text-zinc-950" : "border-zinc-600"}`}>{promoApplied ? <Check className="size-3.5" /> : null}</span>Apply {promoCode}</span>
+              <span className="font-mono text-xs">0% platform fee</span>
+            </button> : null}
           </div>
         )}
 
@@ -79,19 +85,15 @@ export function PricingCalculator({ href }: { href: string }) {
             <dd className="text-right font-mono text-zinc-200">{formatCents(perTester.typicalCharge?.totalCents || 0)}</dd>
             <dt className="text-zinc-500">· Rewards if all fill ({validators} × {formatCents(Math.round(stipend * 100))})</dt>
             <dd className="text-right font-mono text-zinc-400">{formatCents(perTester.stipendCents)}</dd>
-            <dt className="text-zinc-500">· {floorApplied ? `Platform fee ($${minFeeUsd} minimum)` : `Platform fee (${feePercent}%)`}</dt>
-            <dd className="text-right font-mono text-zinc-400">{formatCents(perTester.platformFeeCents)}</dd>
+            <dt className="text-zinc-400">· {floorApplied ? `Platform fee ($${minFeeUsd} minimum)` : `Platform fee (${feePercent}%)`}</dt>
+            <dd className="text-right font-mono text-zinc-300">{promoApplied ? <><span className="mr-2 text-zinc-500 line-through">{formatCents(standardPerTester.platformFeeCents)}</span><span className="text-emerald-400">{formatCents(0)}</span></> : formatCents(perTester.platformFeeCents)}</dd>
             <dt className="border-t border-zinc-800 pt-3 font-medium text-zinc-100">Maximum if every place fills</dt>
-            <dd className="border-t border-zinc-800 pt-3 text-right font-mono font-medium text-zinc-100">{formatCents(perTester.maxTotalCents)}</dd>
+            <dd className="border-t border-zinc-800 pt-3 text-right font-mono font-medium text-zinc-100 transition-colors">{formatCents(perTester.maxTotalCents)}</dd>
           </dl>
         )}
-        <div className="mt-3 text-xs leading-5 text-zinc-500">
-          {bundle?.type === "GOOGLE_PLAY_14_DAY"
-            ? "SeedEnv cannot guarantee Google's production-access decision; the refund covers tester retention only."
-            : bundle
-              ? "The live session time is agreed in your cohort brief. Testers join from their own devices and networks."
-              : `Top up a prepaid balance (from $10) and launch. Each tester you accept draws their reward plus fee from it, so you only pay for testers who join; the $${minFeeUsd} minimum fee is taken with the first one. Unused places return to your balance, which is refundable in full any time. No card processing or top-up fees.`}
-        </div>
+        {bundle ? <p className="mt-3 text-xs leading-5 text-zinc-400">{bundle.type === "GOOGLE_PLAY_14_DAY" ? "SeedEnv cannot guarantee Google's production-access decision; the refund covers tester retention only." : "The live session time is agreed in your cohort brief. Testers join from their own devices and networks."}</p> : <ul className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-300">
+          {["Unused escrow refundable anytime", "No card transaction surcharges", `$${minFeeUsd} minimum fee before discounts`].map((item) => <li key={item} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-950/50 px-2.5 py-1.5"><Check className="size-3.5 text-emerald-400" />{item}</li>)}
+        </ul>}
         <Link className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 text-sm font-semibold text-zinc-950 transition-colors hover:bg-white" href={cohortLaunchHref(href, type)}>
           {bundle ? `Start ${bundle.shortName}` : "Deploy a Cohort"} <ArrowRight className="size-4" />
         </Link>

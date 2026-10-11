@@ -177,7 +177,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
           </div>
         </section>
 
-        {launchOffer ? <div id="launch-offer" className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 sm:pb-12 lg:px-8"><LandingPlatformFeeOfferCard offer={launchOffer} href={developerHref} /></div> : null}
+        {launchOffer ? <div id="launch-offer" className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 sm:pb-12 lg:px-8"><LandingPlatformFeeOfferCard offer={launchOffer} /></div> : null}
         <section id="cohorts" className={sectionShell}>
           <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />
           <div className={sectionClass}><div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 sm:p-8">
@@ -253,7 +253,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
             ].map(([title, text]) => <div key={title}><p className="font-mono text-xs text-emerald-400">{title}</p><p className="mt-3 text-sm leading-6 text-zinc-400">{text}</p></div>)}
           </div>
         </div></section>
-        <DeveloperPricing href={developerHref} />
+        <DeveloperPricing href={developerHref} promoCode={launchOffer?.code} />
         <section className={sectionShell} aria-labelledby="testing-guides-title">
           <div className={sectionClass}>
             <p className={labelClass}>Plan your beta test</p>
@@ -320,11 +320,42 @@ function LiveShowcase({ onStartCohort }: { onStartCohort: () => void }) {
           <div id="showcase-panel-cohorts" role="tabpanel" aria-labelledby="showcase-tab-cohorts" className="grid gap-3 p-3 pb-5 sm:gap-4 sm:p-4 sm:pb-6 md:grid-cols-2">
             {sandboxScenarios.map((scenario) => <ScenarioCard key={scenario.id} scenario={scenario} onInspect={() => inspector.inspect(scenario)} />)}
           </div>
-        ) : <div id="showcase-panel-report" role="tabpanel" aria-labelledby="showcase-tab-report" className="p-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-3 font-mono text-xs"><span className="text-zinc-400">report.json</span><button type="button" onClick={() => inspector.inspect(featured)} aria-haspopup="dialog" className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-emerald-300 hover:text-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">Inspect Scenario <ArrowRight className="size-3.5" aria-hidden="true" /></button></div><pre className="max-h-[400px] overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-6 text-zinc-300 md:max-h-[200px]"><code>{reportPreview(featured)}</code></pre></div>}
+        ) : <div id="showcase-panel-report" role="tabpanel" aria-labelledby="showcase-tab-report" className="p-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-3 font-mono text-xs"><span className="text-zinc-400">report.json</span><button type="button" onClick={() => inspector.inspect(featured)} aria-haspopup="dialog" className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-emerald-300 hover:text-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">Inspect Scenario <ArrowRight className="size-3.5" aria-hidden="true" /></button></div><JsonReportPreview json={reportPreview(featured)} /></div>}
       </div>
       <ScenarioDrawer scenario={inspector.active} onOpenChange={inspector.onOpenChange} onStartCohort={() => { inspector.onOpenChange(false); onStartCohort(); }} />
     </div>
   );
+}
+
+function JsonReportPreview({ json }: { json: string }) {
+  return (
+    <pre className="max-h-[400px] overflow-auto rounded-lg border border-zinc-800 bg-[#090B10] p-4 font-mono text-xs leading-6 md:max-h-[200px]">
+      <code>
+        {json.split("\n").map((line, index) => {
+          const property = line.match(/^(\s*)("[^"]+")(: )(.*?)(,?)$/);
+          if (property) {
+            return <span className="block" key={`${index}-${line}`}><span>{property[1]}</span><span className="text-sky-300">{property[2]}</span><span className="text-zinc-500">{property[3]}</span><JsonValue value={property[4]} /><span className="text-zinc-500">{property[5]}</span></span>;
+          }
+          const item = line.match(/^(\s*)(".*?")(,?)$/);
+          if (item) {
+            return <span className="block" key={`${index}-${line}`}><span>{item[1]}</span><span className="text-emerald-300">{item[2]}</span><span className="text-zinc-500">{item[3]}</span></span>;
+          }
+          return <span className="block text-zinc-500" key={`${index}-${line}`}>{line}</span>;
+        })}
+      </code>
+    </pre>
+  );
+}
+
+function JsonValue({ value }: { value: string }) {
+  const tone = value.startsWith('"')
+    ? "text-emerald-300"
+    : value === "true" || value === "false" || value === "null"
+      ? "text-violet-300"
+      : /^-?\d/.test(value)
+        ? "text-amber-300"
+        : "text-zinc-400";
+  return <span className={tone}>{value}</span>;
 }
 
 function WorkflowStep({ number, icon, title, text }: { number: string; icon: ReactNode; title: string; text: string }) {
@@ -339,7 +370,7 @@ function CohortRow({ mission, signedIn, own, onJoin }: { mission: Mission; signe
   return (
     <tr className="bg-[#0A0D12] transition-colors hover:bg-[#12161F]">
       <td className="w-64 px-4 py-5"><div className="flex items-start gap-3">
-        <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-[#0F1117]">{iconUrl && !imageFailed ? <Image src={iconUrl} alt="" width={44} height={44} className="size-11 object-cover" unoptimized onError={() => setImageFailed(true)} /> : mission.platform === "WEB_STAGING" ? <Globe className="size-5 text-zinc-400" /> : <Smartphone className="size-5 text-zinc-400" />}</span>
+        <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 p-1">{iconUrl && !imageFailed ? <Image src={iconUrl} alt="" width={44} height={44} className="size-full rounded-lg object-cover" unoptimized onError={() => setImageFailed(true)} /> : mission.platform === "WEB_STAGING" ? <Globe className="size-5 text-zinc-400" /> : <Smartphone className="size-5 text-zinc-400" />}</span>
         <div className="min-w-0"><h3 className="break-words text-base font-semibold text-white"><CohortBriefLink className="hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400" campaignId={mission.id}>{mission.title}</CohortBriefLink></h3><p className="mt-1 font-mono text-xs text-emerald-400">{platformLabels[mission.platform]}</p><CohortBriefLink className="mt-2 inline-flex min-h-9 items-center text-xs text-zinc-400 hover:text-emerald-300" campaignId={mission.id}>View full brief <ArrowRight className="ml-1 size-3" /></CohortBriefLink></div>
       </div></td>
       <td className="max-w-sm px-4 py-5"><p className="line-clamp-2 text-sm leading-6 text-zinc-200">{mission.instructions.map((item) => item.instructionTitle).join(" / ") || "Acceptance criteria in the cohort brief"}</p><p className="mt-2 line-clamp-2 text-xs leading-5 text-zinc-500">{mission.description}</p></td>
@@ -350,7 +381,7 @@ function CohortRow({ mission, signedIn, own, onJoin }: { mission: Mission; signe
   );
 }
 
-function DeveloperPricing({ href }: { href: string }) {
+function DeveloperPricing({ href, promoCode }: { href: string; promoCode?: string }) {
   return (
     <section id="pricing" className={sectionShell}><div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" /><div className={`${sectionClass} max-w-6xl`}>
       <div className="grid gap-10 lg:grid-cols-2">
@@ -363,7 +394,7 @@ function DeveloperPricing({ href }: { href: string }) {
             <PricingFeature icon={<Fingerprint className="size-4" />} title="Device metadata & fraud filtering" text="Device context, server-side proof hashing, and duplicate-evidence checks support review. Device signals are not a guarantee of identity or fraud prevention." />
           </div></Tooltip.Provider>
         </div>
-        <PricingCalculator href={href} />
+        <PricingCalculator href={href} promoCode={promoCode} />
       </div>
     </div></section>
   );
