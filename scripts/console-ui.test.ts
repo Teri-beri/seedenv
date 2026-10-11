@@ -50,8 +50,12 @@ test("admin cohort tools collapse into one menu and stay hidden from non-admins"
     assert.equal(renderToStaticMarkup(createElement(CohortRulesMenu, { links: [] })), "");
 
     const messages = renderToStaticMarkup(createElement(ConsoleHeader, { activeView: "messages", paymentsMode: "live", account }));
-    const messagesLink = messages.slice(messages.indexOf('href="/messages"') - 200, messages.indexOf('href="/messages"') + 300);
-    const consoleLink = messages.slice(messages.indexOf('href="/console"') - 100, messages.indexOf('href="/console"') + 250);
+    const anchorAt = (html: string, href: string) => {
+      const start = html.lastIndexOf("<a ", html.indexOf(`href="${href}"`));
+      return html.slice(start, html.indexOf("</a>", start));
+    };
+    const messagesLink = anchorAt(messages, "/messages");
+    const consoleLink = anchorAt(messages, "/console");
     assert.ok(messagesLink.includes('aria-current="page"'));
     assert.ok(messagesLink.includes("Messages"));
     assert.ok(!consoleLink.includes('aria-current="page"'));

@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { MissionExperience } from "@/components/mission-experience";
 import { LeaderboardTable } from "@/components/tester/LeaderboardTable";
+import { SegmentedTabLinks } from "@/components/ui/SegmentedTabs";
 import { TesterBottomNav } from "@/components/navigation";
 import { rankForXp, rankProgress, rankThresholds } from "@/lib/rank";
 import { approvalRate, availableSlots, testerMilestones, testerViews, type TesterView } from "@/lib/tester-console";
@@ -59,10 +60,17 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
               <span className="truncate text-sm font-semibold">Flight Deck</span>
               <span className="hidden font-mono text-[11px] text-zinc-500 sm:inline">{nodeId}</span>
             </Link>
-            <nav aria-label="Tester console" className="hidden items-center gap-1 lg:flex">
-              {testerViews.map((item) => <Link key={item.id} aria-current={activeView === item.id ? "page" : undefined} className={activeView === item.id ? activeTab : inactiveTab} href={`/dashboard?view=${item.id}`}>{item.label}</Link>)}
-              <Link className={inactiveTab} href="/launch-circle">Launch Circle</Link>
-            </nav>
+            <div className="hidden lg:block">
+              <SegmentedTabLinks
+                groupId="tester-console-views"
+                label="Tester console"
+                activeId={activeView}
+                tabs={[
+                  ...testerViews.map((item) => ({ id: item.id, label: item.label, href: `/dashboard?view=${item.id}` })),
+                  { id: "launch-circle" as const, label: "Launch Circle", href: "/launch-circle" },
+                ]}
+              />
+            </div>
             <div className="flex items-center gap-2">
               <Link className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-medium text-emerald-200 transition hover:border-emerald-400/50 hover:text-emerald-100" href="/account?tab=portfolio#stripe-setup">
                 {formatCents(pendingPayoutCents)} Cash Out
@@ -168,8 +176,6 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
   );
 }
 
-const activeTab = "rounded-md bg-zinc-800/80 px-3 py-1.5 text-xs font-medium text-white";
-const inactiveTab = "rounded-md px-3 py-1.5 text-xs text-zinc-400 transition-colors hover:text-zinc-200";
 
 function DeckCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return <div className="flex flex-col rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-4"><p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">{label}</p><p className="mt-2 font-mono text-xl font-semibold text-zinc-100 sm:text-2xl">{value}</p><p className="mt-1 text-xs leading-5 text-zinc-500">{detail}</p></div>;

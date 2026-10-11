@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { UserDropdown, type DropdownAccount } from "@/components/user-dropdown";
+import { SegmentedTabLinks } from "@/components/ui/SegmentedTabs";
 import { useDismissableMenu } from "@/components/use-dismissable-menu";
 
 export type ConsoleView = "overview" | "new-drop" | "review-deck" | "asset-vault" | "billing" | "messages";
@@ -67,21 +68,15 @@ export function ConsoleHeader({ activeView, paymentsMode, account, cohortRules =
             ? <span title="Stripe payments are in live mode" className="ml-3 shrink-0 whitespace-nowrap rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-400">LIVE</span>
             : <span title="Stripe payments are in test mode" className="ml-3 shrink-0 whitespace-nowrap rounded border border-zinc-700 bg-zinc-800/60 px-2 py-0.5 font-mono text-[11px] text-zinc-400">TEST MODE</span>}
         </div>
-        <nav aria-label="Developer console sections" className="hidden items-center gap-0.5 md:flex lg:gap-1">
-          {tabs.map((tab) => {
-            const active = tab.view === activeView;
-            return (
-              <Link
-                key={tab.label}
-                href={tab.href}
-                aria-current={active ? "page" : undefined}
-                className={`whitespace-nowrap rounded-md px-2 py-1.5 text-xs lg:px-3 transition-colors ${active ? "bg-zinc-800/80 font-medium text-white" : "text-zinc-400 hover:text-zinc-200"}`}
-              >
-                {tab.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="hidden md:block">
+          <SegmentedTabLinks
+            groupId="developer-console-sections"
+            label="Developer console sections"
+            activeId={tabs.find((tab) => tab.view === activeView)?.label ?? ""}
+            tabs={tabs.map((tab) => ({ id: tab.label, label: tab.label, href: tab.href }))}
+            itemClassName="lg:px-3"
+          />
+        </div>
         <div className="flex shrink-0 items-center gap-3">
           <CohortRulesMenu links={cohortRules} />
           <Link

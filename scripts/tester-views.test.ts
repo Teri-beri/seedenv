@@ -26,8 +26,13 @@ test("each tester screen renders only its own sections and marks the selected na
       assert.equal(html.includes("Verified milestones"), view.id === "reputation");
       assert.equal(html.includes("Community standouts"), view.id === "leaderboard");
       assert.equal(html.includes('aria-label="Tester opportunities"'), false);
-      assert.ok(html.includes(`aria-current="page" class="rounded-md bg-zinc-800/80 px-3 py-1.5 text-xs font-medium text-white" href="/dashboard?view=${view.id}"`));
+      const activeNavLink = new RegExp(`<a[^>]*aria-current="page"[^>]*href="/dashboard\\?view=${view.id}"`);
+      const activeNavLinkReversed = new RegExp(`<a[^>]*href="/dashboard\\?view=${view.id}"[^>]*aria-current="page"`);
+      assert.ok(activeNavLink.test(html) || activeNavLinkReversed.test(html));
+      // The console nav must stay anchor-based so /dashboard?view=... remains bookmarkable.
+      assert.ok(/<nav aria-label="Tester console"[^>]*>\s*<a /.test(html));
       for (const item of testerViews) assert.ok(html.includes(`/dashboard?view=${item.id}`));
+      assert.ok(html.includes('href="/launch-circle"'));
       assert.ok(!html.includes('href="#'));
       assert.equal(html.includes("Available payout"), view.id === "discover");
       assert.ok(html.includes("$0.00 Cash Out"));
@@ -109,12 +114,16 @@ test("segmented tabs animate a per-group indicator and keep every group id uniqu
   assert.match(component, /reduceMotion \? \{ duration: 0 \} : \{ type: "spring", stiffness: 450, damping: 35 \}/);
   assert.doesNotMatch(component, /zinc-850/);
 
-  const callSites = ["mission-experience.tsx", "public-landing.tsx", "tester/LeaderboardTable.tsx"];
+  const callSites = ["mission-experience.tsx", "public-landing.tsx", "tester/LeaderboardTable.tsx", "tester-console.tsx", "console-header.tsx"];
   const groupIds: string[] = [];
   for (const file of callSites) {
     const source = await readFile(new URL(`../components/${file}`, import.meta.url), "utf8");
     for (const match of source.matchAll(/groupId="([^"]+)"/g)) groupIds.push(match[1]);
   }
-  assert.ok(groupIds.length >= 4, "expected the segmented tabs to replace the static tab button maps");
+  assert.ok(groupIds.length >= 6, "expected the segmented tabs to replace the static tab button and link maps");
   assert.equal(new Set(groupIds).size, groupIds.length, `duplicate groupId would glide the pill between groups: ${groupIds.join(", ")}`);
+  // The link variant must share the pill without downgrading routes to click handlers.
+  assert.match(component, /export function SegmentedTabLinks/);
+  assert.match(component, /<Link[\s\S]*?aria-current=\{isActive \? "page" : undefined\}/);
+  assert.doesNotMatch(component.slice(component.indexOf("export function SegmentedTabLinks")), /onChange/);
 });
