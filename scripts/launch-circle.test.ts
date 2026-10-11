@@ -89,7 +89,7 @@ test("only authenticated members write; structured tags and cohort ownership are
 
     assert.equal(await toggleHelpful("post-test"), "Marked as helpful.");
     assert.ok(refreshed.includes("/"));
-    assert.ok(refreshed.includes("/community/[id]"));
+    assert.ok(refreshed.includes("/launch-circle/[id]"));
   } finally { for (const item of modules.reverse()) item.restore(); }
 });
 
@@ -157,5 +157,32 @@ test("the feed labels its sample updates and renders real posts with app, tag an
     assert.ok(live.includes("Add validator feedback"));
     // Markdown is rendered rather than printed raw.
     assert.ok(live.includes("<code"));
+  } finally { for (const item of modules.reverse()) item.restore(); }
+});
+
+test("the Launch Circle lives at /launch-circle and legacy /community links redirect there", async () => {
+  const modules = [
+    mock.module("next/navigation", { namedExports: { useRouter: () => ({ refresh: () => {} }), permanentRedirect: (href: string) => { throw new Error(`Redirect:${href}`); } } }),
+    mock.module("next/link", { defaultExport: ({ children, ...props }: { children: ReactNode; href: string }) => createElement("a", props, children) }),
+    mock.module("next-auth/react", { namedExports: { useSession: () => ({ update: async () => {} }) } }),
+    mock.module("../app/actions/communityActions.ts", { namedExports: { publishPost: async () => "", publishComment: async () => "", reportCommunityContent: async () => "", dismissCommunityReport: async () => "", hideCommunityContent: async () => "", toggleHelpful: async () => "" } }),
+    mock.module("../lib/public-launch-circle.ts", { namedExports: { optionalCircleMember: async () => null, circlePostInclude: () => ({}), toCirclePost: (post: unknown) => post } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: { communityPost: { findMany: async () => [] } } } }),
+  ];
+  try {
+    const { default: LaunchCirclePage } = await import(`../app/launch-circle/page.tsx?route=${randomUUID()}`);
+    const markup = renderToStaticMarkup(await LaunchCirclePage({ searchParams: Promise.resolve({}) }));
+    assert.ok(markup.includes("Launch Circle"));
+    assert.ok(markup.includes("Live developer changelogs &amp; validator feedback"));
+    assert.ok(markup.includes("All Updates") && markup.includes("Active Drops"));
+    assert.ok(markup.includes("Search updates or apps..."));
+    // Feed navigation stays on the canonical route instead of bouncing through the legacy path.
+    assert.ok(markup.includes('"/launch-circle'));
+    assert.ok(!markup.includes('"/community'));
+
+    const { default: LegacyFeed } = await import(`../app/community/page.tsx?legacy=${randomUUID()}`);
+    await assert.rejects(LegacyFeed({ searchParams: Promise.resolve({ show: "drops", q: "cart" }) }), /Redirect:\/launch-circle\?show=drops&q=cart/);
+    const { default: LegacyThread } = await import(`../app/community/[id]/page.tsx?legacy=${randomUUID()}`);
+    await assert.rejects(LegacyThread({ params: Promise.resolve({ id: "post 1" }), searchParams: Promise.resolve({ page: "2" }) }), /Redirect:\/launch-circle\/post%201\?page=2/);
   } finally { for (const item of modules.reverse()) item.restore(); }
 });

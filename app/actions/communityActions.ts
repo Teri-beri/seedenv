@@ -30,9 +30,9 @@ export async function publishPost(body: string, publicVisible = false, details: 
       if (!owned) throw new Error("Attach an update only to a cohort you own.");
     }
     const post = await tx.communityPost.create({ data: { authorId: member.id, body: text, publicVisible: visibility, tag, campaignId, buildLabel: campaignId ? buildLabel : null } });
-    await queueFollowerEmails(tx, member.id, `post:${post.id}`, `/community/${post.id}`, `@${member.username} posted a Launch Circle update`);
+    await queueFollowerEmails(tx, member.id, `post:${post.id}`, `/launch-circle/${post.id}`, `@${member.username} posted a Launch Circle update`);
   });
-  revalidatePath("/community");
+  revalidatePath("/launch-circle");
   revalidatePath("/");
   return "App update published.";
 }
@@ -49,8 +49,8 @@ export async function publishComment(postId: string, body: string, details: Comm
     if (count >= 20) throw new Error("Comment limit reached. Please try again later.");
     await tx.communityComment.create({ data: { postId, authorId: member.id, body: text, tag, deviceLabel } });
   });
-  revalidatePath("/community");
-  revalidatePath("/community/[id]", "page");
+  revalidatePath("/launch-circle");
+  revalidatePath("/launch-circle/[id]", "page");
   revalidatePath("/");
   return "Comment added.";
 }
@@ -69,8 +69,8 @@ export async function toggleHelpful(postId: string) {
     await tx.communityPostHelpful.create({ data: { postId: id, userId: member.id } });
     return true;
   });
-  revalidatePath("/community");
-  revalidatePath("/community/[id]", "page");
+  revalidatePath("/launch-circle");
+  revalidatePath("/launch-circle/[id]", "page");
   return marked ? "Marked as helpful." : "Helpful mark removed.";
 }
 
@@ -85,7 +85,7 @@ export async function reportCommunityContent(id: string, type: "post" | "comment
     if (count >= 20) throw new Error("Report limit reached for today.");
     await tx.communityReport.createMany({ data: [{ reporterId: member.id, ...(type === "post" ? { postId: id } : { commentId: id }), reason: text }], skipDuplicates: true });
   });
-  revalidatePath("/community");
+  revalidatePath("/launch-circle");
   return "Report sent to platform moderators.";
 }
 
@@ -99,8 +99,8 @@ export async function hideCommunityContent(id: string, type: "post" | "comment")
     else await tx.communityComment.update({ where: { id }, data: { hidden: true } });
     await tx.communityReport.updateMany({ where: type === "post" ? { postId: id } : { commentId: id }, data: { resolved: true } });
   });
-  revalidatePath("/community");
-  revalidatePath("/community/[id]", "page");
+  revalidatePath("/launch-circle");
+  revalidatePath("/launch-circle/[id]", "page");
   revalidatePath("/");
   return "Content removed.";
 }
@@ -109,6 +109,6 @@ export async function dismissCommunityReport(id: string) {
   const member = await requireMember();
   if (member.role !== "ADMIN") throw new Error("Moderator access required.");
   await serializable((tx) => tx.communityReport.update({ where: { id }, data: { resolved: true } }));
-  revalidatePath("/community");
+  revalidatePath("/launch-circle");
   return "Report reviewed and dismissed.";
 }

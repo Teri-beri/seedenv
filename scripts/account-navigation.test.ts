@@ -18,7 +18,7 @@ test("landing destinations map to continuous-page anchors and keep safe legacy r
   assert.equal(resolveLandingView("not-a-section"), "overview");
   assert.equal(landingViewHref("overview"), "#top");
   assert.equal(resolveLandingView("circle"), "circle");
-  assert.equal(landingViewHref("circle"), "/community");
+  assert.equal(landingViewHref("circle"), "/launch-circle");
   assert.equal(landingViews.some((view) => String(view.id) === "circle"), false);
   assert.deepEqual(["developers", "validators", "cohorts", "pricing", "mobile"].map((view) => landingViewHref(resolveLandingView(view))), ["#engine", "#validators", "#cohorts", "#pricing", "#pwa"]);
   for (const view of landingViews) {

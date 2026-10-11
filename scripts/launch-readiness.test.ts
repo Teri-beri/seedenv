@@ -190,7 +190,7 @@ test("public landing survives unavailable cohort and optional account lookups wi
   try {
     const { default: Home } = await import(`../app/page.tsx?landing=${randomUUID()}`);
     await assert.rejects(Home({ params: Promise.resolve({}), searchParams: Promise.resolve({ view: "developers" }) }), /Redirect:\/#engine/);
-    await assert.rejects(Home({ params: Promise.resolve({}), searchParams: Promise.resolve({ view: "circle" }) }), /Redirect:\/community/);
+    await assert.rejects(Home({ params: Promise.resolve({}), searchParams: Promise.resolve({ view: "circle" }) }), /Redirect:\/launch-circle/);
     const guest = await Home({ params: Promise.resolve({}), searchParams: Promise.resolve({}) });
     assert.deepEqual(guest.props.missions, []);
     assert.equal(guest.props.viewer, null);
@@ -334,7 +334,7 @@ test("launch journeys use real rollback-only database records and mocked provide
       const post = await tx.communityPost.create({ data: { authorId: developer.id, body: "A launch fixture app announcement." } });
       member = tester;
       await publishComment(post.id, "Useful discussion feedback.");
-      assert.ok(revalidated.includes("/community/[id]"));
+      assert.ok(revalidated.includes("/launch-circle/[id]"));
       const comment = await tx.communityComment.findFirstOrThrow({ where: { postId: post.id, authorId: tester.id } });
       member = stranger;
       await assert.rejects(hideCommunityContent(comment.id, "comment"), /Only the author/);

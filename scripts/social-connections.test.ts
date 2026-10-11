@@ -117,8 +117,8 @@ test("requests, follows, blocks, email fanout and history permissions (sandbox P
     assert.equal(testerFollow.emailUpdates, false);
     await assert.rejects(serializable(tx => setFollowing(tx, tester.id, tester.id, true, true)), /yourself/);
     const post = await db.communityPost.create({ data: { authorId: developer.id, body: "Private original update, not included in the email", publicVisible: false } });
-    await serializable(tx => queueFollowerEmails(tx, developer.id, `post:${post.id}`, `/community/${post.id}`, "A developer update"));
-    await serializable(tx => queueFollowerEmails(tx, developer.id, `post:${post.id}`, `/community/${post.id}`, "Duplicate event"));
+    await serializable(tx => queueFollowerEmails(tx, developer.id, `post:${post.id}`, `/launch-circle/${post.id}`, "A developer update"));
+    await serializable(tx => queueFollowerEmails(tx, developer.id, `post:${post.id}`, `/launch-circle/${post.id}`, "Duplicate event"));
     assert.equal(await db.followerEmail.count({ where: { eventKey: `post:${post.id}` } }), 1);
     const delivery = await deliverFollowerEmails(30, sendEmail);
     assert.equal(delivery.sent, 1);
@@ -128,12 +128,12 @@ test("requests, follows, blocks, email fanout and history permissions (sandbox P
     assert.equal((await deliverFollowerEmails(30, sendEmail)).sent, 0);
     assert.ok(deliveries[0].key.startsWith("follower-email-"));
     const nextPost = await db.communityPost.create({ data: { authorId: developer.id, body: "Another update" } });
-    await serializable(tx => queueFollowerEmails(tx, developer.id, `post:${nextPost.id}`, `/community/${nextPost.id}`, "Second update"));
+    await serializable(tx => queueFollowerEmails(tx, developer.id, `post:${nextPost.id}`, `/launch-circle/${nextPost.id}`, "Second update"));
     await serializable(tx => setFollowing(tx, tester.id, developer.id, true, false));
     assert.ok((await db.followerEmail.findFirstOrThrow({ where: { eventKey: `post:${nextPost.id}` } })).cancelledAt);
     await serializable(tx => setFollowing(tx, tester.id, developer.id, true, true));
     const outagePost = await db.communityPost.create({ data: { authorId: developer.id, body: "Provider outage test" } });
-    await serializable(tx => queueFollowerEmails(tx, developer.id, `post:${outagePost.id}`, `/community/${outagePost.id}`, "Retry update"));
+    await serializable(tx => queueFollowerEmails(tx, developer.id, `post:${outagePost.id}`, `/launch-circle/${outagePost.id}`, "Retry update"));
     emailFailure = true;
     const log = mock.method(console, "error", () => {});
     try { assert.equal((await deliverFollowerEmails(30, sendEmail)).failed, 1); } finally { log.mock.restore(); }

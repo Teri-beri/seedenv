@@ -30,7 +30,7 @@ ${bundles}
 # Where things are
 - Developer console: /console (Overview, New drop, Billing at /console?view=billing). Applications to review: /applications.
 - Testers: browse missions at /explore; account and payouts in /settings.
-- Public pages: /pricing, /faq, /docs, /status, /terms, /privacy, /contact, /community.
+- Public pages: /pricing, /faq, /docs, /status, /terms, /privacy, /contact, /launch-circle.
 - Human support: the "Contact a human" tab in this panel, or email terimus@seedenv.com.
 
 # FAQ

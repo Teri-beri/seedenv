@@ -14,7 +14,7 @@ export type DropdownAccount = {
 
 const itemClass = "flex items-center px-3 py-1.5 rounded-lg transition-colors";
 const workspaceLinks = [
-  { label: "Launch Circle", href: "/community", mobileOnly: true },
+  { label: "Launch Circle", href: "/launch-circle", mobileOnly: true },
   { label: "Tester Applications", href: "/applications" },
   { label: "Messages & Requests", href: "/messages" },
   { label: "Connections", href: "/account?tab=connections" },

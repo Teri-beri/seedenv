@@ -32,7 +32,7 @@ const markdownComponents = {
 export function PostCard({ post, userId, admin = false, interactive = true, canComment = true, sample = false, showDiscussionLink = true }: { post: CirclePost; userId?: string; admin?: boolean; interactive?: boolean; canComment?: boolean; sample?: boolean; showDiscussionLink?: boolean }) {
   const tag = postTag(post.tag);
   const appBadge = appBadgeLabel(post.campaign, post.buildLabel);
-  const discussionHref = `/community/${encodeURIComponent(post.id)}`;
+  const discussionHref = `/launch-circle/${encodeURIComponent(post.id)}`;
   const ownContent = Boolean(userId && post.author.id === userId);
 
   return <article className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 sm:p-5">

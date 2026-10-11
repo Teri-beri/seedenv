@@ -18,7 +18,7 @@ export function feedHref({ tab = "all", sort = "latest", query = "", page = 1 }:
   if (query) params.set("q", query);
   if (page > 1) params.set("page", String(page));
   const value = params.toString();
-  return value ? `/community?${value}` : "/community";
+  return value ? `/launch-circle?${value}` : "/launch-circle";
 }
 
 export function FeedHeader({ tab, sort, query, home, member }: { tab: FeedTab; sort: FeedSort; query: string; home: string; member: boolean }) {
@@ -35,7 +35,7 @@ export function FeedHeader({ tab, sort, query, home, member }: { tab: FeedTab; s
         {tabs.map((item) => <Link key={item.value} href={feedHref({ tab: item.value, sort, query })} aria-current={tab === item.value ? "page" : undefined} className={control(tab === item.value)}>{item.label}</Link>)}
       </nav>
       <div className="flex flex-wrap items-center gap-2">
-        <form action="/community" role="search" className="relative">
+        <form action="/launch-circle" role="search" className="relative">
           {tab !== "all" ? <input type="hidden" name="show" value={tab} /> : null}
           {sort !== "latest" ? <input type="hidden" name="sort" value={sort} /> : null}
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-500" aria-hidden="true" />

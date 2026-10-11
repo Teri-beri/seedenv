@@ -15,6 +15,6 @@ export function resolveLandingView(value: unknown): LandingView {
 }
 
 export function landingViewHref(view: LandingView) {
-  if (view === "circle") return "/community";
+  if (view === "circle") return "/launch-circle";
   return `#${landingViews.find((item) => item.id === view)?.anchor || "top"}`;
 }

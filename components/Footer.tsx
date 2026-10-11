@@ -3,7 +3,7 @@ import Image from "next/image";
 import { StatusPill } from "@/components/StatusPill";
 
 const columns = [
-  { title: "Product", links: [["Live Cohorts", "/#cohorts"], ["Launch Circle", "/community"], ["Developer Platform", "/#engine"], ["Native Console (PWA)", "/#pwa"], ["Pricing Calculator", "/#pricing"]] },
+  { title: "Product", links: [["Live Cohorts", "/#cohorts"], ["Launch Circle", "/launch-circle"], ["Developer Platform", "/#engine"], ["Native Console (PWA)", "/#pwa"], ["Pricing Calculator", "/#pricing"]] },
   { title: "Developers", links: [["Find Beta Testers", "/guides/find-beta-testers"], ["TestFlight Testing Guide", "/guides/testflight-beta-testing"], ["Google Play Closed Testing", "/guides/google-play-closed-testing"], ["Testing Guides", "/guides"], ["Documentation", "/docs"], ["Blog", "/blog"], ["FAQ", "/faq"]] },
   { title: "Validators", links: [["Capability Tiers", "/#validators"], ["Payout Schedule (Stripe)", "/docs#payouts"], ["PWA Installation Guide", "/#pwa"], ["Hardware Verification", "/#validators"], ["Guidelines & NDA", "/docs#guidelines"]] },
   { title: "Trust & Legal", links: [["Terms of Service", "/terms"], ["Privacy Policy", "/privacy"], ["Security Disclosure", "/security"], ["Operational Status", "/status"], ["Contact", "/contact"], ["TERIMUS LLC", "/terimus"]] },

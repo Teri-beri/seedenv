@@ -67,13 +67,13 @@ directly. Set a retention policy, verify mailbox delivery, and staff the queue.
 
 The additive `20261005_public_launch_circle` migration marks existing posts
 private by default. New developer updates include an explicit public-visibility
-choice; public updates and their visible comments appear in `/community`.
+choice; public updates and their visible comments appear in `/launch-circle`.
 The landing is one continuous page with `#engine`, `#validators`, `#cohorts`,
 `#pricing`, and `#pwa` sections. Older `?view=` links redirect to their section
 anchors. Header navigation uses reduced-motion-aware smooth scrolling.
 Launch Circle is a separate far-right header action, not an embedded landing
-section. Older `?view=circle` links redirect to `/community`.
-Public `/community` and discussion reads exclude private/hidden content when no
+section. Older `?view=circle` links redirect to `/launch-circle`.
+Public `/launch-circle` and discussion reads exclude private/hidden content when no
 member session is available. Publishing, commenting, reports, and moderation
 still require authenticated server actions and existing rate limits.
 

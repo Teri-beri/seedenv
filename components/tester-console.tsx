@@ -63,7 +63,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
             </Link>
             <nav aria-label="Tester console" className="hidden items-center gap-1 lg:flex">
               {testerViews.map((item) => <Link key={item.id} aria-current={activeView === item.id ? "page" : undefined} className={activeView === item.id ? activeTab : inactiveTab} href={`/dashboard?view=${item.id}`}>{item.label}</Link>)}
-              <Link className={inactiveTab} href="/community">Launch Circle</Link>
+              <Link className={inactiveTab} href="/launch-circle">Launch Circle</Link>
             </nav>
             <Link className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-700 hover:text-white" href="/account">
               <Settings className="size-3.5" /> Account
