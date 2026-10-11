@@ -1139,7 +1139,7 @@ function GitHubExportButton({ submissionId, repo, initialIssueUrl }: { submissio
     setIsExporting(true);
     setError("");
     try {
-      const response = await fetch(`/api/submissions/${submissionId}/export-github`, { method: "POST" });
+      const response = await fetch("/api/integrations/github/issue", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ submissionId }) });
       const body = await response.json().catch(() => ({})) as { issueUrl?: string; message?: string };
       if (body.issueUrl) setIssueUrl(body.issueUrl);
       else setError(body.message || "Export failed.");
@@ -1152,7 +1152,7 @@ function GitHubExportButton({ submissionId, repo, initialIssueUrl }: { submissio
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button disabled={isExporting} onClick={exportIssue} size="sm" type="button" variant="outline">{isExporting ? <LoaderCircle className="size-4 animate-spin" /> : null} Export to {repo}</Button>
+      <Button disabled={isExporting} onClick={exportIssue} size="sm" type="button" variant="outline">{isExporting ? <LoaderCircle className="size-4 animate-spin" /> : null} Sync to GitHub Issue ↗</Button>
       {error ? <span className="max-w-xs text-right text-xs text-rose-300" role="alert">{error}</span> : null}
     </div>
   );

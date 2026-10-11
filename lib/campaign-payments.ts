@@ -71,7 +71,7 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     if (campaign.platformFeeDiscountPercent > 0) await consumeCohortPromo(tx, campaign.id);
     if (campaign.referralPolicyVersion === 1) await recordCampaignFeeBenefits(tx, campaign.id);
     if (campaign.cancelledAt) return { cancelledBeforePayment: true, campaignId: campaign.id };
-    await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: "ACTIVE", ...(serviceTax ? { taxSnapshot: serviceTax } : {}) } });
+    await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: "ACTIVE", launchedAt: new Date(), ...(serviceTax ? { taxSnapshot: serviceTax } : {}) } });
     if (campaign.referralPolicyVersion === 1) {
       await reconcileReferralMilestone(tx, campaign.id);
     }

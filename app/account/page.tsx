@@ -226,7 +226,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                   <p className="mt-1 text-sm text-neutral-400">Control email updates and real-time tester alerts.</p>
                 </div>
                 <NotificationSettingsForm initialPreferences={preferences} initialWebhookUrl={user.discordWebhookUrl || ""} />
-                {user.role !== UserRole.TESTER || user.developerWorkspaceEnabled ? <GitHubTokenForm connected={Boolean(user.githubTokenEncrypted)} /> : null}
+                {user.role !== UserRole.TESTER || user.developerWorkspaceEnabled ? <GitHubTokenForm connected={Boolean(user.githubTokenEncrypted)} defaultRepo={user.githubDefaultRepo} /> : null}
               </div>
             ) : null}
             {activeTab === "messages" ? <MessageInbox memberId={user.id} params={params} /> : null}

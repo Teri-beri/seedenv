@@ -55,6 +55,7 @@ export function PricingCalculator({ href, promoCode }: { href: string; promoCode
               <div className="font-mono text-2xl font-semibold text-zinc-100">{formatCents(bundle.totalCents)}<span className="ml-1 text-xs font-normal text-zinc-500">flat</span></div>
             </div>
             <div className="mt-3 text-sm leading-6 text-zinc-400">{bundle.summary}</div>
+            <FillGuarantee />
             <ul className="mt-4 space-y-2 text-sm text-zinc-300">
               {bundle.features.map((feature) => <li className="flex gap-2" key={feature}><Check className="mt-0.5 size-4 shrink-0 text-emerald-400" />{feature}</li>)}
             </ul>
@@ -67,6 +68,7 @@ export function PricingCalculator({ href, promoCode }: { href: string; promoCode
               <span className="flex items-center gap-2 text-sm font-medium"><span className={`grid size-5 place-items-center rounded border ${promoApplied ? "border-emerald-400 bg-emerald-400 text-zinc-950" : "border-zinc-600"}`}>{promoApplied ? <Check className="size-3.5" /> : null}</span>Apply {promoCode}</span>
               <span className="font-mono text-xs">0% platform fee</span>
             </button> : null}
+            <div className="flex items-start gap-2 rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 font-mono text-xs text-zinc-300"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-400" /><span><strong className="text-emerald-400">Pay only for testers you accept:</strong> <span className="text-zinc-400">Custom drops charge per acceptance, so places that never fill are never billed. Nothing to refund if the cohort stays open.</span></span></div>
           </div>
         )}
 
@@ -91,8 +93,13 @@ export function PricingCalculator({ href, promoCode }: { href: string; promoCode
             <dd className="border-t border-zinc-800 pt-3 text-right font-mono font-medium text-zinc-100 transition-colors">{formatCents(perTester.maxTotalCents)}</dd>
           </dl>
         )}
-        {bundle ? <p className="mt-3 text-xs leading-5 text-zinc-400">{bundle.type === "GOOGLE_PLAY_14_DAY" ? "SeedEnv cannot guarantee Google's production-access decision; the refund covers tester retention only." : "The live session time is agreed in your cohort brief. Testers join from their own devices and networks."}</p> : <ul className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-300">
-          {["Unused escrow refundable anytime", "No card transaction surcharges", `$${minFeeUsd} minimum fee before discounts`].map((item) => <li key={item} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-950/50 px-2.5 py-1.5"><Check className="size-3.5 text-emerald-400" />{item}</li>)}
+        {bundle ? <>
+          <ul className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-300">
+            {["Unused escrow balance refundable to card at any time", "Zero card processing fees on top-ups", "14-day engagement audit log with PDF export"].map((item) => <li key={item} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-950/50 px-2.5 py-1.5"><Check className="size-3.5 text-emerald-400" />{item}</li>)}
+          </ul>
+          <p className="mt-3 text-xs leading-5 text-zinc-400">{bundle.type === "GOOGLE_PLAY_14_DAY" ? "SeedEnv cannot guarantee Google's production-access decision; the fill guarantee covers tester recruitment only." : "The live session time is agreed in your cohort brief. Testers join from their own devices and networks."}</p>
+        </> : <ul className="mt-4 flex flex-wrap gap-2 text-xs text-zinc-300">
+          {["Unused escrow balance refundable to card at any time", "Zero card processing fees on top-ups", `$${minFeeUsd} minimum platform fee before discounts`].map((item) => <li key={item} className="inline-flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-950/50 px-2.5 py-1.5"><Check className="size-3.5 text-emerald-400" />{item}</li>)}
         </ul>}
         <Link className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 text-sm font-semibold text-zinc-950 transition-colors hover:bg-white" href={cohortLaunchHref(href, type)}>
           {bundle ? `Start ${bundle.shortName}` : "Deploy a Cohort"} <ArrowRight className="size-4" />
@@ -100,6 +107,10 @@ export function PricingCalculator({ href, promoCode }: { href: string; promoCode
       </div>
     </div>
   );
+}
+
+function FillGuarantee() {
+  return <div className="mt-4 flex items-start gap-2 rounded-lg border border-zinc-800 bg-zinc-950/80 p-3 font-mono text-xs text-zinc-300"><span className="mt-1 h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-400" /><span><strong className="text-emerald-400">4-Hour Fill Guarantee:</strong> <span className="text-zinc-400">If requested slots don&apos;t fill within 4h of launch, the platform fee is 100% refunded to your prepaid balance.</span></span></div>;
 }
 
 function RangeField({ id, label, min, max, step, value, display, onChange }: { id: string; label: string; min: number; max: number; step: number; value: number; display: string; onChange: (value: number) => void }) {

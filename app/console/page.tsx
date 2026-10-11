@@ -110,7 +110,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       where: activeCampaignScope,
       orderBy: { createdAt: "desc" },
       take: overview ? 10 : activeView === "review-deck" || activeView === "asset-vault" ? 1 : 0,
-      select: { id: true, title: true, platform: true, iconUrl: true, totalBudgetUsd: true, platformFeeUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true, fundingModel: true, _count: { select: { clicks: true } }, slotCharges: { where: { status: "SUCCEEDED" }, select: { stipendCents: true } } },
+      select: { id: true, title: true, platform: true, iconUrl: true, totalBudgetUsd: true, platformFeeUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true, fundingModel: true, cohortType: true, _count: { select: { clicks: true } }, slotCharges: { where: { status: "SUCCEEDED" }, select: { stipendCents: true } }, compliance: { select: { status: true, targetDays: true, requiredTesters: true, dailyPings: { select: { dayNumber: true, validatorId: true, deviceModel: true, osVersion: true } } } } },
     }),
     prisma.walletTransaction.groupBy({
       by: ["type"],

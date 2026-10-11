@@ -124,6 +124,7 @@ model User {
   authoredFollowerEmails    FollowerEmail[]         @relation("EmailAuthor")
   discordWebhookUrl         String?                 @map("discord_webhook_url")
   githubTokenEncrypted      String?                 @map("github_token_encrypted")
+  githubDefaultRepo         String?                 @map("github_default_repo")
   walletBalanceCents        Int                     @default(0)
   xpPoints                  Int                     @default(0)
   rankTier                  RankTier                @default(ALPHA_SEEDER)
@@ -351,10 +352,41 @@ model AppCampaign {
   promoDiscountPercent       Int                        @default(0)
   fundingCheckoutSessionId   String?                    @unique
   fundingCheckoutAttemptId   String?
+  compliance                 CohortCompliance?
+  launchedAt                 DateTime?                  @map("launched_at")
+  fillGuaranteeCreditedCents Int                        @default(0) @map("fill_guarantee_credited_cents")
 
   @@index([developerId, status])
   @@index([status, expiresAt])
   @@index([platform])
+  @@index([launchedAt])
+}
+
+model CohortCompliance {
+  id              String         @id @default(cuid())
+  cohortId        String         @unique
+  cohort          AppCampaign    @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  targetDays      Int            @default(14)
+  requiredTesters Int            @default(12)
+  status          String         @default("ACTIVE")
+  dailyPings      DailyPingLog[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model DailyPingLog {
+  id               String           @id @default(cuid())
+  complianceId     String
+  compliance       CohortCompliance @relation(fields: [complianceId], references: [id], onDelete: Cascade)
+  validatorId      String
+  validatorHandle  String
+  dayNumber        Int
+  deviceModel      String
+  osVersion        String
+  sessionDuration  Int
+  timestamp        DateTime         @default(now())
+
+  @@index([complianceId, dayNumber])
 }
 
 model CohortClick {

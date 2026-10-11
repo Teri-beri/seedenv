@@ -203,6 +203,13 @@ async function persistLaunchCampaign(input: CampaignInput, developer: Awaited<Re
       const appUrl = await assertTestFlightOwner(tx, developer.id, input.appUrl, campaign.id, true);
       campaign = await tx.appCampaign.update({ where: { id: campaign.id }, data: { appUrl } });
     }
+    if (input.cohortType === CohortType.GOOGLE_PLAY_14_DAY) {
+      await tx.cohortCompliance.upsert({
+        where: { cohortId: campaign.id },
+        create: { cohortId: campaign.id },
+        update: {},
+      });
+    }
     const benefits = await reserveAutomaticFeeBenefits(tx, developer.id, campaign.id, developer.platformFeeWaived || Boolean(existing?.promoRedemptions.length), discountPercent);
     const firstTester = quoteSlotCharge(Math.round(input.bountyPerTaskUsd * 100), 0, 0, developer.platformFeeWaived || benefits.firstCohortFeeWaived, benefits.effectiveDiscountPercent);
     const funded = custom && developer.fundingBalanceCents >= firstTester.totalCents;
@@ -211,6 +218,7 @@ async function persistLaunchCampaign(input: CampaignInput, developer: Awaited<Re
     if (expectedPlatformFeeCents !== undefined && Math.round(finalQuote.platformFeeUsd * 100) !== expectedPlatformFeeCents) throw new CohortPromoError("Your fee benefits changed in another tab or expired. Refresh Budget and review the new total before launching; no payment was created.");
     campaign = await tx.appCampaign.update({ where: { id: campaign.id }, data: {
       status: funded ? CampaignStatus.ACTIVE : CampaignStatus.ESCROW_PENDING,
+      ...(funded ? { launchedAt: new Date() } : {}),
       referralPolicyVersion: REFERRAL_RULES.POLICY_VERSION, firstCohortFeeWaived: benefits.firstCohortFeeWaived,
       referralDiscountPercent: benefits.referralDiscountPercent, promoDiscountPercent: discountPercent,
       platformFeeDiscountPercent: benefits.effectiveDiscountPercent, platformFeeUsd: finalQuote.platformFeeUsd, totalBudgetUsd: finalQuote.totalBudgetUsd,

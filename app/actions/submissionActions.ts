@@ -20,6 +20,7 @@ import { serializable } from "@/lib/quest-ledger";
 import { startAcceptedApplication } from "@/lib/mission-applications";
 import { versionDirections } from "@/lib/instruction-versions";
 import { auditSubmission } from "@/lib/ai/qa-audit";
+import { recordCompliancePing } from "@/lib/compliance-pings";
 import { assertProofEditable, rejectProof, requestProofRevision, startProofRevision } from "@/lib/submission-lifecycle";
 import { reconcileReferralMilestone } from "@/lib/services/billing.service";
 
@@ -203,6 +204,14 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
   });
   revalidatePath("/dashboard");
   revalidatePath("/console");
+  // A proof submission is observed engagement, so it also records this tester's compliance day.
+  after(() => recordCompliancePing({
+    campaignId: submission.campaignId,
+    testerId: tester.id,
+    testerHandle: tester.username,
+    deviceModel: input.deviceModel || null,
+    osVersion: input.osBuild || null,
+  }).catch((error) => console.warn("SeedEnv compliance ping failed:", error instanceof Error ? error.message : error)));
   // Advisory AI audit runs after the response is sent; it records its own failures and never blocks the tester.
   after(() => auditSubmission(savedSubmission.id).then(() => undefined));
 

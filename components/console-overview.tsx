@@ -3,6 +3,7 @@ import { Boxes } from "lucide-react";
 import Link from "next/link";
 import { CohortAppIcon } from "@/components/cohort-app-icon";
 import { CohortRowActions } from "@/components/cohort-row-actions";
+import { GooglePlayComplianceCard } from "@/components/console/GooglePlayComplianceCard";
 import { formatCents } from "@/lib/utils";
 
 export type ConsoleMetrics = {
@@ -29,6 +30,7 @@ export type ConsoleCohort = {
   fundingModel: "PREPAID" | "PAY_PER_TESTER";
   paidStipendCents: number | null;
   clickCount?: number;
+  compliance?: { status: string; targetDays: number; requiredTesters: number; dailyPings: { dayNumber: number; validatorId: string; deviceModel: string; osVersion: string }[] } | null;
 };
 
 const platformLabels: Record<PlatformType, string> = {
@@ -73,6 +75,8 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
         </Link>
       </div>
       {cohorts.length ? (
+        <>
+        {cohorts.filter((cohort) => cohort.platform === PlatformType.PLAY_STORE && cohort.compliance).map((cohort) => cohort.compliance ? <div key={`${cohort.id}-compliance`} className="mb-4"><GooglePlayComplianceCard cohortId={cohort.id} targetDays={cohort.compliance.targetDays} requiredTesters={cohort.compliance.requiredTesters} status={cohort.compliance.status} pings={cohort.compliance.dailyPings} /></div> : null)}
         <div className="overflow-x-auto rounded-xl border border-zinc-800">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-zinc-800 bg-zinc-900/40 font-mono text-[11px] uppercase tracking-wider text-zinc-400">
@@ -122,6 +126,7 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
           </table>
           {total > cohorts.length ? <p className="border-t border-zinc-800 px-4 py-2.5 font-mono text-xs text-zinc-400">Showing {cohorts.length} of {total} active cohorts</p> : null}
         </div>
+        </>
       ) : (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 p-10 text-center">
           <Boxes aria-hidden className="mb-3 size-8 text-zinc-600" />

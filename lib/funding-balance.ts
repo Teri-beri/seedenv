@@ -53,7 +53,7 @@ async function activateFundedCohort(tx: Prisma.TransactionClient, userId: string
   if (!campaign) return false;
   if (campaign.platformFeeDiscountPercent > 0) await consumeCohortPromo(tx, campaign.id);
   if (campaign.status !== CampaignStatus.ESCROW_PENDING || campaign.fundingModel !== "PAY_PER_TESTER" || campaign.cancelledAt) return false;
-  await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: CampaignStatus.ACTIVE, expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) } });
+  await tx.appCampaign.update({ where: { id: campaign.id }, data: { status: CampaignStatus.ACTIVE, launchedAt: new Date(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) } });
   if (campaign.referralPolicyVersion === 1) await tx.firstCohortBenefit.updateMany({ where: { campaignId: campaign.id, fundedAt: null }, data: { fundedAt: new Date() } });
   await queueFollowerEmails(tx, userId, `cohort:${campaign.id}`, `/cohorts/${campaign.id}`, "A developer you follow launched a new cohort");
   return true;

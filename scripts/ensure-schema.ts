@@ -79,6 +79,37 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS "CommunityPostHelpful_userId_idx" ON "CommunityPostHelpful"("userId")`,
   `DO $$ BEGIN ALTER TABLE "CommunityPostHelpful" ADD CONSTRAINT "CommunityPostHelpful_postId_fkey" FOREIGN KEY ("postId") REFERENCES "CommunityPost"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
   `DO $$ BEGIN ALTER TABLE "CommunityPostHelpful" ADD CONSTRAINT "CommunityPostHelpful_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `CREATE TABLE IF NOT EXISTS "CohortCompliance" (
+    "id" TEXT NOT NULL,
+    "cohortId" TEXT NOT NULL,
+    "targetDays" INTEGER NOT NULL DEFAULT 14,
+    "requiredTesters" INTEGER NOT NULL DEFAULT 12,
+    "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "CohortCompliance_pkey" PRIMARY KEY ("id")
+  )`,
+  `CREATE TABLE IF NOT EXISTS "DailyPingLog" (
+    "id" TEXT NOT NULL,
+    "complianceId" TEXT NOT NULL,
+    "validatorId" TEXT NOT NULL,
+    "validatorHandle" TEXT NOT NULL,
+    "dayNumber" INTEGER NOT NULL,
+    "deviceModel" TEXT NOT NULL,
+    "osVersion" TEXT NOT NULL,
+    "sessionDuration" INTEGER NOT NULL,
+    "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "DailyPingLog_pkey" PRIMARY KEY ("id")
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "CohortCompliance_cohortId_key" ON "CohortCompliance"("cohortId")`,
+  `CREATE INDEX IF NOT EXISTS "DailyPingLog_complianceId_dayNumber_idx" ON "DailyPingLog"("complianceId", "dayNumber")`,
+  `DO $$ BEGIN ALTER TABLE "CohortCompliance" ADD CONSTRAINT "CohortCompliance_cohortId_fkey" FOREIGN KEY ("cohortId") REFERENCES "AppCampaign"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN ALTER TABLE "DailyPingLog" ADD CONSTRAINT "DailyPingLog_complianceId_fkey" FOREIGN KEY ("complianceId") REFERENCES "CohortCompliance"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "github_default_repo" TEXT`,
+  `ALTER TABLE "AppCampaign"
+    ADD COLUMN IF NOT EXISTS "launched_at" TIMESTAMP(3),
+    ADD COLUMN IF NOT EXISTS "fill_guarantee_credited_cents" INTEGER NOT NULL DEFAULT 0`,
+  `CREATE INDEX IF NOT EXISTS "AppCampaign_launched_at_idx" ON "AppCampaign"("launched_at")`,
 ];
 
 async function main() {

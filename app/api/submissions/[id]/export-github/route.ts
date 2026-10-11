@@ -16,7 +16,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const [developer, submission] = await Promise.all([
-    prisma.user.findUnique({ where: { id: session.user.id }, select: { githubTokenEncrypted: true } }),
+    prisma.user.findUnique({ where: { id: session.user.id }, select: { githubTokenEncrypted: true, githubDefaultRepo: true } }),
     prisma.submission.findUnique({
       where: { id },
       include: { tester: { select: { username: true } }, campaign: { select: { id: true, title: true, platform: true, developerId: true, syncGitHubRepo: true } } },
@@ -24,7 +24,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   ]);
   if (!developer || !submission || submission.campaign.developerId !== session.user.id) return NextResponse.json({ message: "Submission unavailable." }, { status: 404, headers });
   if (submission.githubIssueUrl) return NextResponse.json({ issueUrl: submission.githubIssueUrl, alreadyExported: true }, { headers });
-  if (!submission.campaign.syncGitHubRepo) return NextResponse.json({ message: "Add a GitHub repo (owner/repo) to this cohort before exporting." }, { status: 409, headers });
+  const repo = submission.campaign.syncGitHubRepo || developer.githubDefaultRepo;
+  if (!repo) return NextResponse.json({ message: "Add a GitHub repo (owner/repo) to this cohort or set a default in Settings before exporting." }, { status: 409, headers });
   if (!developer.githubTokenEncrypted) return NextResponse.json({ message: "Add a GitHub token in Settings → Notifications before exporting." }, { status: 409, headers });
 
   let token: string;
@@ -36,7 +37,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try {
     const appOrigin = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://seedenv.com";
-    const issueUrl = await createGitHubIssue(token, submission.campaign.syncGitHubRepo, buildGitHubIssue(submission, appOrigin.replace(/\/$/, "")));
+    const issueUrl = await createGitHubIssue(token, repo, buildGitHubIssue(submission, appOrigin.replace(/\/$/, "")));
     // Only the first export is recorded, so a double-click cannot overwrite the stored link.
     await prisma.submission.updateMany({ where: { id, githubIssueUrl: null }, data: { githubIssueUrl: issueUrl } });
     return NextResponse.json({ issueUrl }, { status: 201, headers });
