@@ -5,15 +5,12 @@ import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { StatusPill } from "@/components/StatusPill";
 
 export const metadata: Metadata = {
-  title: { absolute: "TERIMUS LLC | Independent Software Studio" },
-  description: "TERIMUS LLC is an independent product studio and parent entity building developer utilities, beta validation platforms, and consumer applications.",
+  title: { absolute: "TERIMUS LLC | SeedEnv Corporate Operator" },
+  description: "TERIMUS LLC is the corporate operator behind SeedEnv and an independent product studio building developer utilities, validation infrastructure, and consumer applications.",
   alternates: { canonical: "/terimus" },
 };
 
-const capabilities = [
-  { title: "Developer Infrastructure", text: "Building pre-launch staging, QA validation, and device telemetry systems like SeedEnv." },
-  { title: "Digital Products & Tooling", text: "End-to-end mobile architecture, custom API design, and distributed application ecosystems." },
-];
+const sunbizRecord = "https://search.sunbiz.org/Inquiry/CorporationSearch/SearchResultDetail?inquirytype=EntityName&directionType=Initial&searchNameOrder=TERIMUS%20L250005445050&aggregateId=flal-l25000544505-b016af34-9559-48b7-a196-ad70882e96d8&searchTerm=TERIMUS%20LLC&listNameOrder=TERIMUS%20L250005445050";
 
 const portfolio = [
   {
@@ -29,15 +26,17 @@ const portfolio = [
     status: "Active TestFlight Cohort",
   },
   {
-    tags: ["Internal research"],
-    title: "Hardware & Utility Prototypes",
-    text: "Explorations in physical tracking hardware, automated distribution pipelines, and developer telemetry tooling.",
+    tags: ["Telemetry hardware"],
+    title: "LoCat",
+    text: "A focused physical tracking and device telemetry program spanning enclosure design, low-power firmware, and field validation.",
+    status: "CAD & Firmware Staging",
   },
 ];
 
 const corporateDetails = [
   { label: "Legal Entity", value: "TERIMUS LLC" },
-  { label: "Jurisdiction", value: "Florida, United States" },
+  { label: "Jurisdiction", value: "Florida, United States · Verified", href: sunbizRecord, external: true },
+  { label: "Florida Document Number", value: "L25000544505", href: sunbizRecord, external: true },
   { label: "Primary Focus", value: "Mobile Software & Web Infrastructure" },
   { label: "Security & Inquiries", value: "terimus@seedenv.com", href: "mailto:terimus@seedenv.com" },
 ];
@@ -55,7 +54,7 @@ export default function TerimusPage() {
         <div className={`${container} flex h-14 items-center justify-between gap-4`}>
           <Link href="/terimus" className={`flex items-center gap-2 rounded font-mono text-xs tracking-wider ${focusRing}`}>
             <span className="font-semibold text-zinc-100">TERIMUS LLC</span>
-            <span className="hidden text-zinc-500 sm:inline">[STUDIO LABS]</span>
+            <span className="hidden text-zinc-500 sm:inline">[CORPORATE OPERATOR]</span>
           </Link>
           <nav aria-label="TERIMUS sections" className="flex items-center gap-4 sm:gap-6">
             <a href="#portfolio" className={`hidden rounded font-mono text-xs text-zinc-400 transition-colors hover:text-zinc-100 sm:inline ${focusRing}`}>Portfolio</a>
@@ -68,22 +67,13 @@ export default function TerimusPage() {
       </header>
 
       <main id="main-content">
-        <section className={`${container} py-16 sm:py-24`}>
-          <p className={metaLabel}>Independent software studio · Est. 2026</p>
+        <section className={`${container} py-16 sm:py-20`}>
+          <p className={metaLabel}>SeedEnv / Corporate operator &amp; governance</p>
           <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-zinc-100 sm:text-4xl">Designing and operating focused software infrastructure.</h1>
-          <p className="mt-5 max-w-2xl text-base font-normal leading-relaxed text-zinc-400 sm:text-lg">TERIMUS LLC is an independent product studio and parent entity building developer utilities, beta validation platforms, and consumer applications. We focus on low-noise software with deterministic execution.</p>
+          <p className="mt-5 max-w-2xl text-base font-normal leading-relaxed text-zinc-400 sm:text-lg">TERIMUS LLC is the corporate operator behind SeedEnv and an independent product studio building developer utilities, beta validation platforms, and consumer applications. We focus on low-noise software with deterministic execution.</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a href="#portfolio" className={`inline-flex min-h-11 items-center gap-2 rounded-lg bg-zinc-100 px-4 text-sm font-semibold text-zinc-950 transition-colors hover:bg-white ${focusRing}`}>Explore Products <ArrowRight className="size-4" aria-hidden="true" /></a>
-            <a href="#corporate" className={`inline-flex min-h-11 items-center rounded-lg border border-zinc-800 px-4 text-sm font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 ${focusRing}`}>Corporate Verification</a>
-          </div>
-
-          <div className="mt-14 grid gap-4 sm:grid-cols-2">
-            {capabilities.map((item) => (
-              <article key={item.title} className={card}>
-                <h2 className="text-base font-semibold text-zinc-100">{item.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-zinc-400">{item.text}</p>
-              </article>
-            ))}
+            <a href={sunbizRecord} target="_blank" rel="noreferrer" className={`inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-800 px-4 text-sm font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-zinc-100 ${focusRing}`}>Verify Florida Registration <span aria-hidden="true">↗</span></a>
           </div>
         </section>
 
@@ -120,7 +110,7 @@ export default function TerimusPage() {
                 <div key={item.label}>
                   <dt className={metaLabel}>{item.label}</dt>
                   <dd className="mt-1.5 text-sm text-zinc-100">
-                    {item.href ? <a href={item.href} className={`rounded text-emerald-400 hover:text-emerald-300 ${focusRing}`}>{item.value}</a> : item.value}
+                    {item.href ? <a href={item.href} target={item.external ? "_blank" : undefined} rel={item.external ? "noreferrer" : undefined} className={`inline-flex items-center gap-1.5 rounded text-emerald-400 hover:text-emerald-300 ${focusRing}`}>{item.value}{item.external ? <span aria-hidden="true">↗</span> : null}</a> : item.value}
                   </dd>
                 </div>
               ))}

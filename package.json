@@ -23,6 +23,7 @@
     "test:cohort-clicks": "node --conditions=react-server --experimental-test-module-mocks --import tsx --test --test-concurrency=1 scripts/cohort-clicks.test.ts",
     "test:landing-offer": "node --experimental-test-module-mocks --import tsx --test scripts/landing-offer.test.ts",
     "test:compliance-card": "node --import tsx --test scripts/compliance-card.test.ts",
+    "test:terimus": "node --import tsx --test scripts/terimus-page.test.ts",
     "test:messages": "node --experimental-test-module-mocks --import tsx --test scripts/social-views.test.ts",
     "test:account": "node --experimental-test-module-mocks --import tsx --test scripts/account-navigation.test.ts",
     "test:applications": "node --experimental-test-module-mocks --import tsx --test --test-concurrency=1 scripts/applications-queue.test.ts",
