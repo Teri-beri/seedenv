@@ -42,8 +42,12 @@ test("the queue buckets applications into status tabs and derives completion fro
     assert.ok(html.includes("Active in Test (1)"));
     // An approved submission promotes a STARTED run into Completed rather than leaving it in flight.
     assert.ok(html.includes("Completed (1)"));
-    assert.ok(html.includes("Declined (1)"));
-    assert.ok(html.includes("Withdrawn (1)"));
+    // Exactly the four required status tabs: withdrawn requests close without a run, so they join Rejected.
+    assert.ok(html.includes("Rejected (2)"));
+    assert.ok(!html.includes("Withdrawn ("));
+    assert.equal(html.match(/role="tab"/g)?.length, 4);
+    // Folding them together must not blur who rejected whom.
+    assert.ok(html.includes("1 you declined · 1 withdrawn by testers"));
     // Raw debug pagination copy must not reappear as unstyled body text.
     assert.ok(!html.includes("pending in this list"));
     assert.ok(html.includes("grid-cols-1 gap-6 lg:grid-cols-3"));

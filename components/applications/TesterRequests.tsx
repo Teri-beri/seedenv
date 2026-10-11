@@ -21,14 +21,15 @@ export type QueueApplication = {
 export type ChargePreview = { credit: true } | { credit: false; stipendCents: number; platformFeeCents: number; totalCents: number };
 export type BalancePreview = { balanceCents: number; autoReloadCents: number };
 
-type QueueTab = "pending" | "active" | "completed" | "declined" | "withdrawn";
+type QueueTab = "pending" | "active" | "completed" | "rejected";
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
 function bucketOf(application: QueueApplication): QueueTab {
   if (application.status === "PENDING") return "pending";
-  if (application.status === "DECLINED") return "declined";
-  if (application.status === "WITHDRAWN") return "withdrawn";
+  // Declined and withdrawn requests both close without a run, so they share the Rejected tab.
+  // The card pill and the queue summary keep them distinguishable so decline rates stay honest.
+  if (application.status === "DECLINED" || application.status === "WITHDRAWN") return "rejected";
   return application.completed ? "completed" : "active";
 }
 
@@ -36,16 +37,22 @@ const tabLabels: ReadonlyArray<{ value: QueueTab; label: string }> = [
   { value: "pending", label: "Pending Review" },
   { value: "active", label: "Active in Test" },
   { value: "completed", label: "Completed" },
-  { value: "declined", label: "Declined" },
-  { value: "withdrawn", label: "Withdrawn" },
+  { value: "rejected", label: "Rejected" },
 ];
+
+const statusLabels: Record<string, string> = {
+  PENDING: "Pending",
+  ACCEPTED: "Accepted",
+  STARTED: "In test",
+  DECLINED: "Declined",
+  WITHDRAWN: "Withdrawn by tester",
+};
 
 const emptyCopy: Record<QueueTab, { heading: string; detail: string }> = {
   pending: { heading: "No pending tester applications", detail: "Validators who meet your minimum REP and device criteria will appear here for review." },
   active: { heading: "No testers in flight", detail: "Accepted validators appear here while their claim window and proof timer run." },
   completed: { heading: "No completed runs yet", detail: "Testers move here once you approve their submitted proof." },
-  declined: { heading: "No declined requests", detail: "Requests you turn down are kept here for your records." },
-  withdrawn: { heading: "No withdrawn requests", detail: "Requests testers pull back, or that expire unstarted, are kept here." },
+  rejected: { heading: "No rejected requests", detail: "Requests you decline, and requests testers pull back or leave unstarted, are kept here for your records." },
 };
 
 const statusTone: Record<string, string> = {
@@ -98,7 +105,7 @@ function ApplicantCard({ application, preview, balance, renderedAt }: { applicat
             </div>
           </div>
         </div>
-        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider ${statusTone[application.status] || statusTone.WITHDRAWN}`}>{application.completed ? "Completed" : application.status}</span>
+        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider ${statusTone[application.status] || statusTone.WITHDRAWN}`}>{application.completed ? "Completed" : statusLabels[application.status] || application.status}</span>
       </div>
       <p className="mt-3 font-mono text-[11px] text-zinc-500">{application.campaign.title} · {application.tester.submissionCount.toLocaleString()} lifetime submissions</p>
       {application.note ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-400">{application.note}</p> : null}
@@ -153,6 +160,8 @@ export function TesterRequests({ applications, chargePreviews = {}, balance, ren
   const [tab, setTab] = useState<QueueTab>("pending");
   const [rulesOpen, setRulesOpen] = useState(false);
   const counts = Object.fromEntries(tabLabels.map((item) => [item.value, applications.filter((application) => bucketOf(application) === item.value).length])) as Record<QueueTab, number>;
+  const declinedCount = applications.filter((application) => application.status === "DECLINED").length;
+  const withdrawnCount = applications.filter((application) => application.status === "WITHDRAWN").length;
   const visible = applications.filter((application) => bucketOf(application) === tab);
 
   return (
@@ -214,6 +223,7 @@ export function TesterRequests({ applications, chargePreviews = {}, balance, ren
                 </div>
               ))}
             </dl>
+            {counts.rejected ? <p className="mt-2 font-mono text-[11px] text-zinc-500">Rejected splits into {declinedCount.toLocaleString()} you declined · {withdrawnCount.toLocaleString()} withdrawn by testers.</p> : null}
             {balance ? <p className="mt-4 border-t border-zinc-800 pt-3 font-mono text-[11px] text-zinc-400">Prepaid balance <span className="text-zinc-200">{money(balance.balanceCents)}</span>. Accepting a tester draws their reward and the platform fee from it.</p> : null}
           </div>
           <p className="text-xs leading-5 text-zinc-500">REP unlocks permission to request entry. Developers choose who joins. Accepted testers have up to 24 hours to start; the proof timer begins only when they start. Discovery Passes bypass only developer-approved REP floors, never other task qualifications. Submitted proof is reviewed separately in Submissions.</p>
