@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 const tones = {
   primary: "rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-black",
   emerald: "rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-black hover:bg-emerald-400",
+  ghost: "rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white",
 };
 
 export function MemberAction({ action, children, disabled = false, tone = "primary" }: { action: () => Promise<string>; children: React.ReactNode; disabled?: boolean; tone?: keyof typeof tones }) {
