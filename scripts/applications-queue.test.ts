@@ -22,7 +22,7 @@ function applicant(overrides: Record<string, unknown> = {}) {
   };
 }
 
-const baseProps = { chargePreviews: {}, renderedAt: Date.UTC(2025, 0, 1, 12, 0, 0), shareCohort: null, rulesPanel: null, note: "Showing up to 100 requests." };
+const baseProps = { chargePreviews: {}, renderedAt: Date.UTC(2025, 0, 1, 12, 0, 0), shareCohort: null, rulesPanel: null, rulesSummary: null };
 
 test("the queue buckets applications into status tabs and derives completion from approved proof", async () => {
   const modules = [mock.module("next/link", anchorMock), mock.module("next/navigation", routerMock), mock.module("../app/actions/applicationActions.ts", actionsMock)];
@@ -47,10 +47,42 @@ test("the queue buckets applications into status tabs and derives completion fro
     assert.ok(!html.includes("Withdrawn ("));
     assert.equal(html.match(/role="tab"/g)?.length, 4);
     // Folding them together must not blur who rejected whom.
-    assert.ok(html.includes("1 you declined · 1 withdrawn by testers"));
+    assert.ok(html.includes("Rejected: 1 declined · 1 withdrawn."));
     // Raw debug pagination copy must not reappear as unstyled body text.
     assert.ok(!html.includes("pending in this list"));
+    assert.ok(!html.includes("Showing up to"));
     assert.ok(html.includes("grid-cols-1 gap-6 lg:grid-cols-3"));
+    assert.ok(html.includes("REP Gating"));
+    assert.ok(html.includes("Manual Dev Approval"));
+    assert.ok(html.includes("24h Execution Timer"));
+  } finally { for (const item of modules.reverse()) item.restore(); }
+});
+
+test("the rules card reports real cohort settings and exposes the criteria editor actions", async () => {
+  const modules = [mock.module("next/link", anchorMock), mock.module("next/navigation", routerMock), mock.module("../app/actions/applicationActions.ts", actionsMock)];
+  try {
+    const { TesterRequests } = await import(`../components/applications/TesterRequests.tsx?q=${randomUUID()}`);
+    const html = renderToStaticMarkup(createElement(TesterRequests, {
+      ...baseProps,
+      applications: [],
+      rulesPanel: createElement("div", null, "Server-backed criteria form"),
+      rulesSummary: {
+        campaignTitle: "Goddesses Beta",
+        minimumRep: 85,
+        discoveryAllowed: true,
+        discoveryMinRep: 50,
+        hardwareStrict: true,
+      },
+    }));
+    assert.ok(html.includes("Gating &amp; Validation Rules"));
+    assert.ok(html.includes("Goddesses Beta"));
+    assert.ok(html.includes("85 REP"));
+    assert.ok(html.includes("Active · 50 REP floor"));
+    assert.ok(html.includes("Physical device required"));
+    assert.ok(html.includes("Escrow held until reviewed"));
+    assert.ok(html.includes("REP &amp; Device Rules"));
+    assert.ok(html.includes("Edit Criteria"));
+    assert.ok(!html.includes("Server-backed criteria form"), "the editor belongs in a modal, not an inline accordion");
   } finally { for (const item of modules.reverse()) item.restore(); }
 });
 
@@ -124,7 +156,6 @@ test("testers keep their own application list and are never shown the developer 
       developer: false,
       applications: [{ id: "a1", status: "ACCEPTED", note: "On it", passReserved: true, startBy: null, campaign: { id: "camp-1", title: "Goddesses Beta" }, tester: { username: "nova", xpPoints: 920, _count: { submissions: 3 } } }],
       campaigns: [],
-      note: "Showing your latest 100 requests.",
     }));
     assert.ok(html.includes("Your applications"));
     assert.ok(html.includes("Withdraw / return unused pass"));

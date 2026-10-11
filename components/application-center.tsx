@@ -7,19 +7,26 @@ import { TesterRequests, type BalancePreview, type ChargePreview, type QueueAppl
 import Link from "next/link";
 
 type Application = { id: string; status: string; note: string; passReserved: boolean; startBy: string | null; campaign: { title: string; id: string }; tester: { username: string; xpPoints: number; _count: { submissions: number } } };
-type Campaign = { id: string; title: string; discoveryAllowed: boolean; discoveryMinRep: number; instructions: Array<{ id: string; instructionTitle: string; minimumRep: number }> };
+type Campaign = { id: string; title: string; status: string; discoveryAllowed: boolean; discoveryMinRep: number; hardwareStrict: boolean; instructions: Array<{ id: string; instructionTitle: string; minimumRep: number }> };
 
 export type { ChargePreview, BalancePreview };
 
-export function ApplicationCenter({ developer, applications, campaigns, chargePreviews = {}, balance, queue = [], renderedAt = 0, shareCohort = null, note = "" }: { developer: boolean; applications: Application[]; campaigns: Campaign[]; chargePreviews?: Record<string, ChargePreview>; balance?: BalancePreview; queue?: QueueApplication[]; renderedAt?: number; shareCohort?: { id: string; title: string } | null; note?: string }) {
+export function ApplicationCenter({ developer, applications, campaigns, chargePreviews = {}, balance, queue = [], renderedAt = 0, shareCohort = null }: { developer: boolean; applications: Application[]; campaigns: Campaign[]; chargePreviews?: Record<string, ChargePreview>; balance?: BalancePreview; queue?: QueueApplication[]; renderedAt?: number; shareCohort?: { id: string; title: string } | null }) {
   if (developer) {
+    const primaryCampaign = campaigns.find((campaign) => campaign.status === "ACTIVE") || campaigns[0] || null;
     return <TesterRequests
       applications={queue}
       chargePreviews={chargePreviews}
       balance={balance}
       renderedAt={renderedAt}
       shareCohort={shareCohort}
-      note={note}
+      rulesSummary={primaryCampaign ? {
+        campaignTitle: primaryCampaign.title,
+        minimumRep: Math.max(0, ...primaryCampaign.instructions.map((task) => task.minimumRep)),
+        discoveryAllowed: primaryCampaign.discoveryAllowed,
+        discoveryMinRep: primaryCampaign.discoveryMinRep,
+        hardwareStrict: primaryCampaign.hardwareStrict,
+      } : null}
       rulesPanel={campaigns.length ? <div className="space-y-4">{campaigns.map((campaign) => <Requirements key={campaign.id} campaign={campaign} />)}</div> : null}
     />;
   }
@@ -37,7 +44,6 @@ export function ApplicationCenter({ developer, applications, campaigns, chargePr
         {item.status === "ACCEPTED" && item.startBy && new Date(item.startBy) > new Date() ? <Link href={`/dashboard?claim=${encodeURIComponent(item.campaign.id)}`} className="inline-flex min-h-11 items-center rounded-xl border border-zinc-800 px-4 py-3 text-sm">Start accepted mission</Link> : null}
       </div>
     </article>)}
-    <p className="font-mono text-[11px] text-zinc-500">{note}</p>
   </div>;
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Settings2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Settings2, X } from "lucide-react";
 import { MemberAction } from "@/components/member-action";
 import { ClaimTimer } from "@/components/applications/ClaimTimer";
 import { decideApplication } from "@/app/actions/applicationActions";
@@ -20,6 +20,13 @@ export type QueueApplication = {
 
 export type ChargePreview = { credit: true } | { credit: false; stipendCents: number; platformFeeCents: number; totalCents: number };
 export type BalancePreview = { balanceCents: number; autoReloadCents: number };
+export type RulesSummary = {
+  campaignTitle: string;
+  minimumRep: number;
+  discoveryAllowed: boolean;
+  discoveryMinRep: number;
+  hardwareStrict: boolean;
+};
 
 type QueueTab = "pending" | "active" | "completed" | "rejected";
 
@@ -148,14 +155,14 @@ function ShareCohortButton({ cohort }: { cohort: { id: string; title: string } }
   );
 }
 
-export function TesterRequests({ applications, chargePreviews = {}, balance, renderedAt, shareCohort, rulesPanel, note }: {
+export function TesterRequests({ applications, chargePreviews = {}, balance, renderedAt, shareCohort, rulesPanel, rulesSummary }: {
   applications: QueueApplication[];
   chargePreviews?: Record<string, ChargePreview>;
   balance?: BalancePreview;
   renderedAt: number;
   shareCohort: { id: string; title: string } | null;
   rulesPanel: React.ReactNode;
-  note: string;
+  rulesSummary: RulesSummary | null;
 }) {
   const [tab, setTab] = useState<QueueTab>("pending");
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -163,6 +170,15 @@ export function TesterRequests({ applications, chargePreviews = {}, balance, ren
   const declinedCount = applications.filter((application) => application.status === "DECLINED").length;
   const withdrawnCount = applications.filter((application) => application.status === "WITHDRAWN").length;
   const visible = applications.filter((application) => bucketOf(application) === tab);
+
+  useEffect(() => {
+    if (!rulesOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setRulesOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [rulesOpen]);
 
   return (
     <div className="space-y-6">
@@ -184,15 +200,31 @@ export function TesterRequests({ applications, chargePreviews = {}, balance, ren
         {rulesPanel ? (
           <button
             type="button"
-            aria-expanded={rulesOpen}
-            aria-controls="rep-device-rules"
-            onClick={() => setRulesOpen((open) => !open)}
+            aria-haspopup="dialog"
+            onClick={() => setRulesOpen(true)}
             className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 font-mono text-xs text-zinc-300 transition-colors hover:text-white"
           >
             <Settings2 aria-hidden="true" className="size-3.5" /> REP &amp; Device Rules
           </button>
         ) : null}
       </div>
+
+      <ol aria-label="Application review pipeline" className="grid gap-2 sm:grid-cols-3">
+        {[
+          ["01", "REP Gating", "Qualified validators request access"],
+          ["02", "Manual Dev Approval", "You accept and issue the build"],
+          ["03", "24h Execution Timer", "Accepted testers start or release the slot"],
+        ].map(([step, label, detail], index) => (
+          <li key={step} className="relative rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] text-emerald-400">{step}</span>
+              <span className="text-xs font-medium text-zinc-200">{label}</span>
+            </div>
+            <p className="mt-1 text-[11px] leading-4 text-zinc-500">{detail}</p>
+            {index < 2 ? <span aria-hidden="true" className="absolute -right-2.5 top-1/2 z-10 hidden -translate-y-1/2 bg-[#090b10] px-1 font-mono text-zinc-600 sm:block">→</span> : null}
+          </li>
+        ))}
+      </ol>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
@@ -209,27 +241,89 @@ export function TesterRequests({ applications, chargePreviews = {}, balance, ren
               {tab === "pending" && !shareCohort ? <Link href="/console?view=new-drop" className="mt-4 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400">Deploy a cohort</Link> : null}
             </div>
           )}
-          <p className="font-mono text-[11px] text-zinc-500">{note}</p>
         </div>
 
         <aside className="space-y-4">
           <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-100">Gating &amp; Validation Rules</h2>
+                <p className="mt-1 truncate font-mono text-[11px] text-zinc-500">{rulesSummary?.campaignTitle || "No configurable cohort"}</p>
+              </div>
+              <span className="rounded-full border border-emerald-500/25 bg-emerald-500/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald-300">{rulesSummary ? "Live" : "Empty"}</span>
+            </div>
+            {rulesSummary ? (
+              <>
+                <dl className="mt-4 divide-y divide-zinc-800 text-xs">
+                  <div className="flex items-start justify-between gap-3 py-2.5">
+                    <dt className="text-zinc-500">Minimum REP Floor</dt>
+                    <dd className="text-right font-mono text-zinc-200">{rulesSummary.minimumRep > 0 ? `${rulesSummary.minimumRep.toLocaleString()} REP` : "Level 1 · Open"}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3 py-2.5">
+                    <dt className="text-zinc-500">Execution Window</dt>
+                    <dd className="text-right font-mono text-zinc-200">24 hours</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3 py-2.5">
+                    <dt className="text-zinc-500">Discovery Pass</dt>
+                    <dd className="max-w-[55%] text-right font-mono text-zinc-200">{rulesSummary.discoveryAllowed ? `Active · ${rulesSummary.discoveryMinRep.toLocaleString()} REP floor` : "Disabled"}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3 py-2.5">
+                    <dt className="text-zinc-500">Device Integrity</dt>
+                    <dd className="max-w-[55%] text-right font-mono text-zinc-200">{rulesSummary.hardwareStrict ? "Physical device required" : "Integrity optional"}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3 py-2.5">
+                    <dt className="text-zinc-500">Proof Verification</dt>
+                    <dd className="max-w-[55%] text-right font-mono text-zinc-200">Escrow held until reviewed</dd>
+                  </div>
+                </dl>
+                <button
+                  type="button"
+                  onClick={() => setRulesOpen(true)}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 font-mono text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+                >
+                  <Settings2 aria-hidden="true" className="size-3.5" /> Edit Criteria
+                </button>
+              </>
+            ) : (
+              <div className="mt-4">
+                <p className="text-xs leading-5 text-zinc-500">Deploy a cohort to configure REP, Discovery Pass, and hardware validation rules.</p>
+                <Link href="/console?view=new-drop" className="mt-3 inline-flex rounded-lg border border-zinc-800 px-3 py-2 font-mono text-xs text-zinc-300 hover:text-white">Deploy a cohort</Link>
+              </div>
+            )}
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4">
             <h2 className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Queue summary</h2>
-            <dl className="mt-3 space-y-2 text-xs">
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
               {tabLabels.map((item) => (
-                <div key={item.value} className="flex items-center justify-between gap-3">
-                  <dt className="text-zinc-400">{item.label}</dt>
-                  <dd className="font-mono text-zinc-200">{counts[item.value]}</dd>
+                <div key={item.value} className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-2">
+                  <dt className="text-zinc-500">{item.label}</dt>
+                  <dd className="mt-1 font-mono text-zinc-200">{counts[item.value]}</dd>
                 </div>
               ))}
             </dl>
-            {counts.rejected ? <p className="mt-2 font-mono text-[11px] text-zinc-500">Rejected splits into {declinedCount.toLocaleString()} you declined · {withdrawnCount.toLocaleString()} withdrawn by testers.</p> : null}
-            {balance ? <p className="mt-4 border-t border-zinc-800 pt-3 font-mono text-[11px] text-zinc-400">Prepaid balance <span className="text-zinc-200">{money(balance.balanceCents)}</span>. Accepting a tester draws their reward and the platform fee from it.</p> : null}
+            {counts.rejected ? <p className="mt-2 font-mono text-[11px] text-zinc-500">Rejected: {declinedCount.toLocaleString()} declined · {withdrawnCount.toLocaleString()} withdrawn.</p> : null}
+            {balance ? <p className="mt-4 border-t border-zinc-800 pt-3 font-mono text-[11px] text-zinc-400">Prepaid balance <span className="text-zinc-200">{money(balance.balanceCents)}</span>. Accepting a tester draws their reward and platform fee.</p> : null}
           </div>
-          <p className="text-xs leading-5 text-zinc-500">REP unlocks permission to request entry. Developers choose who joins. Accepted testers have up to 24 hours to start; the proof timer begins only when they start. Discovery Passes bypass only developer-approved REP floors, never other task qualifications. Submitted proof is reviewed separately in Submissions.</p>
-          {rulesPanel ? <div id="rep-device-rules" hidden={!rulesOpen}>{rulesPanel}</div> : null}
         </aside>
       </div>
+
+      {rulesOpen && rulesPanel ? (
+        <div role="dialog" aria-modal="true" aria-labelledby="criteria-dialog-title" className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-sm sm:p-8">
+          <button type="button" aria-label="Close criteria editor" className="fixed inset-0 cursor-default" onClick={() => setRulesOpen(false)} />
+          <section className="relative z-10 w-full max-w-2xl rounded-2xl border border-zinc-800 bg-[#0b0d12] shadow-2xl">
+            <header className="sticky top-0 z-10 flex items-start justify-between gap-4 rounded-t-2xl border-b border-zinc-800 bg-[#0b0d12]/95 p-5 backdrop-blur">
+              <div>
+                <h2 id="criteria-dialog-title" className="text-base font-semibold text-zinc-100">REP &amp; Entry Rules</h2>
+                <p className="mt-1 text-xs leading-5 text-zinc-500">Set task REP floors and Discovery Pass access. Existing accepted testers keep their eligibility.</p>
+              </div>
+              <button type="button" aria-label="Close criteria editor" onClick={() => setRulesOpen(false)} className="rounded-lg border border-zinc-800 p-2 text-zinc-400 transition-colors hover:text-white">
+                <X aria-hidden="true" className="size-4" />
+              </button>
+            </header>
+            <div className="max-h-[calc(100vh-10rem)] overflow-y-auto p-5">{rulesPanel}</div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
