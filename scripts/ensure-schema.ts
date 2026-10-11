@@ -59,6 +59,26 @@ const statements = [
   `UPDATE "User" SET "developer_workspace_enabled" = TRUE WHERE "role" = 'DEVELOPER' AND "developer_workspace_enabled" = FALSE`,
   `UPDATE "User" SET "notification_preferences" = '{"email_tester_feedback":true,"email_ledger_updates":true,"email_announcements":false}'::jsonb WHERE "notification_preferences" IS NULL`,
   `ALTER TABLE "User" ALTER COLUMN "notification_preferences" SET NOT NULL`,
+  `DO $$ BEGIN CREATE TYPE "CommunityPostTag" AS ENUM ('CHANGELOG', 'NEED_VALIDATION', 'BUG_FIX'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN CREATE TYPE "CommunityCommentTag" AS ENUM ('GENERAL_FEEDBACK', 'REPRO_LOG', 'DEVICE_CONFIRMED'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `ALTER TABLE "CommunityPost"
+    ADD COLUMN IF NOT EXISTS "tag" "CommunityPostTag" NOT NULL DEFAULT 'CHANGELOG',
+    ADD COLUMN IF NOT EXISTS "campaign_id" TEXT,
+    ADD COLUMN IF NOT EXISTS "build_label" VARCHAR(40)`,
+  `DO $$ BEGIN ALTER TABLE "CommunityPost" ADD CONSTRAINT "CommunityPost_campaign_id_fkey" FOREIGN KEY ("campaign_id") REFERENCES "AppCampaign"("id") ON DELETE SET NULL ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `CREATE INDEX IF NOT EXISTS "CommunityPost_campaign_id_createdAt_idx" ON "CommunityPost"("campaign_id", "createdAt")`,
+  `ALTER TABLE "CommunityComment"
+    ADD COLUMN IF NOT EXISTS "tag" "CommunityCommentTag" NOT NULL DEFAULT 'GENERAL_FEEDBACK',
+    ADD COLUMN IF NOT EXISTS "device_label" VARCHAR(60)`,
+  `CREATE TABLE IF NOT EXISTS "CommunityPostHelpful" (
+    "postId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "CommunityPostHelpful_pkey" PRIMARY KEY ("postId", "userId")
+  )`,
+  `CREATE INDEX IF NOT EXISTS "CommunityPostHelpful_userId_idx" ON "CommunityPostHelpful"("userId")`,
+  `DO $$ BEGIN ALTER TABLE "CommunityPostHelpful" ADD CONSTRAINT "CommunityPostHelpful_postId_fkey" FOREIGN KEY ("postId") REFERENCES "CommunityPost"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `DO $$ BEGIN ALTER TABLE "CommunityPostHelpful" ADD CONSTRAINT "CommunityPostHelpful_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
 ];
 
 async function main() {

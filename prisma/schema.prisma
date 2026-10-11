@@ -92,66 +92,66 @@ enum TransactionStatus {
 }
 
 model User {
-  id                        String               @id @default(cuid())
-  email                     String               @unique
+  id                        String                  @id @default(cuid())
+  email                     String                  @unique
   emailVerified             DateTime?
   name                      String?
   image                     String?
   passwordHash              String?
-  sessionVersion            Int                  @default(0) @map("session_version")
-  role                      UserRole             @default(TESTER)
-  testerWorkspaceEnabled    Boolean              @default(false) @map("tester_workspace_enabled")
-  developerWorkspaceEnabled Boolean              @default(false) @map("developer_workspace_enabled")
-  username                  String               @default("SeedEnv Member")
+  sessionVersion            Int                     @default(0) @map("session_version")
+  role                      UserRole                @default(TESTER)
+  testerWorkspaceEnabled    Boolean                 @default(false) @map("tester_workspace_enabled")
+  developerWorkspaceEnabled Boolean                 @default(false) @map("developer_workspace_enabled")
+  username                  String                  @default("SeedEnv Member")
   avatarUrl                 String?
-  bio                       String?              @db.VarChar(200)
+  bio                       String?                 @db.VarChar(200)
   portfolioUrl              String?
   companyName               String?
   productUrl                String?
-  githubUsername            String?              @map("github_username")
-  discordUrl                String?              @map("discord_url")
-  twitterHandle             String?              @map("twitter_handle")
-  notificationPreferences   Json                 @default("{\"email_tester_feedback\":true,\"email_ledger_updates\":true,\"email_announcements\":false}") @map("notification_preferences")
-  messageRequestsEnabled    Boolean              @default(true)
-  following                 UserFollow[]         @relation("Following")
-  followers                 UserFollow[]         @relation("Followers")
-  blocks                    UserBlock[]          @relation("Blocker")
-  blockedBy                 UserBlock[]          @relation("Blocked")
-  conversationsA            DirectConversation[] @relation("ParticipantA")
-  conversationsB            DirectConversation[] @relation("ParticipantB")
+  githubUsername            String?                 @map("github_username")
+  discordUrl                String?                 @map("discord_url")
+  twitterHandle             String?                 @map("twitter_handle")
+  notificationPreferences   Json                    @default("{\"email_tester_feedback\":true,\"email_ledger_updates\":true,\"email_announcements\":false}") @map("notification_preferences")
+  messageRequestsEnabled    Boolean                 @default(true)
+  following                 UserFollow[]            @relation("Following")
+  followers                 UserFollow[]            @relation("Followers")
+  blocks                    UserBlock[]             @relation("Blocker")
+  blockedBy                 UserBlock[]             @relation("Blocked")
+  conversationsA            DirectConversation[]    @relation("ParticipantA")
+  conversationsB            DirectConversation[]    @relation("ParticipantB")
   directMessages            DirectMessage[]
-  followerEmails            FollowerEmail[]       @relation("EmailRecipient")
-  authoredFollowerEmails    FollowerEmail[]       @relation("EmailAuthor")
-  discordWebhookUrl         String?              @map("discord_webhook_url")
-  githubTokenEncrypted      String?              @map("github_token_encrypted")
-  walletBalanceCents        Int                  @default(0)
-  xpPoints                  Int                  @default(0)
-  rankTier                  RankTier             @default(ALPHA_SEEDER)
-  streakDays                Int                  @default(1)
-  lastActiveDate            DateTime             @default(now())
+  followerEmails            FollowerEmail[]         @relation("EmailRecipient")
+  authoredFollowerEmails    FollowerEmail[]         @relation("EmailAuthor")
+  discordWebhookUrl         String?                 @map("discord_webhook_url")
+  githubTokenEncrypted      String?                 @map("github_token_encrypted")
+  walletBalanceCents        Int                     @default(0)
+  xpPoints                  Int                     @default(0)
+  rankTier                  RankTier                @default(ALPHA_SEEDER)
+  streakDays                Int                     @default(1)
+  lastActiveDate            DateTime                @default(now())
   stripeCustomerId          String?
-  fundingBalanceCents       Int                  @default(0) @map("funding_balance_cents")
-  autoReloadCents           Int                  @default(0) @map("auto_reload_cents")
-  platformFeeWaived         Boolean              @default(false) @map("platform_fee_waived")
-  launchWizardDrafts        Json                 @default("{}") @map("launch_wizard_drafts")
-  launchWizardDraftRevision Int                  @default(0) @map("launch_wizard_draft_revision")
+  fundingBalanceCents       Int                     @default(0) @map("funding_balance_cents")
+  autoReloadCents           Int                     @default(0) @map("auto_reload_cents")
+  platformFeeWaived         Boolean                 @default(false) @map("platform_fee_waived")
+  launchWizardDrafts        Json                    @default("{}") @map("launch_wizard_drafts")
+  launchWizardDraftRevision Int                     @default(0) @map("launch_wizard_draft_revision")
   promoRedemptions          CohortPromoRedemption[]
   balanceTopUps             BalanceTopUp[]
   stripeConnectAccountId    String?
-  questXp                   Int                  @default(0)
-  discoveryPasses           Int                  @default(0)
-  referralCode              String               @unique @default(cuid())
+  questXp                   Int                     @default(0)
+  discoveryPasses           Int                     @default(0)
+  referralCode              String                  @unique @default(cuid())
   referredById              String?
-  referredBy                User?                @relation("UserReferrals", fields: [referredById], references: [id], onDelete: Restrict)
-  referrals                 User[]               @relation("UserReferrals")
+  referredBy                User?                   @relation("UserReferrals", fields: [referredById], references: [id], onDelete: Restrict)
+  referrals                 User[]                  @relation("UserReferrals")
   feeCredits                FeeCredit[]
   firstCohortBenefit        FirstCohortBenefit?
   testFlightBuilds          TestFlightBuild[]
-  developerReferralCode     String?              @unique @map("developer_referral_code")
-  developerReferralsSent    DeveloperReferral[]  @relation("DeveloperReferrer")
-  developerReferralReceived DeveloperReferral?   @relation("DeveloperReferred")
+  developerReferralCode     String?                 @unique @map("developer_referral_code")
+  developerReferralsSent    DeveloperReferral[]     @relation("DeveloperReferrer")
+  developerReferralReceived DeveloperReferral?      @relation("DeveloperReferred")
   ownedPromoCodes           CohortPromoCode[]
-  questTheme                String               @default("classic")
+  questTheme                String                  @default("classic")
   clipProfile               ClipProfile?
   clipCampaigns             ClipCampaign[]
   clipEngagements           ClipEngagement[]
@@ -161,20 +161,21 @@ model User {
   clipOAuthStates           ClipOAuthState[]
   questRewards              QuestReward[]
   applications              MissionApplication[]
-  referralsSent             Referral[]           @relation("ReferralInviter")
-  referralReceived          Referral?            @relation("ReferralFriend")
+  referralsSent             Referral[]              @relation("ReferralInviter")
+  referralReceived          Referral?               @relation("ReferralFriend")
   posts                     CommunityPost[]
+  helpfulVotes              CommunityPostHelpful[]
   comments                  CommunityComment[]
   reports                   CommunityReport[]
-  campaigns                 AppCampaign[]        @relation("DeveloperCampaigns")
-  submissions               Submission[]         @relation("TesterSubmissions")
+  campaigns                 AppCampaign[]           @relation("DeveloperCampaigns")
+  submissions               Submission[]            @relation("TesterSubmissions")
   transactions              WalletTransaction[]
   billingProfile            BillingProfile?
   supportTickets            SupportTicket[]
   accounts                  Account[]
   sessions                  Session[]
-  createdAt                 DateTime             @default(now())
-  updatedAt                 DateTime             @updatedAt
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
 
   @@index([role])
   @@index([rankTier, xpPoints])
@@ -187,12 +188,12 @@ enum DirectConversationStatus {
 }
 
 model UserFollow {
-  followerId  String
-  followingId String
-  emailUpdates Boolean @default(false)
-  createdAt DateTime @default(now())
-  follower User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
-  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+  followerId   String
+  followingId  String
+  emailUpdates Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  follower     User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following    User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@id([followerId, followingId])
   @@index([followingId, createdAt])
@@ -202,24 +203,24 @@ model UserBlock {
   blockerId String
   blockedId String
   createdAt DateTime @default(now())
-  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
-  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
 
   @@id([blockerId, blockedId])
   @@index([blockedId, blockerId])
 }
 
 model DirectConversation {
-  id String @id @default(cuid())
+  id             String                   @id @default(cuid())
   participantAId String
   participantBId String
-  requesterId String
-  status DirectConversationStatus @default(REQUESTED)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  participantA User @relation("ParticipantA", fields: [participantAId], references: [id], onDelete: Cascade)
-  participantB User @relation("ParticipantB", fields: [participantBId], references: [id], onDelete: Cascade)
-  messages DirectMessage[]
+  requesterId    String
+  status         DirectConversationStatus @default(REQUESTED)
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  participantA   User                     @relation("ParticipantA", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantB   User                     @relation("ParticipantB", fields: [participantBId], references: [id], onDelete: Cascade)
+  messages       DirectMessage[]
 
   @@unique([participantAId, participantBId])
   @@index([participantAId, updatedAt])
@@ -228,33 +229,33 @@ model DirectConversation {
 }
 
 model DirectMessage {
-  id String @id @default(cuid())
+  id             String             @id @default(cuid())
   conversationId String
-  senderId String
-  body String @db.VarChar(2000)
-  createdAt DateTime @default(now())
-  conversation DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderId       String
+  body           String             @db.VarChar(2000)
+  createdAt      DateTime           @default(now())
+  conversation   DirectConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User               @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt, id])
   @@index([senderId, createdAt])
 }
 
 model FollowerEmail {
-  id String @id @default(cuid())
-  eventKey String
-  recipientId String
-  authorId String
-  path String
-  subject String
-  sentAt DateTime?
-  cancelledAt DateTime?
-  attempts Int @default(0)
-  nextAttemptAt DateTime @default(now())
-  lastError String?
-  createdAt DateTime @default(now())
-  recipient User @relation("EmailRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
-  author User @relation("EmailAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  id            String    @id @default(cuid())
+  eventKey      String
+  recipientId   String
+  authorId      String
+  path          String
+  subject       String
+  sentAt        DateTime?
+  cancelledAt   DateTime?
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  recipient     User      @relation("EmailRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  author        User      @relation("EmailAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@unique([eventKey, recipientId])
   @@index([sentAt, cancelledAt, nextAttemptAt])
@@ -299,56 +300,57 @@ model VerificationToken {
 }
 
 model AppCampaign {
-  id               String               @id @default(cuid())
-  developerId      String
-  developer        User                 @relation("DeveloperCampaigns", fields: [developerId], references: [id], onDelete: Cascade)
-  title            String
-  platform         PlatformType
-  appUrl           String
-  iconUrl          String?
-  targetVibe       String
-  description      String
-  totalBudgetUsd   Float
-  bountyPerTaskUsd Float
-  platformFeeUsd   Float
-  totalSlots       Int
-  claimedSlots     Int                  @default(0)
-  completedSlots   Int                  @default(0)
-  status           CampaignStatus       @default(DRAFT)
-  instructions     TaskInstruction[]
-  instructionRevision Int              @default(1)
-  instructionVersions CohortInstructionVersion[]
-  submissions      Submission[]
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  expiresAt        DateTime
-  discoveryAllowed Boolean              @default(false)
-  discoveryMinRep  Int                  @default(0)
-  cohortType       CohortType           @default(STANDARD_QA)
-  guaranteedDays   Int?
-  syncGitHubRepo   String?
-  hardwareStrict   Boolean              @default(true)
-  estimatedMinutes Int?                 @map("estimated_minutes")
-  testerPerk       String?              @map("tester_perk") @db.VarChar(80)
-  fundingModel     CohortFundingModel   @default(PREPAID) @map("funding_model")
-  cancelledAt      DateTime?            @map("cancelled_at")
-  refundedCents    Int                  @default(0) @map("refunded_cents")
-  billingHoldCents Int                  @default(0) @map("billing_hold_cents")
-  taxSnapshot      Json?
-  applications     MissionApplication[]
-  transactions     WalletTransaction[]
-  slotCharges      SlotCharge[]
-  synthesis        CampaignSynthesis?
-  platformFeeDiscountPercent Int                @default(0) @map("platform_fee_discount_percent")
-  promoCodeDraft   String?              @map("promo_code_draft") @db.VarChar(81)
-  promoRedemptions CohortPromoRedemption[]
-  clicks           CohortClick[]
-  referralPolicyVersion Int @default(0)
-  firstCohortFeeWaived Boolean @default(false)
-  referralDiscountPercent Int @default(0)
-  promoDiscountPercent Int @default(0)
-  fundingCheckoutSessionId String? @unique
-  fundingCheckoutAttemptId String?
+  id                         String                     @id @default(cuid())
+  developerId                String
+  developer                  User                       @relation("DeveloperCampaigns", fields: [developerId], references: [id], onDelete: Cascade)
+  title                      String
+  platform                   PlatformType
+  appUrl                     String
+  iconUrl                    String?
+  targetVibe                 String
+  description                String
+  totalBudgetUsd             Float
+  bountyPerTaskUsd           Float
+  platformFeeUsd             Float
+  totalSlots                 Int
+  claimedSlots               Int                        @default(0)
+  completedSlots             Int                        @default(0)
+  status                     CampaignStatus             @default(DRAFT)
+  instructions               TaskInstruction[]
+  instructionRevision        Int                        @default(1)
+  instructionVersions        CohortInstructionVersion[]
+  submissions                Submission[]
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
+  expiresAt                  DateTime
+  discoveryAllowed           Boolean                    @default(false)
+  discoveryMinRep            Int                        @default(0)
+  cohortType                 CohortType                 @default(STANDARD_QA)
+  guaranteedDays             Int?
+  syncGitHubRepo             String?
+  hardwareStrict             Boolean                    @default(true)
+  estimatedMinutes           Int?                       @map("estimated_minutes")
+  testerPerk                 String?                    @map("tester_perk") @db.VarChar(80)
+  fundingModel               CohortFundingModel         @default(PREPAID) @map("funding_model")
+  cancelledAt                DateTime?                  @map("cancelled_at")
+  refundedCents              Int                        @default(0) @map("refunded_cents")
+  billingHoldCents           Int                        @default(0) @map("billing_hold_cents")
+  taxSnapshot                Json?
+  applications               MissionApplication[]
+  transactions               WalletTransaction[]
+  slotCharges                SlotCharge[]
+  synthesis                  CampaignSynthesis?
+  platformFeeDiscountPercent Int                        @default(0) @map("platform_fee_discount_percent")
+  promoCodeDraft             String?                    @map("promo_code_draft") @db.VarChar(81)
+  promoRedemptions           CohortPromoRedemption[]
+  clicks                     CohortClick[]
+  communityPosts             CommunityPost[]
+  referralPolicyVersion      Int                        @default(0)
+  firstCohortFeeWaived       Boolean                    @default(false)
+  referralDiscountPercent    Int                        @default(0)
+  promoDiscountPercent       Int                        @default(0)
+  fundingCheckoutSessionId   String?                    @unique
+  fundingCheckoutAttemptId   String?
 
   @@index([developerId, status])
   @@index([status, expiresAt])
@@ -358,9 +360,9 @@ model AppCampaign {
 model CohortClick {
   campaignId String
   visitorKey String
-  day String @db.VarChar(10)
-  createdAt DateTime @default(now())
-  campaign AppCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  day        String      @db.VarChar(10)
+  createdAt  DateTime    @default(now())
+  campaign   AppCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   @@id([campaignId, visitorKey, day])
 }
@@ -372,40 +374,40 @@ model CohortPromoCode {
   maxRedemptions  Int                     @map("max_redemptions")
   reservedCount   Int                     @default(0) @map("reserved_count")
   expiresAt       DateTime?               @map("expires_at")
-  ownerId         String?                @map("owner_id")
-  owner           User?                  @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  ownerId         String?                 @map("owner_id")
+  owner           User?                   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   enabled         Boolean                 @default(true)
   createdAt       DateTime                @default(now()) @map("created_at")
   redemptions     CohortPromoRedemption[]
 }
 
 model CohortPromoRedemption {
-  id              String         @id @default(cuid())
-  promoCodeId      String         @map("promo_code_id")
-  promoCode        CohortPromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Restrict)
-  developerId     String         @map("developer_id")
-  developer       User           @relation(fields: [developerId], references: [id], onDelete: Restrict)
-  campaignId      String         @map("campaign_id")
-  campaign        AppCampaign    @relation(fields: [campaignId], references: [id], onDelete: Restrict)
-  discountPercent Int            @map("discount_percent")
-  consumedAt      DateTime?      @map("consumed_at")
-  paymentPending  Boolean        @default(false) @map("payment_pending")
-  checkoutSessionId String?      @map("checkout_session_id")
-  createdAt       DateTime       @default(now()) @map("created_at")
+  id                String          @id @default(cuid())
+  promoCodeId       String          @map("promo_code_id")
+  promoCode         CohortPromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Restrict)
+  developerId       String          @map("developer_id")
+  developer         User            @relation(fields: [developerId], references: [id], onDelete: Restrict)
+  campaignId        String          @map("campaign_id")
+  campaign          AppCampaign     @relation(fields: [campaignId], references: [id], onDelete: Restrict)
+  discountPercent   Int             @map("discount_percent")
+  consumedAt        DateTime?       @map("consumed_at")
+  paymentPending    Boolean         @default(false) @map("payment_pending")
+  checkoutSessionId String?         @map("checkout_session_id")
+  createdAt         DateTime        @default(now()) @map("created_at")
 
   @@unique([promoCodeId, developerId])
   @@index([campaignId])
 }
 
 model DeveloperReferral {
-  id            String    @id @default(cuid())
-  inviterId     String    @map("inviter_id")
-  inviter       User      @relation("DeveloperReferrer", fields: [inviterId], references: [id], onDelete: Restrict)
-  developerId   String    @unique @map("developer_id")
-  developer     User      @relation("DeveloperReferred", fields: [developerId], references: [id], onDelete: Restrict)
-  qualifiedAt   DateTime? @map("qualified_at")
-  qualifiedCampaignId String? @map("qualified_campaign_id")
-  createdAt     DateTime  @default(now()) @map("created_at")
+  id                  String    @id @default(cuid())
+  inviterId           String    @map("inviter_id")
+  inviter             User      @relation("DeveloperReferrer", fields: [inviterId], references: [id], onDelete: Restrict)
+  developerId         String    @unique @map("developer_id")
+  developer           User      @relation("DeveloperReferred", fields: [developerId], references: [id], onDelete: Restrict)
+  qualifiedAt         DateTime? @map("qualified_at")
+  qualifiedCampaignId String?   @map("qualified_campaign_id")
+  createdAt           DateTime  @default(now()) @map("created_at")
 }
 
 enum CreditStatus {
@@ -417,24 +419,24 @@ enum CreditStatus {
 }
 
 model FeeCredit {
-  id String @id @default(cuid())
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
-  amountCents Int @default(0)
-  discountType String @default("PERCENTAGE")
-  percentageRate Float? @default(0.5)
-  status CreditStatus @default(PENDING)
-  sourceReferralId String @unique
-  qualifyingDropId String
-  reservedDropId String?
-  redeemedDropId String?
-  redeemedDiscountCents Int @default(0)
-  clawbackCents Int @default(0)
-  createdAt DateTime @default(now())
-  vestedAt DateTime?
-  redeemedAt DateTime?
-  expiresAt DateTime?
-  reviewedAt DateTime @default(now())
+  id                    String       @id @default(cuid())
+  userId                String
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  amountCents           Int          @default(0)
+  discountType          String       @default("PERCENTAGE")
+  percentageRate        Float?       @default(0.5)
+  status                CreditStatus @default(PENDING)
+  sourceReferralId      String       @unique
+  qualifyingDropId      String
+  reservedDropId        String?
+  redeemedDropId        String?
+  redeemedDiscountCents Int          @default(0)
+  clawbackCents         Int          @default(0)
+  createdAt             DateTime     @default(now())
+  vestedAt              DateTime?
+  redeemedAt            DateTime?
+  expiresAt             DateTime?
+  reviewedAt            DateTime     @default(now())
 
   @@index([userId, status])
   @@index([status, reviewedAt])
@@ -444,30 +446,30 @@ model FeeCredit {
 }
 
 model FirstCohortBenefit {
-  userId String @id
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
-  campaignId String @unique
-  fundedAt DateTime?
-  createdAt DateTime @default(now())
+  userId     String    @id
+  user       User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  campaignId String    @unique
+  fundedAt   DateTime?
+  createdAt  DateTime  @default(now())
 }
 
 model TestFlightBuild {
-  joinToken String @id
-  developerId String
-  developer User @relation(fields: [developerId], references: [id], onDelete: Restrict)
+  joinToken          String   @id
+  developerId        String
+  developer          User     @relation(fields: [developerId], references: [id], onDelete: Restrict)
   originalCampaignId String?
-  createdAt DateTime @default(now())
+  createdAt          DateTime @default(now())
 }
 
 model ReferralAudit {
-  id String @id @default(cuid())
-  eventKey String @unique
-  userId String
-  campaignId String?
-  creditId String?
-  amountCents Int @default(0)
-  reason String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  eventKey    String   @unique
+  userId      String
+  campaignId  String?
+  creditId    String?
+  amountCents Int      @default(0)
+  reason      String
+  createdAt   DateTime @default(now())
 
   @@index([userId, createdAt])
 }
@@ -534,13 +536,13 @@ model TaskInstruction {
 }
 
 model CohortInstructionVersion {
-  id          String       @id @default(cuid())
-  campaignId  String
-  campaign    AppCampaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  revision    Int
-  directions  Json
-  editedById  String
-  createdAt   DateTime     @default(now())
+  id           String               @id @default(cuid())
+  campaignId   String
+  campaign     AppCampaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  revision     Int
+  directions   Json
+  editedById   String
+  createdAt    DateTime             @default(now())
   applications MissionApplication[]
   submissions  Submission[]
 
@@ -581,22 +583,34 @@ model Referral {
 }
 
 model MissionApplication {
-  id           String            @id @default(cuid())
-  campaignId   String
-  campaign     AppCampaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  testerId     String
-  tester       User              @relation(fields: [testerId], references: [id], onDelete: Cascade)
-  note         String
-  status       ApplicationStatus @default(PENDING)
-  passReserved Boolean           @default(false)
-  startBy      DateTime?
+  id                   String                    @id @default(cuid())
+  campaignId           String
+  campaign             AppCampaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  testerId             String
+  tester               User                      @relation(fields: [testerId], references: [id], onDelete: Cascade)
+  note                 String
+  status               ApplicationStatus         @default(PENDING)
+  passReserved         Boolean                   @default(false)
+  startBy              DateTime?
   instructionVersionId String?
-  instructionVersion CohortInstructionVersion? @relation(fields: [instructionVersionId], references: [id], onDelete: Restrict)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  instructionVersion   CohortInstructionVersion? @relation(fields: [instructionVersionId], references: [id], onDelete: Restrict)
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
 
   @@unique([campaignId, testerId])
   @@index([campaignId, status])
+}
+
+enum CommunityPostTag {
+  CHANGELOG
+  NEED_VALIDATION
+  BUG_FIX
+}
+
+enum CommunityCommentTag {
+  GENERAL_FEEDBACK
+  REPRO_LOG
+  DEVICE_CONFIRMED
 }
 
 model CommunityPost {
@@ -606,25 +620,44 @@ model CommunityPost {
   body          String
   hidden        Boolean            @default(false)
   publicVisible Boolean            @default(false)
+  tag           CommunityPostTag   @default(CHANGELOG)
+  campaignId    String?            @map("campaign_id")
+  campaign      AppCampaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  buildLabel    String?            @map("build_label") @db.VarChar(40)
   comments      CommunityComment[]
+  helpfulVotes  CommunityPostHelpful[]
   reports       CommunityReport[]
   createdAt     DateTime           @default(now())
 
   @@index([hidden, createdAt])
+  @@index([campaignId, createdAt])
 }
 
 model CommunityComment {
-  id        String            @id @default(cuid())
-  postId    String
-  post      CommunityPost     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  authorId  String
-  author    User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  body      String
-  hidden    Boolean           @default(false)
-  reports   CommunityReport[]
-  createdAt DateTime          @default(now())
+  id          String              @id @default(cuid())
+  postId      String
+  post        CommunityPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  body        String
+  hidden      Boolean             @default(false)
+  tag         CommunityCommentTag @default(GENERAL_FEEDBACK)
+  deviceLabel String?             @map("device_label") @db.VarChar(60)
+  reports     CommunityReport[]
+  createdAt   DateTime            @default(now())
 
   @@index([postId, createdAt])
+}
+
+model CommunityPostHelpful {
+  postId    String
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@id([postId, userId])
+  @@index([userId])
 }
 
 model CommunityReport {
@@ -645,47 +678,47 @@ model CommunityReport {
 }
 
 model Submission {
-  id                  String            @id @default(cuid())
-  campaignId          String
-  campaign            AppCampaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  testerId            String
-  tester              User              @relation("TesterSubmissions", fields: [testerId], references: [id], onDelete: Cascade)
+  id                   String                    @id @default(cuid())
+  campaignId           String
+  campaign             AppCampaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  testerId             String
+  tester               User                      @relation("TesterSubmissions", fields: [testerId], references: [id], onDelete: Cascade)
   instructionVersionId String?
-  instructionVersion CohortInstructionVersion? @relation(fields: [instructionVersionId], references: [id], onDelete: Restrict)
-  proofImageUrl       String?
-  recordingUrl        String?
-  proofImageHash      String?
-  feedbackText        String?
-  osBuild             String?
-  deviceModel         String?
-  screenResolution    String?
-  appBuildVersion     String?
-  networkType         String?
-  crashLogs           String?           @db.Text
-  networkLogs         String?           @db.Text
-  hardwareStatus      HardwareIntegrity @default(UNVERIFIED)
-  gpuRenderer         String?
-  isTouchCapable      Boolean?
-  batteryLevel        Float?
-  isLowPowerMode      Boolean?
-  hardwareFlags       String[]          @default([])
-  githubIssueUrl      String?
-  audit               SubmissionAudit?
-  status              SubmissionStatus  @default(PENDING)
-  rejectionReason     String?
-  denialReviewPending Boolean           @default(false) @map("denial_review_pending")
-  denialRequestedAt   DateTime?         @map("denial_requested_at")
-  denialResolvedAt    DateTime?         @map("denial_resolved_at")
-  denialResolution    String?           @map("denial_resolution") @db.VarChar(1000)
-  denialReviewerId    String?           @map("denial_reviewer_id")
-  revisionRequestedAt DateTime?
-  revisionStartedAt   DateTime?
-  submittedAt         DateTime?         @map("submitted_at")
-  payoutCents         Int
-  claimedAt           DateTime          @default(now())
-  expiresAt           DateTime
-  reviewedAt          DateTime?
-  createdAt           DateTime          @default(now())
+  instructionVersion   CohortInstructionVersion? @relation(fields: [instructionVersionId], references: [id], onDelete: Restrict)
+  proofImageUrl        String?
+  recordingUrl         String?
+  proofImageHash       String?
+  feedbackText         String?
+  osBuild              String?
+  deviceModel          String?
+  screenResolution     String?
+  appBuildVersion      String?
+  networkType          String?
+  crashLogs            String?                   @db.Text
+  networkLogs          String?                   @db.Text
+  hardwareStatus       HardwareIntegrity         @default(UNVERIFIED)
+  gpuRenderer          String?
+  isTouchCapable       Boolean?
+  batteryLevel         Float?
+  isLowPowerMode       Boolean?
+  hardwareFlags        String[]                  @default([])
+  githubIssueUrl       String?
+  audit                SubmissionAudit?
+  status               SubmissionStatus          @default(PENDING)
+  rejectionReason      String?
+  denialReviewPending  Boolean                   @default(false) @map("denial_review_pending")
+  denialRequestedAt    DateTime?                 @map("denial_requested_at")
+  denialResolvedAt     DateTime?                 @map("denial_resolved_at")
+  denialResolution     String?                   @map("denial_resolution") @db.VarChar(1000)
+  denialReviewerId     String?                   @map("denial_reviewer_id")
+  revisionRequestedAt  DateTime?
+  revisionStartedAt    DateTime?
+  submittedAt          DateTime?                 @map("submitted_at")
+  payoutCents          Int
+  claimedAt            DateTime                  @default(now())
+  expiresAt            DateTime
+  reviewedAt           DateTime?
+  createdAt            DateTime                  @default(now())
 
   @@unique([campaignId, testerId])
   @@index([campaignId, status])
@@ -721,7 +754,7 @@ model WalletTransaction {
 
 // Immutable remote mutation identity survives Stripe's idempotency-key retention.
 model BillingOperation {
-  id             String   @id
+  id             String    @id
   kind           String
   resourceId     String
   userId         String
@@ -730,13 +763,13 @@ model BillingOperation {
   paymentId      String?
   destinationId  String?
   amountCents    Int
-  feeCents       Int      @default(0)
-  state          String   @default("RESERVED")
+  feeCents       Int       @default(0)
+  state          String    @default("RESERVED")
   firstAttemptAt DateTime?
-  remoteId       String?  @unique
+  remoteId       String?   @unique
   error          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([resourceId, state])
   @@index([state, updatedAt])
@@ -758,12 +791,12 @@ model FundingReversal {
 }
 
 model FundingAllocation {
-  id          String @id @default(cuid())
-  topUpId     String
-  slotChargeId String
-  campaignId  String
-  amountCents Int
-  releasedCents Int @default(0)
+  id            String @id @default(cuid())
+  topUpId       String
+  slotChargeId  String
+  campaignId    String
+  amountCents   Int
+  releasedCents Int    @default(0)
 
   @@unique([topUpId, slotChargeId])
   @@index([campaignId])

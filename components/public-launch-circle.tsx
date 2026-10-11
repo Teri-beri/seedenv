@@ -1,12 +1,13 @@
-import Link from "next/link";
-import { ProfileLink } from "@/components/profile-link";
-import type { FeedPost } from "@/components/community-feed";
+import { FeedList } from "@/components/launch-circle/FeedList";
 import { LaunchCircleAccess } from "@/components/launch-circle-access";
+import type { CirclePost } from "@/components/launch-circle/types";
 
-export function PublicLaunchCircle({ posts, signedIn, unavailable = false }: { posts: FeedPost[]; signedIn: boolean; unavailable?: boolean }) {
-  return <section className="mx-auto max-w-5xl space-y-5 px-4 py-8 sm:px-6 lg:px-8" aria-label="Public Launch Circle">
-    <p className="text-sm leading-7 text-zinc-400">Read public developer updates and validator conversations. Sign in to participate; comments and account actions are not available in this public preview.</p>
-    {!posts.length ? <p role="status" className="border-y border-white/10 py-8 text-sm text-zinc-400">{unavailable ? "Launch Circle is temporarily unavailable. Please check back shortly." : "No public launch updates yet. Developers can publish an update from Launch Circle."}</p> : null}
-    {posts.map((post) => <article key={post.id} className="rounded-lg border border-white/10 bg-[#171923] p-5"><header className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm font-semibold"><ProfileLink username={post.author.username} /><span className="ml-2 font-mono text-xs text-emerald-300">Developer update</span></p><time className="font-mono text-xs text-zinc-500" dateTime={post.createdAt}>{post.createdAt.slice(0, 10)}</time></header><p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-zinc-200">{post.body}</p><div className="mt-5 space-y-3 border-t border-white/10 pt-4">{post.comments.map((comment) => <div key={comment.id} className="border-l-2 border-zinc-700 pl-4"><p className="font-mono text-xs text-zinc-400"><ProfileLink username={comment.author.username} /> / {comment.author.role === "TESTER" ? "Tester" : "Developer"}</p><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-300">{comment.body}</p></div>)}<div className="flex flex-wrap items-center justify-between gap-4"><Link href={`/community/${encodeURIComponent(post.id)}`} className="text-xs text-zinc-400 hover:text-white">{post._count.comments} comments / Read discussion</Link><LaunchCircleAccess callbackUrl={`/community/${encodeURIComponent(post.id)}`} signedIn={signedIn} /></div></div></article>)}
+export function PublicLaunchCircle({ posts, signedIn, unavailable = false, showSamples = true, showDiscussionLink = true, emptyMessage }: { posts: CirclePost[]; signedIn: boolean; unavailable?: boolean; showSamples?: boolean; showDiscussionLink?: boolean; emptyMessage?: string }) {
+  return <section className="space-y-5" aria-label="Public Launch Circle">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+      <p className="font-mono text-xs leading-5 text-zinc-400">Read public developer updates and validator conversations. Sign in to comment or publish.</p>
+      <LaunchCircleAccess callbackUrl="/community" signedIn={signedIn} />
+    </div>
+    {unavailable ? <p role="status" className="rounded-xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-400">Launch Circle is temporarily unavailable. Please check back shortly.</p> : <FeedList posts={posts} interactive={false} showSamples={showSamples} showDiscussionLink={showDiscussionLink} emptyMessage={emptyMessage ?? "No public launch updates yet. Developers can publish an update from Launch Circle."} />}
   </section>;
 }
