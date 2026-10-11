@@ -1,7 +1,8 @@
 import { PlatformType } from "@prisma/client";
 import { Boxes } from "lucide-react";
 import Link from "next/link";
-import { EndCohortButton } from "@/components/end-cohort-button";
+import { CohortAppIcon } from "@/components/cohort-app-icon";
+import { CohortRowActions } from "@/components/cohort-row-actions";
 import { formatCents } from "@/lib/utils";
 
 export type ConsoleMetrics = {
@@ -18,6 +19,7 @@ export type ConsoleCohort = {
   id: string;
   title: string;
   platform: PlatformType;
+  iconUrl?: string | null;
   totalBudgetUsd: number;
   totalSlots: number;
   claimedSlots: number;
@@ -30,8 +32,8 @@ export type ConsoleCohort = {
 };
 
 const platformLabels: Record<PlatformType, string> = {
-  [PlatformType.TESTFLIGHT]: "TestFlight",
-  [PlatformType.PLAY_STORE]: "Play Console",
+  [PlatformType.TESTFLIGHT]: "iOS TestFlight",
+  [PlatformType.PLAY_STORE]: "Android Play Console",
   [PlatformType.WEB_STAGING]: "Web staging",
 };
 
@@ -76,7 +78,6 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
             <thead className="border-b border-zinc-800 bg-zinc-900/40 font-mono text-[11px] uppercase tracking-wider text-zinc-400">
               <tr>
                 <th scope="col" className="px-4 py-2.5 font-normal">Cohort</th>
-                <th scope="col" className="px-4 py-2.5 font-normal">Platform</th>
                 <th scope="col" className="px-4 py-2.5 font-normal">Slots filled</th>
                 <th scope="col" className="px-4 py-2.5 text-right font-normal">Held for testers</th>
                 <th scope="col" className="px-4 py-2.5 text-right font-normal">Released</th>
@@ -91,21 +92,29 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
                 const lockedUsd = Math.max(0, poolUsd - releasedUsd);
                 return (
                   <tr key={cohort.id} className="transition-colors hover:bg-zinc-900/40">
-                    <td className="max-w-xs px-4 py-3">
-                      <Link href="/console?view=review-deck" className="block truncate font-medium text-zinc-100 hover:underline">{cohort.title}</Link>
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-400">{cohort.fundingModel === "PAY_PER_TESTER" ? "Charged per accepted tester" : "Prepaid escrow"}</span>
-                      <span title="Public brief clicks from other members and visitors, counted once per visitor per UTC day. Your signed-in clicks, bots, local previews and opted-out traffic are excluded. Tracking starts with this release." className="mt-2 inline-flex rounded-md border border-emerald-400/20 bg-emerald-400/5 px-2 py-1 font-mono text-[10px] text-emerald-300">{(cohort.clickCount ?? 0).toLocaleString()} brief clicks</span>
+                    <td className="max-w-sm px-4 py-3">
+                      <div className="flex items-start gap-3">
+                        <CohortAppIcon iconUrl={cohort.iconUrl ?? null} platform={cohort.platform} />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Link href={`/console/cohorts/${cohort.id}/directions`} className="truncate font-medium text-zinc-100 hover:underline">{cohort.title}</Link>
+                            <span className="shrink-0 rounded border border-zinc-800 bg-zinc-900/60 px-2 py-0.5 font-mono text-[10px] text-zinc-300">{platformLabels[cohort.platform]}</span>
+                          </div>
+                          <p className="mt-1 font-mono text-[11px] text-zinc-400">${cohort.bountyPerTaskUsd.toFixed(2)} / tester · {cohort.claimedSlots}/{cohort.totalSlots} slots claimed</p>
+                          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">{cohort.fundingModel === "PAY_PER_TESTER" ? "Charged per accepted tester" : "Prepaid escrow"}</p>
+                          <span title="Public brief clicks from other members and visitors, counted once per visitor per UTC day. Your signed-in clicks, bots, local previews and opted-out traffic are excluded. Tracking starts with this release." className="mt-2 inline-flex rounded-md border border-emerald-400/20 bg-emerald-400/5 px-2 py-1 font-mono text-[10px] text-emerald-300">{(cohort.clickCount ?? 0).toLocaleString()} brief clicks</span>
+                        </div>
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-zinc-400">{platformLabels[cohort.platform]}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-zinc-800"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${filledPercent}%` }} /></div>
-                        <span className="font-mono text-xs text-zinc-400">{cohort.claimedSlots}/{cohort.totalSlots}</span>
+                        <div className="h-1.5 w-24 overflow-hidden rounded-full border border-zinc-800 bg-zinc-950"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${filledPercent}%` }} /></div>
+                        <span className="font-mono text-xs text-zinc-300">{cohort.claimedSlots}/{cohort.totalSlots}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-zinc-200">${lockedUsd.toFixed(2)}</td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-emerald-400">${releasedUsd.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-right"><div className="flex flex-col items-end gap-2"><Link href={`/console/cohorts/${cohort.id}/directions`} className="text-xs text-emerald-300 underline">Edit directions</Link><Link href={`/console/cohorts/${cohort.id}/directions#history`} className="text-xs text-zinc-400 underline">View instruction history</Link><EndCohortButton campaignId={cohort.id} title={cohort.title} payPerTester={cohort.fundingModel === "PAY_PER_TESTER"} /></div></td>
+                    <td className="px-4 py-3 text-right"><CohortRowActions campaignId={cohort.id} title={cohort.title} payPerTester={cohort.fundingModel === "PAY_PER_TESTER"} /></td>
                   </tr>
                 );
               })}

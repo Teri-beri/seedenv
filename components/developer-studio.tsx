@@ -783,11 +783,21 @@ const rejectionReasons = ["Blurry Image", "Irrelevant Content", "Incomplete Step
 
 function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalCount }: { submissions: ReviewSubmission[]; onReview: (id: string, action: "approve" | "reject" | "revision", reason?: string) => void; isPending: boolean; page: number; totalPages: number; totalCount: number }) {
   const [selectedId, setSelectedId] = useState("");
+  const [queueFilter, setQueueFilter] = useState<"all" | "awaiting" | "revision" | "flagged">("all");
   const [decision, setDecision] = useState<"approve" | "revision" | "reject" | null>(null);
   const [revisionNote, setRevisionNote] = useState("");
   const [rejectionReason, setRejectionReason] = useState<(typeof rejectionReasons)[number]>("Generic Feedback");
   const [error, setError] = useState("");
-  const active = submissions.find((submission) => submission.id === selectedId) || submissions[0];
+  const matchesFilter = (submission: ReviewSubmission, filter: typeof queueFilter) => {
+    if (filter === "flagged") return Boolean(submission.aiHold);
+    if (filter === "revision") return Boolean(submission.revisionRequestedAt);
+    if (filter === "awaiting") return !submission.aiHold && !submission.revisionRequestedAt;
+    return true;
+  };
+  const queueFilters = ([["all", "All"], ["awaiting", "Awaiting review"], ["revision", "In revision"], ["flagged", "Flagged"]] as const)
+    .map(([value, label]) => ({ value, label, count: submissions.filter((submission) => matchesFilter(submission, value)).length }));
+  const visible = submissions.filter((submission) => matchesFilter(submission, queueFilter));
+  const active = visible.find((submission) => submission.id === selectedId) || visible[0];
 
   function confirmDecision() {
     if (!active || !decision) return;
@@ -815,6 +825,23 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
           <div><h2 className="text-3xl font-semibold tracking-tight">Submissions</h2><p className="mt-1 text-sm text-neutral-400">Review proof, request a revision, or approve the tester payout.</p></div>
           <span className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1 text-xs font-semibold text-zinc-300">{totalCount} awaiting review</span>
         </div>
+        <nav aria-label="Submission views" className="mt-4 inline-flex rounded-lg border border-zinc-800 p-0.5">
+          <span aria-current="page" className="inline-flex min-h-9 items-center rounded-md bg-zinc-800/80 px-3 font-mono text-xs font-medium text-white">All submissions</span>
+          <Link href="/console?view=asset-vault" className="inline-flex min-h-9 items-center rounded-md px-3 font-mono text-xs text-zinc-400 transition-colors hover:text-white">Approved artifacts</Link>
+        </nav>
+        <div role="group" aria-label="Filter queue by status" className="mt-3 flex flex-wrap gap-2">
+          {queueFilters.map((filter) => (
+            <button
+              key={filter.value}
+              type="button"
+              aria-pressed={queueFilter === filter.value}
+              onClick={() => { setQueueFilter(filter.value); setSelectedId(""); setDecision(null); setError(""); }}
+              className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${queueFilter === filter.value ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"}`}
+            >
+              {filter.label} ({filter.count})
+            </button>
+          ))}
+        </div>
       </header>
 
       {active ? (
@@ -822,7 +849,7 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
           <aside className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
             <h3 className="text-sm font-semibold text-white">Pending queue</h3>
             <div className="mt-3 max-h-[70vh] space-y-2 overflow-y-auto">
-              {submissions.map((submission) => (
+              {visible.map((submission) => (
                 <button aria-pressed={active.id === submission.id} className={`w-full rounded-xl border p-3 text-left transition ${active.id === submission.id ? "border-zinc-600 bg-zinc-800/60" : "border-zinc-800 bg-[#090A0F]/55 hover:border-white/20"}`} key={submission.id} onClick={() => { setSelectedId(submission.id); setDecision(null); setError(""); }} type="button">
                   <span className="block truncate text-sm font-semibold text-white">{submission.campaign.title}</span>
                   <span className="mt-1 block truncate text-xs text-neutral-500">{submission.tester.username} · {submission.id.slice(-8)}</span>
@@ -911,9 +938,19 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
       ) : (
         <section className="rounded-2xl border border-dashed border-[#3A3F4C] bg-[#0E1017]/70 p-8 text-center">
           <CheckCircle2 className="mx-auto size-8 text-emerald-400" />
-          <h3 className="mt-3 text-lg font-bold text-white">Nothing to review</h3>
-          <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-neutral-400">New proof submissions appear here. You can review past decisions in the Audit Hub.</p>
-          <Link className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-400 hover:text-emerald-300" href="/console?view=overview">Open Audit Hub</Link>
+          {submissions.length ? (
+            <>
+              <h3 className="mt-3 text-lg font-bold text-white">No reports match this filter</h3>
+              <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-neutral-400">This page of the queue has no {queueFilter === "flagged" ? "flagged" : queueFilter === "revision" ? "in-revision" : "awaiting-review"} reports.</p>
+              <button type="button" onClick={() => setQueueFilter("all")} className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-400 hover:text-emerald-300">Show all submissions</button>
+            </>
+          ) : (
+            <>
+              <h3 className="mt-3 text-lg font-bold text-white">Nothing to review</h3>
+              <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-neutral-400">New proof submissions appear here. You can review past decisions in the Audit Hub.</p>
+              <Link className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-400 hover:text-emerald-300" href="/console?view=overview">Open Audit Hub</Link>
+            </>
+          )}
         </section>
       )}
       {totalCount > 0 ? (

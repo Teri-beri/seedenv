@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { useEffect, useRef, useState } from "react";
+import { useDismissableMenu } from "@/components/use-dismissable-menu";
 
 export type DropdownAccount = {
   username: string;
@@ -22,20 +22,7 @@ const workspaceLinks = [
 ] as const;
 
 export function UserDropdown({ account }: { account: DropdownAccount }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent | KeyboardEvent) => {
-      if (event instanceof KeyboardEvent ? event.key === "Escape" : !ref.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    document.addEventListener("keydown", close);
-    return () => {
-      document.removeEventListener("mousedown", close);
-      document.removeEventListener("keydown", close);
-    };
-  }, [open]);
+  const { open, setOpen, ref } = useDismissableMenu<HTMLDivElement>();
   const initial = account.username.trim().charAt(0).toUpperCase() || "?";
   const dismiss = () => setOpen(false);
 

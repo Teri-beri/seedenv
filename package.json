@@ -18,6 +18,8 @@
     "test:launch": "node --conditions=react-server --experimental-test-module-mocks --import tsx --test scripts/launch-readiness.test.ts",
     "test:cohort-promos": "node --conditions=react-server --experimental-test-module-mocks --import tsx --test --test-concurrency=1 scripts/cohort-promos.test.ts scripts/developer-referral-onboarding.test.ts scripts/resilient-referrals.test.ts",
     "test:launch-circle": "node --experimental-test-module-mocks --import tsx --test --test-concurrency=1 scripts/launch-circle.test.ts",
+    "test:console": "node --experimental-test-module-mocks --import tsx --test --test-concurrency=1 scripts/console-ui.test.ts",
+    "test:account": "node --experimental-test-module-mocks --import tsx --test scripts/account-navigation.test.ts",
     "test:quests": "node --import tsx --test scripts/quest-rules.test.ts scripts/quest-ledger.integration.test.ts",
     "test:clippers": "node --conditions=react-server --experimental-test-module-mocks --import tsx --test scripts/clipper-rules.test.ts scripts/clipper-lifecycle.integration.test.ts scripts/clipper-payments.integration.test.ts scripts/clipper-tiktok.integration.test.ts scripts/clipper-storage.integration.test.ts",
     "setup:clippers-storage": "tsx scripts/setup-clippers-storage.ts",

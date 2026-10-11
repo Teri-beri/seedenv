@@ -13,7 +13,9 @@ import { BillingMetrics } from "@/components/billing/billing-metrics";
 import { BillingInfoForm, PaymentMethodCard } from "@/components/billing/billing-profile";
 import { InvoiceTable } from "@/components/billing/invoice-table";
 import { DeveloperStudio } from "@/components/developer-studio";
-import { ConsoleHeader } from "@/components/console-header";
+import { ConsoleHeader, type CohortRuleLink } from "@/components/console-header";
+import { ConsolePromoBanner } from "@/components/console-promo-banner";
+import { JoinRequestsCard } from "@/components/console-join-requests";
 import { ActiveCohorts, ConsoleMetricStrip } from "@/components/console-overview";
 import { ReleaseReports } from "@/components/release-reports";
 import { DeveloperBottomNav } from "@/components/navigation";
@@ -23,7 +25,6 @@ import { prisma } from "@/lib/prisma";
 import { isPublicHandle, publicProfilePath } from "@/lib/public-profile";
 import { getProofImageUrl } from "@/lib/storage";
 import { COHORT_PLATFORM_FEE_RATE } from "@/lib/pricing";
-import Link from "next/link";
 import { launchDraftKey, launchWizardDraftsSchema } from "@/lib/launch-wizard-draft";
 import { canManageCohortPromos } from "@/lib/cohort-promos";
 import { automaticFeeBenefits } from "@/lib/services/billing.service";
@@ -99,7 +100,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       where: activeCampaignScope,
       orderBy: { createdAt: "desc" },
       take: overview ? 10 : 0,
-      select: { id: true, title: true, platform: true, totalBudgetUsd: true, platformFeeUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true, fundingModel: true, _count: { select: { clicks: true } }, slotCharges: { where: { status: "SUCCEEDED" }, select: { stipendCents: true } } },
+      select: { id: true, title: true, platform: true, iconUrl: true, totalBudgetUsd: true, platformFeeUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true, fundingModel: true, _count: { select: { clicks: true } }, slotCharges: { where: { status: "SUCCEEDED" }, select: { stipendCents: true } } },
     }),
     prisma.walletTransaction.groupBy({
       by: ["type"],
@@ -193,6 +194,9 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     Promise.all(auditReports.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl), recordingUrl: recordingHref(submission.id, submission.recordingUrl) }))),
   ]);
   const accountUsername = security?.username || session.user.name || "account";
+  const cohortRules: CohortRuleLink[] = canManageCohortPromos(session.user)
+    ? [{ label: "Manage cohort promo codes", href: "/admin/promos" }, { label: "Review denied tester work", href: "/admin/proof-reviews", tone: "caution" }]
+    : [];
   const consoleAccount = {
     username: accountUsername,
     avatarUrl: security?.avatarUrl || null,
@@ -203,14 +207,10 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   return (
     <AuthCheck role="DEVELOPER">
     <main className="mobile-app-shell min-h-screen bg-[#0A0D12] pb-16 text-white" id="console-top">
-      <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} />
-      {canManageCohortPromos(session.user) ? <div className="mt-4 flex gap-4"><Link href="/admin/promos" className="inline-flex min-h-11 items-center text-sm text-emerald-300 underline">Manage cohort promo codes</Link><Link href="/admin/proof-reviews" className="inline-flex min-h-11 items-center text-sm text-amber-300 underline">Review denied tester work</Link></div> : null}
-      {security?.platformFeeWaived ? <p role="status" className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-300">Platform fees are permanently waived for your developer account. Tester rewards remain fully funded. Existing charges are unchanged.</p> : null}
+      <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} cohortRules={cohortRules} />
+      {security?.platformFeeWaived ? <ConsolePromoBanner>Platform fees are permanently waived for your developer account. Tester rewards remain fully funded. Existing charges are unchanged.</ConsolePromoBanner> : null}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <section aria-labelledby="tester-requests-heading" className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-5">
-          <div><h2 id="tester-requests-heading" className="text-sm font-semibold text-zinc-100">Tester join requests <span className="ml-2 rounded bg-emerald-400/10 px-2 py-1 font-mono text-emerald-300">{pendingApplicationCount}</span></h2><p className="mt-2 text-sm text-zinc-400">{pendingApplicationCount ? "Testers are waiting for your decision. Accept or decline their requests in Applications." : "No pending join requests. New requests will appear in Applications."} Join requests are separate from submitted proof reviews.</p></div>
-          <Link href="/applications#tester-requests" className="inline-flex min-h-11 items-center rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-black">Review tester requests</Link>
-        </section>
+        <JoinRequestsCard pendingCount={pendingApplicationCount} />
         {overview ? <>
           {params.launched ? <p className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">{launchedCampaign?.status === CampaignStatus.ESCROW_PENDING ? `${launchedCampaign.title} goes live as soon as Stripe confirms your top-up, usually within a few seconds. Refresh shortly.` : "Cohort launched. Each tester you accept in Applications draws their reward and the platform fee from your prepaid balance."}</p> : null}
           <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: security?.platformFeeWaived ? 0 : COHORT_PLATFORM_FEE_RATE, balanceCents: security?.fundingBalanceCents ?? 0 }} />

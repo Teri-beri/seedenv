@@ -3,8 +3,11 @@
 import Image from "next/image";
 import Link from "next/link";
 import { UserDropdown, type DropdownAccount } from "@/components/user-dropdown";
+import { useDismissableMenu } from "@/components/use-dismissable-menu";
 
 export type ConsoleView = "overview" | "new-drop" | "review-deck" | "asset-vault" | "billing";
+
+export type CohortRuleLink = { label: string; href: string; tone?: "default" | "caution" };
 
 const tabs = [
   { label: "Console", href: "/console", view: "overview" },
@@ -16,7 +19,40 @@ const tabs = [
   { label: "Messages", href: "/messages", view: null },
 ] as const;
 
-export function ConsoleHeader({ activeView, paymentsMode, account }: { activeView: ConsoleView; paymentsMode: "live" | "test"; account: DropdownAccount }) {
+export function CohortRulesMenu({ links }: { links: ReadonlyArray<CohortRuleLink> }) {
+  const { open, setOpen, ref } = useDismissableMenu<HTMLDivElement>();
+  if (!links.length) return null;
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-1.5 font-mono text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
+      >
+        Cohort Rules <span aria-hidden="true">▾</span>
+      </button>
+      {open ? (
+        <div role="menu" className="absolute right-0 top-10 z-50 w-60 rounded-xl border border-zinc-800 bg-zinc-900 p-1 font-mono text-xs shadow-2xl shadow-black/50">
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              role="menuitem"
+              href={link.href}
+              onClick={() => setOpen(false)}
+              className={`flex items-center rounded-lg px-3 py-2 transition-colors ${link.tone === "caution" ? "text-amber-300 hover:bg-amber-500/10" : "text-zinc-300 hover:bg-zinc-800/70 hover:text-white"}`}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function ConsoleHeader({ activeView, paymentsMode, account, cohortRules = [] }: { activeView: ConsoleView; paymentsMode: "live" | "test"; account: DropdownAccount; cohortRules?: ReadonlyArray<CohortRuleLink> }) {
   return (
     <header className="mobile-app-header relative z-50! border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
@@ -47,6 +83,7 @@ export function ConsoleHeader({ activeView, paymentsMode, account }: { activeVie
           })}
         </nav>
         <div className="flex shrink-0 items-center gap-3">
+          <CohortRulesMenu links={cohortRules} />
           <Link
             href="/console?view=new-drop"
             aria-current={activeView === "new-drop" ? "page" : undefined}

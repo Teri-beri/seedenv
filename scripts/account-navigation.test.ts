@@ -43,7 +43,7 @@ test("Account profile avoids unmigrated invoice columns and unrelated analytics"
     mock.module("../lib/prisma.ts", { namedExports: { prisma: { user: { findUnique: async (input: typeof query) => {
       query = input;
       if (!input.include?.transactions?.select || "invoiceSnapshot" in input.include.transactions.select) throw new Error("New invoice columns are unavailable in this simulated database.");
-      return { id: "owner", email: "owner@example.invalid", username: "teriberi", role: "DEVELOPER", rankTier: "ALPHA_SEEDER", xpPoints: 0, walletBalanceCents: 0, submissions: [], campaigns: [], transactions: [], accounts: [], createdAt: new Date("2026-01-01"), notificationPreferences: {}, emailVerified: null };
+      return { id: "owner", email: "owner@example.invalid", username: "teriberi", role: "DEVELOPER", rankTier: "ALPHA_SEEDER", xpPoints: 0, walletBalanceCents: 0, submissions: [], campaigns: [], transactions: [], accounts: [], developerReferralReceived: null, developerReferralsSent: [], ownedPromoCodes: [], feeCredits: [], createdAt: new Date("2026-01-01"), notificationPreferences: {}, emailVerified: null };
     } } } } }),
     mock.module("../lib/analytics.ts", { namedExports: { getAnalyticsSummary: async () => { analyticsCalls++; throw new Error("Optional analytics unavailable."); } } }),
     mock.module("../components/AuthCheck.tsx", { defaultExport: Empty }),
