@@ -64,7 +64,7 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
     <section id="active-cohorts" aria-labelledby="active-cohorts-heading" className="mb-10 scroll-mt-20">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 id="active-cohorts-heading" className="text-sm font-semibold text-zinc-100">
-          Active Cohorts {total ? <span className="ml-1 font-mono text-xs font-normal text-zinc-500">{total}</span> : null}
+          Active Cohorts {total ?           <span className="ml-1 font-mono text-xs font-normal text-zinc-400">{total}</span> : null}
         </h2>
         <Link href="/console?view=new-drop" className="rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white">
           + New Cohort Drop
@@ -73,7 +73,7 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
       {cohorts.length ? (
         <div className="overflow-x-auto rounded-xl border border-zinc-800">
           <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b border-zinc-800 bg-zinc-900/40 font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+            <thead className="border-b border-zinc-800 bg-zinc-900/40 font-mono text-[11px] uppercase tracking-wider text-zinc-400">
               <tr>
                 <th scope="col" className="px-4 py-2.5 font-normal">Cohort</th>
                 <th scope="col" className="px-4 py-2.5 font-normal">Platform</th>
@@ -93,7 +93,7 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
                   <tr key={cohort.id} className="transition-colors hover:bg-zinc-900/40">
                     <td className="max-w-xs px-4 py-3">
                       <Link href="/console?view=review-deck" className="block truncate font-medium text-zinc-100 hover:underline">{cohort.title}</Link>
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-600">{cohort.fundingModel === "PAY_PER_TESTER" ? "Charged per accepted tester" : "Prepaid escrow"}</span>
+                      <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-400">{cohort.fundingModel === "PAY_PER_TESTER" ? "Charged per accepted tester" : "Prepaid escrow"}</span>
                       <span title="Public brief clicks from other members and visitors, counted once per visitor per UTC day. Your signed-in clicks, bots, local previews and opted-out traffic are excluded. Tracking starts with this release." className="mt-2 inline-flex rounded-md border border-emerald-400/20 bg-emerald-400/5 px-2 py-1 font-mono text-[10px] text-emerald-300">{(cohort.clickCount ?? 0).toLocaleString()} brief clicks</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-zinc-400">{platformLabels[cohort.platform]}</td>
@@ -111,7 +111,7 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
               })}
             </tbody>
           </table>
-          {total > cohorts.length ? <p className="border-t border-zinc-800 px-4 py-2.5 font-mono text-xs text-zinc-500">Showing {cohorts.length} of {total} active cohorts</p> : null}
+          {total > cohorts.length ? <p className="border-t border-zinc-800 px-4 py-2.5 font-mono text-xs text-zinc-400">Showing {cohorts.length} of {total} active cohorts</p> : null}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 p-10 text-center">

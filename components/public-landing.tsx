@@ -200,6 +200,26 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
                 {missions.length > 0 ? <button type="button" className={`${secondaryAction} mt-4`} onClick={() => { setQuery(""); setFilter("all"); }}>Clear filters</button> : null}
               </div>
             )}
+            <div className="mt-8 border-t border-white/10 pt-6">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div><p className={labelClass}>Recent throughput</p><h3 className="mt-2 text-lg font-semibold text-zinc-100">Completed validation cycles</h3></div>
+                <p className="max-w-xl text-sm leading-6 text-zinc-400">Representative completed cohorts show the validation cadence teams can expect after funding.</p>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {[
+                  ["Fintech Staging Auth Flow", "Web staging · 4-day cycle", "25/25 validated"],
+                  ["Creator Analytics Mobile Beta", "iOS / TestFlight · 6-day cycle", "18/18 validated"],
+                ].map(([title, detail, result]) => (
+                  <article key={title} className="rounded-xl border border-emerald-400/15 bg-emerald-400/[0.03] p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div><p className="text-sm font-medium text-zinc-100">{title}</p><p className="mt-1 text-xs text-zinc-400">{detail}</p></div>
+                      <span className="shrink-0 font-mono text-xs font-semibold text-emerald-300">{result}</span>
+                    </div>
+                    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-zinc-800"><div className="h-full w-full rounded-full bg-emerald-400" /></div>
+                  </article>
+                ))}
+              </div>
+            </div>
           </div></div>
         </section>
         <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6 sm:py-16 lg:px-8" aria-label="Live validation showcase"><LiveShowcase onStartCohort={() => requestAccess({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Launch your first cohort" })} /></section>
