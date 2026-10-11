@@ -57,8 +57,8 @@ export function ConsoleHeader({ activeView, paymentsMode, account, cohortRules =
   return (
     <header className="mobile-app-header relative z-50! border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-        <div className="flex min-w-0 items-center">
-          <Link href="/" aria-label="SeedEnv public site" className="flex min-w-0 items-center gap-2.5">
+        <div className="flex shrink-0 items-center">
+          <Link href="/" aria-label="SeedEnv public site" className="flex shrink-0 items-center gap-2.5 whitespace-nowrap">
             <Image src="/seedenv-logo-v3.png" alt="" width={24} height={24} className="size-6 shrink-0 rounded-md" />
             <span className="hidden text-sm font-semibold tracking-tight text-zinc-100 sm:inline">SeedEnv</span>
           </Link>
@@ -68,12 +68,13 @@ export function ConsoleHeader({ activeView, paymentsMode, account, cohortRules =
             ? <span title="Stripe payments are in live mode" className="ml-3 shrink-0 whitespace-nowrap rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-400">LIVE</span>
             : <span title="Stripe payments are in test mode" className="ml-3 shrink-0 whitespace-nowrap rounded border border-zinc-700 bg-zinc-800/60 px-2 py-0.5 font-mono text-[11px] text-zinc-400">TEST MODE</span>}
         </div>
-        <div className="hidden md:block">
+        <div className="hidden min-w-0 flex-1 md:block">
           <SegmentedTabLinks
             groupId="developer-console-sections"
             label="Developer console sections"
             activeId={tabs.find((tab) => tab.view === activeView)?.label ?? ""}
             tabs={tabs.map((tab) => ({ id: tab.label, label: tab.label, href: tab.href }))}
+            className="max-w-full"
             itemClassName="lg:px-3"
           />
         </div>
