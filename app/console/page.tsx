@@ -15,7 +15,6 @@ import { InvoiceTable } from "@/components/billing/invoice-table";
 import { DeveloperStudio } from "@/components/developer-studio";
 import { ConsoleHeader, type CohortRuleLink } from "@/components/console-header";
 import { ConsolePromoBanner } from "@/components/console-promo-banner";
-import { JoinRequestsCard } from "@/components/console-join-requests";
 import { ActiveCohorts, ConsoleMetricStrip } from "@/components/console-overview";
 import { ReleaseReports } from "@/components/release-reports";
 import { DeveloperBottomNav } from "@/components/navigation";
@@ -67,12 +66,12 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   };
   const overview = activeView === "overview";
   const activeCampaignScope = { ...campaignScope, status: CampaignStatus.ACTIVE };
-  const [pendingReviewCount, activeCohortCount, runsInProgress, verifiedValidators, pendingApplicationCount] = await Promise.all([
+  const [pendingReviewCount, approvedSubmissionCount, activeCohortCount, runsInProgress, verifiedValidators] = await Promise.all([
     activeView === "review-deck" || overview ? prisma.submission.count({ where: pendingReviewWhere }) : 0,
+    activeView === "review-deck" ? prisma.submission.count({ where: { status: SubmissionStatus.APPROVED, proofImageUrl: { not: null }, campaign: campaignScope } }) : 0,
     overview ? prisma.appCampaign.count({ where: activeCampaignScope }) : 0,
     overview ? prisma.submission.count({ where: { status: SubmissionStatus.PENDING, campaign: activeCampaignScope, proofImageUrl: null, feedbackText: null } }) : 0,
     overview ? prisma.submission.groupBy({ by: ["testerId"], where: { status: SubmissionStatus.APPROVED, campaign: campaignScope } }).then((rows) => rows.length) : 0,
-    prisma.missionApplication.count({ where: { status: "PENDING", campaign: campaignScope } }),
   ]);
   const reviewTotalPages = Math.max(1, Math.ceil(pendingReviewCount / reviewPageSize));
   const requestedReviewPage = Number.parseInt(params.reviewPage || "1", 10);
@@ -99,7 +98,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     prisma.appCampaign.findMany({
       where: activeCampaignScope,
       orderBy: { createdAt: "desc" },
-      take: overview ? 10 : 0,
+      take: overview ? 10 : activeView === "review-deck" ? 1 : 0,
       select: { id: true, title: true, platform: true, iconUrl: true, totalBudgetUsd: true, platformFeeUsd: true, totalSlots: true, claimedSlots: true, completedSlots: true, bountyPerTaskUsd: true, fundingModel: true, _count: { select: { clicks: true } }, slotCharges: { where: { status: "SUCCEEDED" }, select: { stipendCents: true } } },
     }),
     prisma.walletTransaction.groupBy({
@@ -210,14 +209,13 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
       <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} cohortRules={cohortRules} />
       {security?.platformFeeWaived ? <ConsolePromoBanner>Platform fees are permanently waived for your developer account. Tester rewards remain fully funded. Existing charges are unchanged.</ConsolePromoBanner> : null}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <JoinRequestsCard pendingCount={pendingApplicationCount} />
         {overview ? <>
           {params.launched ? <p className="mb-6 rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-4 text-sm text-emerald-200" role="status">{launchedCampaign?.status === CampaignStatus.ESCROW_PENDING ? `${launchedCampaign.title} goes live as soon as Stripe confirms your top-up, usually within a few seconds. Refresh shortly.` : "Cohort launched. Each tester you accept in Applications draws their reward and the platform fee from your prepaid balance."}</p> : null}
           <ConsoleMetricStrip metrics={{ activeCohorts: activeCohortCount, runsInProgress, pendingAudits: pendingReviewCount, verifiedValidators, escrowCommittedCents: completedEscrowCents, platformFeePercent: security?.platformFeeWaived ? 0 : COHORT_PLATFORM_FEE_RATE, balanceCents: security?.fundingBalanceCents ?? 0 }} />
           <ActiveCohorts cohorts={cohortRows} total={activeCohortCount} />
           <ReleaseReports rows={releaseReports} />
         </> : null}
-        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}`} userId={session.user.id} automaticBenefits={feeBenefits} savedWizard={savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft ? { ...launchDraft, promoCode: launchDraft.promoRedemptions.map((entry) => entry.promoCode.code).join(",") || launchDraft.promoCodeDraft || undefined, promoReserved: Boolean(launchDraft.promoRedemptions.length) } : undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
+        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}`} userId={session.user.id} automaticBenefits={feeBenefits} savedWizard={savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} approvedSubmissionCount={approvedSubmissionCount} reviewCohort={activeView === "review-deck" && campaigns[0] ? { id: campaigns[0].id, title: campaigns[0].title, platform: campaigns[0].platform, totalSlots: campaigns[0].totalSlots, claimedSlots: campaigns[0].claimedSlots } : null} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft ? { ...launchDraft, promoCode: launchDraft.promoRedemptions.map((entry) => entry.promoCode.code).join(",") || launchDraft.promoCodeDraft || undefined, promoReserved: Boolean(launchDraft.promoRedemptions.length) } : undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
         {heldDenials.length ? <section className="mt-6 space-y-3 rounded-xl border border-amber-500/30 p-5">
           <h2 className="font-semibold text-amber-200">Denials awaiting manual review</h2>
           <p className="text-sm text-zinc-400">Oldest 100 cases. These places and unpaid rewards stay reserved until SeedEnv approves the work or confirms denial. They cannot auto-approve, be edited, or be reused while held.</p>

@@ -62,6 +62,14 @@ type Asset = {
   campaign: { id: string; title: string };
 };
 
+type ReviewCohort = {
+  id: string;
+  title: string;
+  platform: PlatformType;
+  totalSlots: number;
+  claimedSlots: number;
+};
+
 type CampaignDraft = {
   id: string;
   title: string;
@@ -101,7 +109,7 @@ const optionStyle = { backgroundColor: "#0E1017", color: "#F8FAFC" };
 
 export type DeveloperStudioView = "overview" | "new-drop" | "review-deck" | "asset-vault";
 
-export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0, platformFeeWaived = false, automaticBenefits, userId, savedWizard, draftRevision }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number; platformFeeWaived?: boolean; automaticBenefits?: { firstCohort: boolean; referralDiscountPercent: number }; userId: string; savedWizard?: LaunchWizardDraft; draftRevision: number }) {
+export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, approvedSubmissionCount = 0, reviewCohort = null, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0, platformFeeWaived = false, automaticBenefits, userId, savedWizard, draftRevision }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; approvedSubmissionCount?: number; reviewCohort?: ReviewCohort | null; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number; platformFeeWaived?: boolean; automaticBenefits?: { firstCohort: boolean; referralDiscountPercent: number }; userId: string; savedWizard?: LaunchWizardDraft; draftRevision: number }) {
   const router = useRouter();
   const [step, setStep] = useState(savedWizard?.step ?? 1);
   const [highestStep, setHighestStep] = useState(savedWizard?.highestStep ?? 1);
@@ -682,7 +690,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
         <LaunchPreview form={form} />
         </div>
       ) : null}
-      {view === "review-deck" ? <ReviewDeck submissions={submissions} onReview={review} isPending={isPending} page={reviewPage} totalPages={reviewTotalPages} totalCount={reviewTotalCount} /> : null}
+      {view === "review-deck" ? <ReviewDeck submissions={submissions} onReview={review} isPending={isPending} page={reviewPage} totalPages={reviewTotalPages} totalCount={reviewTotalCount} approvedCount={approvedSubmissionCount} cohort={reviewCohort} /> : null}
       {view === "asset-vault" ? <AssetVault assets={assets} /> : null}
     </section>
   );
@@ -781,7 +789,7 @@ function IconButton({ label, icon, onClick, disabled = false }: { label: string;
 
 const rejectionReasons = ["Blurry Image", "Irrelevant Content", "Incomplete Steps", "Low Effort", "Generic Feedback", "Did not follow test script", "Incomplete video proof", "Required participation period not completed"] as const;
 
-function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalCount }: { submissions: ReviewSubmission[]; onReview: (id: string, action: "approve" | "reject" | "revision", reason?: string) => void; isPending: boolean; page: number; totalPages: number; totalCount: number }) {
+function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalCount, approvedCount, cohort }: { submissions: ReviewSubmission[]; onReview: (id: string, action: "approve" | "reject" | "revision", reason?: string) => void; isPending: boolean; page: number; totalPages: number; totalCount: number; approvedCount: number; cohort: ReviewCohort | null }) {
   const [selectedId, setSelectedId] = useState("");
   const [queueFilter, setQueueFilter] = useState<"all" | "awaiting" | "revision" | "flagged">("all");
   const [decision, setDecision] = useState<"approve" | "revision" | "reject" | null>(null);
@@ -794,8 +802,8 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
     if (filter === "awaiting") return !submission.aiHold && !submission.revisionRequestedAt;
     return true;
   };
-  const queueFilters = ([["all", "All"], ["awaiting", "Awaiting review"], ["revision", "In revision"], ["flagged", "Flagged"]] as const)
-    .map(([value, label]) => ({ value, label, count: submissions.filter((submission) => matchesFilter(submission, value)).length }));
+  const queueFilters = ([["all", "All"], ["awaiting", "Needs Review"], ["revision", "In Revision"], ["flagged", "Flagged"]] as const)
+    .map(([value, label]) => ({ value, label, count: value === "all" ? totalCount : submissions.filter((submission) => matchesFilter(submission, value)).length }));
   const visible = submissions.filter((submission) => matchesFilter(submission, queueFilter));
   const active = visible.find((submission) => submission.id === selectedId) || visible[0];
 
@@ -821,26 +829,14 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
     <section className="space-y-5">
       <header>
         <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Tester quality</p>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-          <div><h2 className="text-3xl font-semibold tracking-tight">Submissions</h2><p className="mt-1 text-sm text-neutral-400">Review proof, request a revision, or approve the tester payout.</p></div>
-          <span className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1 text-xs font-semibold text-zinc-300">{totalCount} awaiting review</span>
+        <div className="mt-2">
+          <h2 className="text-3xl font-semibold tracking-tight">Submissions</h2>
+          <p className="mt-1 text-sm text-neutral-400">Review proof media, inspect logs, and release escrow bounties.</p>
         </div>
-        <nav aria-label="Submission views" className="mt-4 inline-flex rounded-lg border border-zinc-800 p-0.5">
-          <span aria-current="page" className="inline-flex min-h-9 items-center rounded-md bg-zinc-800/80 px-3 font-mono text-xs font-medium text-white">All submissions</span>
-          <Link href="/console?view=asset-vault" className="inline-flex min-h-9 items-center rounded-md px-3 font-mono text-xs text-zinc-400 transition-colors hover:text-white">Approved artifacts</Link>
-        </nav>
-        <div role="group" aria-label="Filter queue by status" className="mt-3 flex flex-wrap gap-2">
-          {queueFilters.map((filter) => (
-            <button
-              key={filter.value}
-              type="button"
-              aria-pressed={queueFilter === filter.value}
-              onClick={() => { setQueueFilter(filter.value); setSelectedId(""); setDecision(null); setError(""); }}
-              className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${queueFilter === filter.value ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"}`}
-            >
-              {filter.label} ({filter.count})
-            </button>
-          ))}
+        <div role="group" aria-label="Filter queue by status" className="mt-4 flex flex-wrap gap-2">
+          {queueFilters.slice(0, 3).map((filter) => <QueueFilterButton key={filter.value} filter={filter} active={queueFilter === filter.value} onClick={() => { setQueueFilter(filter.value); setSelectedId(""); setDecision(null); setError(""); }} />)}
+          <Link href="/console?view=asset-vault" className="rounded-full border border-zinc-800 bg-zinc-900/50 px-3 py-1 font-mono text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200">Approved ({approvedCount})</Link>
+          {queueFilters.slice(3).map((filter) => <QueueFilterButton key={filter.value} filter={filter} active={queueFilter === filter.value} onClick={() => { setQueueFilter(filter.value); setSelectedId(""); setDecision(null); setError(""); }} />)}
         </div>
       </header>
 
@@ -946,9 +942,23 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
             </>
           ) : (
             <>
-              <h3 className="mt-3 text-lg font-bold text-white">Nothing to review</h3>
-              <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-neutral-400">New proof submissions appear here. You can review past decisions in the Audit Hub.</p>
-              <Link className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-400 hover:text-emerald-300" href="/console?view=overview">Open Audit Hub</Link>
+              <p className="mt-3 font-mono text-xs uppercase tracking-wider text-emerald-400">Queue cleared (0)</p>
+              <h3 className="mt-2 text-lg font-bold text-white">No submissions awaiting QA review</h3>
+              <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-neutral-400">New proof media and reproduction logs will appear here as validators complete active cohort tasks.</p>
+              {cohort ? (
+                <>
+                  <div className="mx-auto mt-4 flex w-fit flex-wrap items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 font-mono text-xs text-zinc-300">
+                    <span>{cohort.title}</span>
+                    <span className="text-zinc-600">·</span>
+                    <span>{platformLabel(cohort.platform)}</span>
+                    <span className="text-zinc-600">·</span>
+                    <span>{cohort.claimedSlots}/{cohort.totalSlots} slots claimed</span>
+                  </div>
+                  <Link className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console#active-cohorts">Inspect Cohort Status <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
+                </>
+              ) : (
+                <Link className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console?view=new-drop">Deploy a Cohort <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
+              )}
             </>
           )}
         </section>
@@ -964,6 +974,25 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
       ) : null}
     </section>
   );
+}
+
+function QueueFilterButton({ filter, active, onClick }: { filter: { value: "all" | "awaiting" | "revision" | "flagged"; label: string; count: number }; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${active ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"}`}
+    >
+      {filter.label} ({filter.count})
+    </button>
+  );
+}
+
+function platformLabel(platform: PlatformType) {
+  if (platform === PlatformType.TESTFLIGHT) return "iOS TestFlight";
+  if (platform === PlatformType.PLAY_STORE) return "Android Play Console";
+  return "Web staging";
 }
 
 function AssetVault({ assets }: { assets: Asset[] }) {

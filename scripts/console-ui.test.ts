@@ -90,7 +90,7 @@ test("active cohort rows lead with the app identity and consolidate their action
   } finally { for (const item of modules.reverse()) item.restore(); }
 });
 
-test("the submission queue separates view switching from status filtering", async () => {
+test("the submission queue uses one status filter bar and an actionable cohort empty state", async () => {
   const modules = [
     mock.module("next/link", anchorMock),
     mock.module("next/image", { defaultExport: Empty }),
@@ -109,15 +109,35 @@ test("the submission queue separates view switching from status filtering", asyn
     ];
     const markup = renderToStaticMarkup(createElement(DeveloperStudio, {
       submissions, assets: [], auditReports: [], reviewPage: 1, reviewTotalPages: 1, reviewTotalCount: 3,
+      approvedSubmissionCount: 4,
+      reviewCohort: { id: "cohort-1", title: "Goddesses", platform: "TESTFLIGHT", claimedSlots: 0, totalSlots: 5 },
       canSaveTestDraft: false, view: "review-deck", userId: "dev", draftRevision: 0,
     }));
-    assert.ok(markup.includes("Submission views"));
+    assert.ok(!markup.includes("Submission views"));
+    assert.ok(!markup.includes("All submissions"));
+    assert.ok(!markup.includes("Approved artifacts"));
+    assert.ok(!markup.includes("awaiting review</span>"));
     assert.ok(markup.includes("/console?view=asset-vault"));
     assert.ok(markup.includes("Filter queue by status"));
-    // Counts reflect the real queue rather than placeholder zeroes.
     assert.ok(markup.includes("All (3)"));
-    assert.ok(markup.includes("Awaiting review (1)"));
-    assert.ok(markup.includes("In revision (1)"));
+    assert.ok(markup.includes("Needs Review (1)"));
+    assert.ok(markup.includes("In Revision (1)"));
+    assert.ok(markup.includes("Approved (4)"));
     assert.ok(markup.includes("Flagged (1)"));
+
+    const empty = renderToStaticMarkup(createElement(DeveloperStudio, {
+      submissions: [], assets: [], auditReports: [], reviewPage: 1, reviewTotalPages: 1, reviewTotalCount: 0,
+      approvedSubmissionCount: 0,
+      reviewCohort: { id: "cohort-1", title: "Goddesses", platform: "TESTFLIGHT", claimedSlots: 0, totalSlots: 5 },
+      canSaveTestDraft: false, view: "review-deck", userId: "dev", draftRevision: 0,
+    }));
+    assert.ok(empty.includes("Queue cleared (0)"));
+    assert.ok(empty.includes("No submissions awaiting QA review"));
+    assert.ok(empty.includes("Goddesses"));
+    assert.ok(empty.includes("iOS TestFlight"));
+    assert.ok(empty.includes("0/5 slots claimed"));
+    assert.ok(empty.includes("Inspect Cohort Status"));
+    assert.ok(empty.includes("/console#active-cohorts"));
+    assert.ok(!empty.includes("Open Audit Hub"));
   } finally { for (const item of modules.reverse()) item.restore(); }
 });
