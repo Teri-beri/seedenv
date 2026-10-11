@@ -50,7 +50,7 @@ export function testerMilestones(approved: number, reputation: number) {
     { name: "First signal", description: "Get your first mission approved.", current: approved, target: 1 },
     { name: "Reliable contributor", description: "Complete 5 approved missions.", current: approved, target: 5 },
     { name: "Launch partner", description: "Complete 25 approved missions.", current: approved, target: 25 },
-    { name: "Core Validator", description: "Earn 1,500 reputation points.", current: reputation, target: 1500 },
+    { name: "Reputation Vanguard", description: "Earn 1,500 reputation points.", current: reputation, target: 1500 },
   ].map((milestone) => ({
     ...milestone,
     earned: milestone.current >= milestone.target,

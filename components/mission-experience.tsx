@@ -49,9 +49,12 @@ type Mission = {
 
 type ProofTelemetry = { osBuild: string; deviceModel: string; screenResolution: string; appBuildVersion: string; networkType: string; recordingUrl: string; crashLogs: string; networkLogs: string };
 type Assignment = { id: string; campaign: Mission; expiresAt: string; submitted: boolean; denialReviewPending?: boolean; revisionRequested?: boolean; revisionStarted?: boolean; revisionNote?: string | null; feedbackText?: string | null; proofPreviewUrl?: string | null; hasScreenshot?: boolean; hasRecording?: boolean; telemetry?: ProofTelemetry };
+type MissionHistory = { id: string; campaignTitle: string; status: string; payoutCents: number; rejectionReason: string | null; expiresAt: string };
+type MissionView = "progress" | "review" | "revisions" | "history";
 
 const noAssignments: Assignment[] = [];
 const noCompletedCampaigns: string[] = [];
+const noHistory: MissionHistory[] = [];
 
 const filters: Array<{ id: MissionFilter; label: string }> = [
   { id: "all", label: "All missions" },
@@ -62,6 +65,26 @@ const filters: Array<{ id: MissionFilter; label: string }> = [
 ];
 
 const platformLabels: Record<string, string> = { WEB_STAGING: "Web · PWA", TESTFLIGHT: "iOS · TestFlight", PLAY_STORE: "Android · Play" };
+const completedMissionPreviews = [
+  {
+    title: "FinFlow Staging Auth",
+    platform: "Web · Staging",
+    reward: "$12.00",
+    reputation: 320,
+    status: "Closed",
+    participants: "25 / 25",
+    summary: "Authentication and recovery-flow validation across staging environments.",
+  },
+  {
+    title: "Pulse Analytics PWA",
+    platform: "Android · Internal",
+    reward: "$8.00",
+    reputation: 200,
+    status: "Filled",
+    participants: "18 / 18",
+    summary: "Mobile dashboard telemetry and offline-state verification.",
+  },
+] as const;
 const recordingTypes = ["video/mp4", "video/quicktime", "video/webm"];
 const maxRecordingBytes = 50 * 1024 * 1024;
 
@@ -104,13 +127,14 @@ function Countdown({ expiresAt }: { expiresAt: Date | null }) {
   return <span>{minutes}:{String(seconds).padStart(2, "0")}</span>;
 }
 
-export function MissionExperience({ mode, missions, assignments = noAssignments, completedCampaignIds = noCompletedCampaigns, initialNow = 0, applications = [], reputation = 0, discoveryPasses = 0 }: { mode: "discover" | "missions"; missions: Mission[]; assignments?: Assignment[]; completedCampaignIds?: string[]; initialNow?: number; applications?: Array<{ campaignId: string; status: string; startBy: string | null }>; reputation?: number; discoveryPasses?: number }) {
+export function MissionExperience({ mode, missions, assignments = noAssignments, history = noHistory, completedCampaignIds = noCompletedCampaigns, initialNow = 0, applications = [], reputation = 0, discoveryPasses = 0 }: { mode: "discover" | "missions"; missions: Mission[]; assignments?: Assignment[]; history?: MissionHistory[]; completedCampaignIds?: string[]; initialNow?: number; applications?: Array<{ campaignId: string; status: string; startBy: string | null }>; reputation?: number; discoveryPasses?: number }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<MissionFilter>("all");
   const [sort, setSort] = useState<MissionSort>("reward");
+  const [missionView, setMissionView] = useState<MissionView>("progress");
   const [activeMission, setActiveMission] = useState<Mission | null>(null);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
@@ -135,7 +159,12 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   const xpGain = xpForBounty(payoutCents);
 
   const filteredMissions = useMemo(() => discoverMissions(missions, query, filter, sort), [missions, query, filter, sort]);
-  const activeAssignments = assignments.filter((item) => !item.submitted && (item.revisionRequested || new Date(item.expiresAt).getTime() > now));
+  const showCompletedPreviews = mode === "discover" && query.trim() === "" && filter === "all";
+  const inProgressAssignments = assignments.filter((item) => !item.submitted && !item.revisionRequested && new Date(item.expiresAt).getTime() > now);
+  const reviewAssignments = assignments.filter((item) => item.submitted);
+  const revisionAssignments = assignments.filter((item) => item.revisionRequested);
+  const completedHistory = history.filter((item) => ["APPROVED", "REJECTED", "EXPIRED"].includes(item.status));
+  const visibleAssignments = missionView === "progress" ? inProgressAssignments : missionView === "review" ? reviewAssignments : missionView === "revisions" ? revisionAssignments : [];
   const expired = Boolean(expiresAt && now > 0 && expiresAt.getTime() <= now);
 
   useEffect(() => {
@@ -320,15 +349,46 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
 
   return (
     <div className="mt-5 space-y-6">
-      {mode === "missions" ? <div className="grid gap-3 sm:grid-cols-2">
-        {assignments.filter((item) => item.submitted || activeAssignments.some((active) => active.id === item.id)).map((assignment) => (
-          <button key={assignment.id} type="button" disabled={isPending || assignment.denialReviewPending} onClick={() => openAssignment(assignment)} className="flex min-w-0 w-full items-center gap-3 rounded-xl border border-zinc-800 bg-black/15 p-4 text-left transition hover:border-zinc-700 disabled:opacity-50">
-            {assignment.submitted ? <CheckCircle2 className="size-5 shrink-0 text-emerald-400" /> : <Clock3 className="size-5 shrink-0 text-amber-400" />}
-            <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{assignment.campaign.title}</span><span className="mt-1 block text-xs text-neutral-500">{assignment.denialReviewPending ? "Reward held / manual denial review" : assignment.revisionRequested ? assignment.revisionStarted && new Date(assignment.expiresAt).getTime() > now ? "Resume requested revision" : "Start revision / fresh 30-minute window" : assignment.submitted ? "Proof received / awaiting developer review" : "Resume your claimed mission"}</span></span>
-            {!assignment.submitted && (!assignment.revisionRequested || (assignment.revisionStarted && new Date(assignment.expiresAt).getTime() > now)) ? <span className="font-mono text-xs text-amber-300"><Countdown expiresAt={new Date(assignment.expiresAt)} /></span> : null}
-          </button>
-        ))}
-        {!activeAssignments.length && !assignments.some((item) => item.submitted) ? <div className="rounded-xl border border-dashed border-zinc-800 p-4 text-sm leading-6 text-neutral-500 sm:col-span-2"><p>No missions in progress yet.</p><Link href="/dashboard?view=discover" className="mt-2 inline-block font-semibold text-emerald-300">Discover your next mission</Link></div> : null}
+      {mode === "missions" ? <div className="space-y-4">
+        <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Mission status">
+          {([
+            ["progress", "In Progress", inProgressAssignments.length],
+            ["review", "Under Review", reviewAssignments.length],
+            ["revisions", "Revisions", revisionAssignments.length],
+            ["history", "History", completedHistory.length],
+          ] as const).map(([id, label, count]) => (
+            <button key={id} type="button" role="tab" aria-selected={missionView === id} onClick={() => { setMissionView(id); setActiveMission(null); setMessage(null); }} className={`shrink-0 rounded-lg border px-3 py-2 font-mono text-[11px] transition ${missionView === id ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-200" : "border-zinc-800 bg-zinc-950/40 text-zinc-500 hover:text-zinc-300"}`}>
+              {label} ({count})
+            </button>
+          ))}
+        </div>
+        {missionView !== "history" && visibleAssignments.length ? <div className="grid gap-3 sm:grid-cols-2">
+          {visibleAssignments.map((assignment) => (
+            <button key={assignment.id} type="button" disabled={isPending || assignment.denialReviewPending} onClick={() => openAssignment(assignment)} className="flex min-w-0 w-full items-center gap-3 rounded-xl border border-zinc-800 bg-black/15 p-4 text-left transition hover:border-zinc-700 disabled:opacity-50">
+              {assignment.submitted ? <CheckCircle2 className="size-5 shrink-0 text-emerald-400" /> : <Clock3 className="size-5 shrink-0 text-amber-400" />}
+              <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{assignment.campaign.title}</span><span className="mt-1 block text-xs text-neutral-500">{assignment.denialReviewPending ? "Reward held / manual denial review" : assignment.revisionRequested ? assignment.revisionStarted && new Date(assignment.expiresAt).getTime() > now ? "Resume requested revision" : "Start revision / fresh 30-minute proof window" : assignment.submitted ? "Proof received / awaiting developer review" : "Proof window active"}</span></span>
+              {!assignment.submitted && (!assignment.revisionRequested || (assignment.revisionStarted && new Date(assignment.expiresAt).getTime() > now)) ? <span className="font-mono text-xs text-amber-300"><Countdown expiresAt={new Date(assignment.expiresAt)} /></span> : null}
+            </button>
+          ))}
+        </div> : null}
+        {missionView === "history" && completedHistory.length ? <div className="grid gap-3 sm:grid-cols-2">
+          {completedHistory.map((item) => (
+            <article key={item.id} className="flex gap-3 rounded-xl border border-zinc-800 bg-black/15 p-4">
+              <CheckCircle2 className={`mt-0.5 size-5 shrink-0 ${item.status === "APPROVED" ? "text-emerald-400" : "text-zinc-600"}`} />
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-sm font-semibold">{item.campaignTitle}</h3>
+                <p className="mt-1 text-xs text-zinc-500">{item.status === "APPROVED" ? `Approved · ${formatCents(item.payoutCents)} earned` : item.status === "REJECTED" ? "Not approved" : "Expired"}</p>
+                {item.rejectionReason ? <p className="mt-2 break-words text-xs leading-5 text-rose-300">{item.rejectionReason}</p> : null}
+              </div>
+            </article>
+          ))}
+        </div> : null}
+        {(missionView === "history" ? completedHistory.length === 0 : visibleAssignments.length === 0) ? <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 p-10 text-center sm:p-12">
+          <div className="rounded-full border border-zinc-800 bg-zinc-900 p-3 text-emerald-400"><Compass className="size-5" /></div>
+          <h2 className="mt-3 text-sm font-medium text-zinc-200">{missionView === "progress" ? "No active validation runs" : missionView === "review" ? "No proofs under review" : missionView === "revisions" ? "No revisions requested" : "No completed missions yet"}</h2>
+          <p className="mt-1 max-w-sm text-xs leading-5 text-zinc-500">{missionView === "progress" ? "Claim an open cohort slot from Discover to begin testing builds and submitting reproduction proof. Accepted invitations remain available for up to 24 hours; the 30-minute proof timer starts only after you begin." : missionView === "review" ? "Submitted proof and developer review status will appear here." : missionView === "revisions" ? "Developer requests for updated proof will appear here with a fresh editing window." : "Approved, declined, and expired validation runs will collect here."}</p>
+          <Link className="mt-4 rounded-lg bg-emerald-500 px-4 py-2 font-mono text-xs font-semibold text-black transition hover:bg-emerald-400" href="/dashboard?view=discover">Browse Open Missions →</Link>
+        </div> : null}
       </div> : null}
       <section id="tester-hub" className="scroll-mt-6" aria-label={mode === "discover" ? "Mission discovery" : "Mission proof workspace"}>
       {mode === "discover" ? <div className="min-w-0 space-y-4">
@@ -391,18 +451,38 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                 </div>
                 <p className="mt-3 flex gap-2 text-[11px] leading-5 text-zinc-500"><ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-emerald-400" /><span><span className="text-zinc-300">Reward reserved before you start.</span> Unreviewed proof auto-approves after 48h unless held for denial or fraud review. Work must meet the instructions and required participation period.</span></p>
                 {!completed && !assignment && !accepted ? (
-                  mission.ownedByTester ? <p className="mt-4 rounded-xl border border-zinc-800 p-3 text-sm text-zinc-400">You own this cohort. You cannot apply to your own cohort; use a separate tester account to test joining.</p> : application && !["DECLINED", "WITHDRAWN", "STARTED"].includes(application.status) ? <Link className="mt-4 block min-h-11 rounded-xl border border-stroke p-3 text-center text-sm text-emerald-300" href="/applications">Application: {application.status.toLowerCase()} / View</Link> : <MissionRequest missionId={mission.id} eligibility={eligibility} passes={discoveryPasses} />
+                  mission.ownedByTester ? <Link className="mt-4 block min-h-11 rounded-xl border border-zinc-800 bg-zinc-900 text-center text-sm font-medium text-emerald-300 transition hover:border-zinc-700 hover:text-emerald-200" href="/console">Your cohort · View in Console →</Link> : application && !["DECLINED", "WITHDRAWN", "STARTED"].includes(application.status) ? <Link className="mt-4 block min-h-11 rounded-xl border border-stroke p-3 text-center text-sm text-emerald-300" href="/applications">Application: {application.status.toLowerCase()} / View</Link> : <MissionRequest missionId={mission.id} eligibility={eligibility} passes={discoveryPasses} />
                 ) : <Button className="mt-5 w-full" onClick={() => handleClaim(mission)} disabled={isPending || completed || Boolean(assignment && !resumable) || (!resumable && spotsLeft <= 0)}>
                   {completed ? "Completed" : assignment?.submitted ? "In review" : resumable ? "Resume mission" : assignment ? "Claim expired" : spotsLeft <= 0 ? "Fully claimed" : "Claim Slot (30m Reserve) →"}
                 </Button>}
               </motion.article>
             );
           })}
+          {showCompletedPreviews ? completedMissionPreviews.map((mission) => (
+            <article key={mission.title} aria-label={`Sample completed cohort: ${mission.title}`} className="rounded-2xl border border-zinc-800 bg-[#0E1017]/55 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">Marketplace preview</span>
+                  <p className="mt-2 font-mono text-[11px] tracking-wider text-zinc-400">[{mission.platform}]</p>
+                  <h3 className="mt-1.5 text-lg font-semibold tracking-tight text-zinc-200">{mission.title}</h3>
+                </div>
+                <span className="rounded-full border border-zinc-700 bg-zinc-900 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-zinc-400">{mission.status}</span>
+              </div>
+              <p className="mt-3 min-h-12 text-sm leading-6 text-zinc-500">{mission.summary}</p>
+              <div className="mt-5 rounded-xl border border-zinc-800 bg-black/15 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-base font-semibold text-zinc-300">{mission.reward}</span>
+                  <span className="font-mono text-xs text-emerald-400/70">+{mission.reputation} REP</span>
+                </div>
+                <p className="mt-3 text-xs text-zinc-500">{mission.participants} participants · Cohort {mission.status.toLowerCase()}</p>
+              </div>
+              <p className="mt-4 text-xs leading-5 text-zinc-500">Example completed cohort. Your validated mission history will appear here after approval.</p>
+            </article>
+          )) : null}
         </div>
       </div> : null}
 
-      {mode === "missions" ? <aside ref={scope} id="mission-workspace" className="border border-zinc-800 bg-zinc-900/40 min-w-0 h-fit scroll-mt-6 rounded-2xl p-5" aria-label="Mission workspace">
-        {activeMission ? (
+      {mode === "missions" && activeMission ? <aside ref={scope} id="mission-workspace" className="border border-zinc-800 bg-zinc-900/40 min-w-0 h-fit scroll-mt-6 rounded-2xl p-5" aria-label="Mission workspace">
           <div className="space-y-5">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -472,16 +552,6 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
               <p className="mt-1 text-xs leading-6 text-neutral-400">Use original proof, follow every step, and be specific. Cash and reputation are awarded only after approval.</p>
             </div>
           </div>
-        ) : (
-          <div className="flex min-h-[300px] flex-col items-center justify-center text-center">
-            <div className="rounded-full border border-zinc-800 bg-zinc-900/60 p-5">
-              <Compass className="size-9 text-emerald-400" />
-            </div>
-            <h2 className="mt-5 text-lg font-semibold tracking-tight">Your next contribution</h2>
-            <p className="mt-2 max-w-xs text-sm leading-6 text-neutral-400">Start a mission to open the brief and reserve a spot for 30 minutes. Your work is saved to your mission desk when you submit proof.</p>
-            {message ? <p role="alert" className="mt-4 rounded-xl border border-rose-400/20 bg-rose-500/5 p-3 text-sm text-rose-200">{message}</p> : null}
-          </div>
-        )}
       </aside> : null}
       </section>
     </div>

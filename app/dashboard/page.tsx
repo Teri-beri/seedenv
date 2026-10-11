@@ -37,10 +37,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       orderBy: [{ bountyPerTaskUsd: "desc" }, { createdAt: "desc" }],
     }),
     prisma.user.findMany({
-      where: { testerWorkspaceEnabled: true, xpPoints: { gt: 0 } },
+      where: { testerWorkspaceEnabled: true, OR: [{ xpPoints: { gt: 0 } }, { id: session.user.id }] },
       orderBy: [{ xpPoints: "desc" }, { createdAt: "asc" }],
-      take: 5,
-      select: { id: true, username: true, xpPoints: true },
+      take: 50,
+      select: {
+        id: true,
+        username: true,
+        avatarUrl: true,
+        xpPoints: true,
+        rankTier: true,
+        submissions: {
+          where: { status: { in: [SubmissionStatus.APPROVED, SubmissionStatus.REJECTED] } },
+          select: { status: true, submittedAt: true },
+        },
+      },
     }),
     prisma.submission.groupBy({
       by: ["status"],
@@ -77,7 +87,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   });
   return (
     <AuthCheck role="TESTER">
-      <TesterConsole activeView={activeView} tester={tester} missions={testerMissions} leaderboard={leaderboard} summary={summary} recent={recent} pending={pendingWithPreviews} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ campaignId: item.campaignId, status: item.status, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} />
+      <TesterConsole activeView={activeView} tester={tester} missions={testerMissions} leaderboard={leaderboard.map((entry) => ({ ...entry, submissions: entry.submissions.flatMap((submission) => submission.submittedAt ? [{ ...submission, submittedAt: submission.submittedAt.toISOString() }] : []) }))} summary={summary} recent={recent} pending={pendingWithPreviews} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ campaignId: item.campaignId, status: item.status, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} />
     </AuthCheck>
   );
 }

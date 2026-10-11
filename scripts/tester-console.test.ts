@@ -49,6 +49,7 @@ test("approval rate is unavailable before reviews and excludes unreviewed claims
 });
 
 test("milestones only unlock at the actual contribution thresholds", () => {
+  assert.equal(testerMilestones(0, 0)[3].name, "Reputation Vanguard");
   assert.equal(testerMilestones(0, 0).filter((item) => item.earned).length, 0);
   assert.equal(testerMilestones(1, 75)[0].earned, true);
   assert.equal(testerMilestones(4, 1499)[1].earned, false);
