@@ -210,5 +210,6 @@ test("mission HUD uses real QR payloads, complete compact steps, and spring odom
   assert.match(signin, /resumesMissionPair = nextPath\.startsWith\("\/pair\/"\)/);
   assert.match(signin, /return to your connected mission automatically/);
   assert.match(onboarding, /"\/pair"/, "onboarding must preserve the post-login mobile pairing callback");
+  assert.match(onboarding, /value\.startsWith\(`\$\{path\}\/`\)/, "onboarding must allow the nested mobile pairing session route");
   assert.doesNotMatch(experience, /triggerHaptic\(\);\s*triggerCompletionTone\(\);\s*setProofSubmitted/);
 });

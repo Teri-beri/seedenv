@@ -13,7 +13,9 @@ const allowedNextPaths = ["/dashboard", "/console", "/admin", "/account", "/vali
 
 function cleanNextPath(value: string | undefined) {
   if (!value?.startsWith("/")) return "/dashboard";
-  return allowedNextPaths.some((path) => value === path || value.startsWith(`${path}?`)) ? value : "/dashboard";
+  return allowedNextPaths.some((path) => value === path || value.startsWith(`${path}/`) || value.startsWith(`${path}?`))
+    ? value
+    : "/dashboard";
 }
 
 function cleanRequestedRole(value: string | undefined) {
