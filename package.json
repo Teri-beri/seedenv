@@ -60,7 +60,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.4.2",
-    "framer-motion": "^13.2.0",
+    "framer-motion": "^14.1.0",
     "html-to-image": "^1.11.13",
     "jszip": "^3.10.2",
     "lucide-react": "^1.57.0",
