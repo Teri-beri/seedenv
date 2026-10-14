@@ -5,6 +5,7 @@ import { ConsoleHeader } from "@/components/console-header";
 import { TelemetryMonitor } from "@/components/console/TelemetryMonitor";
 import { DeveloperBottomNav } from "@/components/navigation";
 import { authOptions } from "@/lib/auth-options";
+import { parseMissionDeviceProfile } from "@/lib/mission-device-profile";
 import { prisma } from "@/lib/prisma";
 import { isPublicHandle, publicProfilePath } from "@/lib/public-profile";
 
@@ -36,23 +37,47 @@ export default async function TelemetryMonitorPage({ searchParams }: { searchPar
     select: { id: true, title: true, status: true },
   });
   const selectedCohort = cohorts.find((cohort) => cohort.id === params.cohort) || cohorts[0] || null;
-  const incidents = selectedCohort ? await prisma.telemetryIncident.findMany({
-    where: { cohortId: selectedCohort.id },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-    select: {
-      id: true,
-      severity: true,
-      statusCode: true,
-      endpoint: true,
-      deviceModel: true,
-      osVersion: true,
-      message: true,
-      createdAt: true,
-      githubIssueUrl: true,
-      validator: { select: { username: true } },
-    },
-  }) : [];
+  const [incidents, mobileSessions] = selectedCohort ? await Promise.all([
+    prisma.telemetryIncident.findMany({
+      where: { cohortId: selectedCohort.id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        severity: true,
+        statusCode: true,
+        endpoint: true,
+        deviceModel: true,
+        osVersion: true,
+        message: true,
+        createdAt: true,
+        githubIssueUrl: true,
+        validator: { select: { username: true } },
+      },
+    }),
+    prisma.missionPairSession.findMany({
+      where: {
+        submission: { campaignId: selectedCohort.id },
+        connectedAt: { not: null },
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        activeStep: true,
+        completedSteps: true,
+        deviceProfile: true,
+        confirmedDeviceModel: true,
+        connectedAt: true,
+        recordingConfirmedAt: true,
+        lastSeenAt: true,
+        updatedAt: true,
+        tester: { select: { username: true } },
+        submission: { select: { campaign: { select: { _count: { select: { instructions: true } } } } } },
+      },
+    }),
+  ]) : [[], []];
   const accountUsername = developer.username || session.user.name || "account";
   const account = {
     username: accountUsername,
@@ -72,6 +97,18 @@ export default async function TelemetryMonitorPage({ searchParams }: { searchPar
             activeCohort={selectedCohort}
             highlightedIncidentId={params.incident}
             incidents={incidents.map((incident) => ({ ...incident, createdAt: incident.createdAt.toISOString(), validatorHandle: incident.validator?.username || null }))}
+            mobileSessions={mobileSessions.map((mobileSession) => ({
+              id: mobileSession.id,
+              activeStep: mobileSession.activeStep,
+              completedSteps: mobileSession.completedSteps.length,
+              totalSteps: mobileSession.submission.campaign._count.instructions,
+              deviceProfile: parseMissionDeviceProfile(mobileSession.deviceProfile),
+              confirmedDeviceModel: mobileSession.confirmedDeviceModel,
+              connectedAt: mobileSession.connectedAt?.toISOString() || null,
+              recordingConfirmedAt: mobileSession.recordingConfirmedAt?.toISOString() || null,
+              lastSeenAt: mobileSession.lastSeenAt?.toISOString() || mobileSession.updatedAt.toISOString(),
+              validatorHandle: mobileSession.tester.username,
+            }))}
           />
         </div>
         <DeveloperBottomNav />

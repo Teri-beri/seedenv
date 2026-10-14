@@ -5,6 +5,7 @@ import { CheckCircle2, LoaderCircle, QrCode, RefreshCw, X } from "lucide-react";
 import Image from "next/image";
 import QRCode from "qrcode";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { MissionDeviceProfile } from "@/lib/mission-device-profile";
 
 export type MissionPairClientState = {
   id: string;
@@ -13,14 +14,18 @@ export type MissionPairClientState = {
   activeStep: number;
   completedSteps: number[];
   compact: boolean;
+  deviceProfile: MissionDeviceProfile | null;
+  confirmedDeviceModel: string | null;
   connectedAt: string | null;
+  recordingConfirmedAt: string | null;
+  lastSeenAt: string | null;
   expiresAt: string;
   updatedAt: string;
 };
 
 export type PairedMissionSession = {
   state: MissionPairClientState;
-  token: string;
+  token: string | null;
   realtime: { key: string; cluster: string } | null;
 };
 
@@ -134,6 +139,20 @@ export function PairingModal({ open, submissionId, activeStep, completedSteps, c
             </div>
             <h3 className="mt-3 text-xl font-semibold text-white">Sync your live mission</h3>
             <p className="mt-2 text-sm leading-6 text-zinc-400">Scan this encrypted session link with the phone signed into your SeedEnv tester account. Progress will stay synchronized across both screens.</p>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[
+                ["1", "Scan", "Use the testing phone"],
+                ["2", "Sign in", "Your slot stays reserved"],
+                ["3", "Resume", "Phone guide opens"],
+              ].map(([number, title, detail]) => (
+                <div key={number} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5 text-center">
+                  <span className="mx-auto grid size-6 place-items-center rounded-full bg-sky-500 text-[10px] font-bold text-zinc-950">{number}</span>
+                  <p className="mt-2 text-xs font-semibold text-white">{title}</p>
+                  <p className="mt-1 text-[9px] leading-4 text-zinc-500">{detail}</p>
+                </div>
+              ))}
+            </div>
 
             <div className="mt-5 flex min-h-60 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
               {qrDataUrl ? <Image src={qrDataUrl} unoptimized width={208} height={208} alt="QR code containing the secure SeedEnv mission pairing link" className="h-52 w-52 rounded-lg" /> : error ? (

@@ -2,8 +2,10 @@ import "server-only";
 
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import Pusher from "pusher";
+import { parseMissionDeviceProfile, type MissionDeviceProfile } from "@/lib/mission-device-profile";
 
 export const MISSION_PAIR_EVENT = "mission-state";
+export const MISSION_PAIR_COOKIE = "seedenv_mission_pair";
 
 export type MissionPairState = {
   id: string;
@@ -12,7 +14,11 @@ export type MissionPairState = {
   activeStep: number;
   completedSteps: number[];
   compact: boolean;
+  deviceProfile: MissionDeviceProfile | null;
+  confirmedDeviceModel: string | null;
   connectedAt: string | null;
+  recordingConfirmedAt: string | null;
+  lastSeenAt: string | null;
   expiresAt: string;
   updatedAt: string;
 };
@@ -42,7 +48,11 @@ export function serializeMissionPairState(session: {
   activeStep: number;
   completedSteps: number[];
   compact: boolean;
+  deviceProfile: unknown;
+  confirmedDeviceModel: string | null;
   connectedAt: Date | null;
+  recordingConfirmedAt: Date | null;
+  lastSeenAt: Date | null;
   expiresAt: Date;
   updatedAt: Date;
 }): MissionPairState {
@@ -53,10 +63,29 @@ export function serializeMissionPairState(session: {
     activeStep: session.activeStep,
     completedSteps: session.completedSteps,
     compact: session.compact,
+    deviceProfile: parseMissionDeviceProfile(session.deviceProfile),
+    confirmedDeviceModel: session.confirmedDeviceModel,
     connectedAt: session.connectedAt?.toISOString() ?? null,
+    recordingConfirmedAt: session.recordingConfirmedAt?.toISOString() ?? null,
+    lastSeenAt: session.lastSeenAt?.toISOString() ?? null,
     expiresAt: session.expiresAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
   };
+}
+
+export function missionPairTokenFromRequest(request: Request, sessionId: string, bodyToken?: string) {
+  if (bodyToken) return bodyToken;
+  const authorization = request.headers.get("authorization") || "";
+  if (authorization.startsWith("Bearer ")) return authorization.slice(7);
+  const cookie = request.headers.get("cookie")?.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${MISSION_PAIR_COOKIE}=`));
+  if (!cookie) return "";
+  try {
+    const value = decodeURIComponent(cookie.slice(MISSION_PAIR_COOKIE.length + 1));
+    const separator = value.indexOf(".");
+    return separator > 0 && value.slice(0, separator) === sessionId ? value.slice(separator + 1) : "";
+  } catch {
+    return "";
+  }
 }
 
 function pusherClient() {

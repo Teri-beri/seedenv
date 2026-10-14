@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import type { CampaignStatus } from "@prisma/client";
 import { setCohortTelemetryPause } from "@/app/actions/telemetryActions";
+import type { MissionDeviceProfile } from "@/lib/mission-device-profile";
 
 type MonitorCohort = { id: string; title: string; status: CampaignStatus };
 type MonitorIncident = {
@@ -19,6 +20,18 @@ type MonitorIncident = {
   githubIssueUrl: string | null;
   validatorHandle: string | null;
 };
+type MonitorMobileSession = {
+  id: string;
+  activeStep: number;
+  completedSteps: number;
+  totalSteps: number;
+  deviceProfile: MissionDeviceProfile | null;
+  confirmedDeviceModel: string | null;
+  connectedAt: string | null;
+  recordingConfirmedAt: string | null;
+  lastSeenAt: string;
+  validatorHandle: string;
+};
 
 function severityClass(severity: MonitorIncident["severity"]) {
   if (severity === "CRITICAL") return "border-red-500/30 bg-red-500/10 text-red-300";
@@ -30,11 +43,13 @@ export function TelemetryMonitor({
   cohorts,
   activeCohort,
   incidents,
+  mobileSessions,
   highlightedIncidentId,
 }: {
   cohorts: MonitorCohort[];
   activeCohort: MonitorCohort | null;
   incidents: MonitorIncident[];
+  mobileSessions: MonitorMobileSession[];
   highlightedIncidentId?: string;
 }) {
   const router = useRouter();
@@ -114,6 +129,35 @@ export function TelemetryMonitor({
         <div className="rounded-xl border border-zinc-800 bg-zinc-950/70 p-4"><p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Events in feed</p><p className="mt-2 text-2xl font-semibold text-zinc-100">{incidents.length}</p></div>
         <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4"><p className="font-mono text-[11px] uppercase tracking-wider text-red-400">Critical</p><p className="mt-2 text-2xl font-semibold text-red-200">{criticalCount}</p></div>
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4"><p className="font-mono text-[11px] uppercase tracking-wider text-amber-400">Warnings</p><p className="mt-2 text-2xl font-semibold text-amber-200">{warningCount}</p></div>
+      </section>
+
+      <section className="overflow-hidden rounded-2xl border border-sky-500/20 bg-[#080A0E]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3">
+          <div className="flex items-center gap-2 font-mono text-xs text-zinc-400"><span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-sky-400 opacity-70" /><span className="relative inline-flex size-2 rounded-full bg-sky-400" /></span> LIVE VALIDATOR NODES</div>
+          <span className="font-mono text-[10px] text-zinc-600">{mobileSessions.length} CONNECTED</span>
+        </div>
+        {mobileSessions.length ? <div className="grid gap-3 p-4 lg:grid-cols-2">
+          {mobileSessions.map((session) => {
+            const profile = session.deviceProfile;
+            const progress = session.totalSteps ? Math.min(100, Math.round((session.completedSteps / session.totalSteps) * 100)) : 0;
+            return <article key={session.id} className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">@{session.validatorHandle}</p>
+                  <h3 className="mt-2 font-semibold text-white">{session.confirmedDeviceModel || profile?.estimatedModel || "Mobile model awaiting confirmation"}</h3>
+                  <p className="mt-1 font-mono text-[10px] text-zinc-500">{profile ? `${profile.osVersion} · ${profile.screenWidth} × ${profile.screenHeight} @ ${profile.devicePixelRatio}x` : "Collecting mobile hardware telemetry..."}</p>
+                </div>
+                <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-1 font-mono text-[9px] uppercase text-emerald-300">Connected</span>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-[10px] font-mono uppercase tracking-[0.12em]">
+                <div className={`rounded-lg border p-2.5 ${session.recordingConfirmedAt ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" : "border-amber-500/20 bg-amber-500/5 text-amber-300"}`}>{session.recordingConfirmedAt ? "● Recording confirmed" : "○ Awaiting recording"}</div>
+                <div className="rounded-lg border border-sky-500/20 bg-sky-500/5 p-2.5 text-sky-300">Step {Math.min(session.activeStep + 1, Math.max(session.totalSteps, 1))} / {session.totalSteps}</div>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800"><div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400" style={{ width: `${progress}%` }} /></div>
+              <div className="mt-2 flex items-center justify-between font-mono text-[10px] text-zinc-600"><span>{session.completedSteps} completed</span><span>Last signal {new Date(session.lastSeenAt).toLocaleTimeString([], { hour12: false })}</span></div>
+            </article>;
+          })}
+        </div> : <div className="grid min-h-36 place-items-center p-6 text-center"><div><p className="text-sm font-semibold text-zinc-300">No mobile companions connected</p><p className="mt-1 text-xs text-zinc-600">A node appears here as soon as an accepted tester scans the mission QR code.</p></div></div>}
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-zinc-800 bg-[#080A0E]">

@@ -70,8 +70,8 @@ export async function POST(request: Request) {
   });
 
   const origin = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || new URL(request.url).origin;
-  const pairUrl = new URL(`/dashboard?view=missions&claim=${encodeURIComponent(submission.campaignId)}`, origin);
-  pairUrl.hash = new URLSearchParams({ pair: pairSession.id, token: credentials.token }).toString();
+  const pairUrl = new URL(`/pair/${encodeURIComponent(pairSession.id)}`, origin);
+  pairUrl.hash = new URLSearchParams({ token: credentials.token }).toString();
 
   return NextResponse.json({
     state: serializeMissionPairState(pairSession),

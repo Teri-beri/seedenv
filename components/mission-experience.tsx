@@ -11,8 +11,10 @@ import { collectHardwareSignals } from "@/lib/hardware-integrity";
 import { Button } from "@/components/ui/button";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { MissionConductor } from "@/components/tester/MissionConductor";
+import { MobileMissionGuide } from "@/components/tester/MobileMissionGuide";
 import { PairingModal, type MissionPairClientState, type PairedMissionSession } from "@/components/tester/PairingModal";
 import { RewardModal } from "@/components/tester/RewardModal";
+import { collectMissionDeviceProfile } from "@/lib/mission-device-profile";
 import { xpForBounty } from "@/lib/rank";
 import { availableSlots, discoverMissions, type MissionFilter, type MissionSort } from "@/lib/tester-console";
 import { formatCents } from "@/lib/utils";
@@ -141,6 +143,8 @@ function Countdown({ expiresAt }: { expiresAt: Date | null }) {
 
 export function MissionExperience({ mode, missions, assignments = noAssignments, history = noHistory, completedCampaignIds = noCompletedCampaigns, initialNow = 0, applications = [], reputation = 0, discoveryPasses = 0 }: { mode: "discover" | "missions"; missions: Mission[]; assignments?: Assignment[]; history?: MissionHistory[]; completedCampaignIds?: string[]; initialNow?: number; applications?: Array<{ campaignId: string; status: string; startBy: string | null }>; reputation?: number; discoveryPasses?: number }) {
   const searchParams = useSearchParams();
+  const requestedPairId = searchParams.get("pair");
+  const companionMode = searchParams.get("companion") === "1";
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const [query, setQuery] = useState("");
@@ -176,10 +180,23 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   const autoClaimedMission = useRef<string | null>(null);
   const fileVersion = useRef(0);
   const latestPairUpdate = useRef("");
+  const publishedCompanionProfile = useRef<string | null>(null);
 
   const payoutCents = activeMission ? Math.round(activeMission.bountyPerTaskUsd * 100) : 0;
   const xpGain = xpForBounty(payoutCents);
   const isRobloxMission = activeMission?.platform === "ROBLOX_EXPERIENCE";
+  const missionLaunchUrl = activeMission
+    ? activeMission.platform === "ROBLOX_EXPERIENCE"
+      ? buildRobloxLaunchUrl(activeMission.robloxExperienceUrl || activeMission.appUrl, activeMission.robloxPlaceId) || activeMission.appUrl
+      : activeMission.appUrl
+    : "";
+  const missionPlatformLabel = activeMission?.platform === "ROBLOX_EXPERIENCE"
+    ? "Roblox Private Server"
+    : activeMission?.platform === "TESTFLIGHT"
+      ? "TestFlight Build"
+      : activeMission?.platform === "PLAY_STORE"
+        ? "Google Play Build"
+        : "Web App";
 
   const filteredMissions = useMemo(() => discoverMissions(missions, query, filter, sort), [missions, query, filter, sort]);
   const showCompletedPreviews = mode === "discover" && query.trim() === "" && filter === "all";
@@ -196,15 +213,25 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
     setMissionStepIndex(state.activeStep);
     setCompletedMissionSteps(state.completedSteps);
     setMissionDeckCompact(state.compact);
+    if (state.deviceProfile) {
+      const profile = state.deviceProfile;
+      setTelemetry((current) => ({
+        ...current,
+        osBuild: profile.osVersion,
+        deviceModel: state.confirmedDeviceModel || profile.estimatedModel,
+        screenResolution: `${profile.screenWidth} × ${profile.screenHeight} @ ${profile.devicePixelRatio}x`,
+      }));
+      setDetectedGpu(profile.gpuRenderer || "GPU not reported");
+    }
   }, []);
 
-  const publishPairedState = useCallback(async (activeStep: number, completedSteps: number[], compact: boolean, targetSession = pairSession) => {
+  const patchPairedSession = useCallback(async (update: Partial<Pick<MissionPairClientState, "activeStep" | "completedSteps" | "compact" | "deviceProfile" | "confirmedDeviceModel">> & { recordingConfirmed?: true }, targetSession = pairSession) => {
     if (!targetSession) return;
     try {
       const response = await fetch(`/api/mission-pair/${encodeURIComponent(targetSession.state.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: targetSession.token, activeStep, completedSteps, compact }),
+        body: JSON.stringify({ ...(targetSession.token ? { token: targetSession.token } : {}), ...update }),
       });
       const payload = await response.json() as { state?: MissionPairClientState; error?: string };
       if (!response.ok || !payload.state) throw new Error(payload.error || "Mission progress could not be synchronized.");
@@ -219,14 +246,14 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   const handleMissionProgress = useCallback((activeStep: number, completedSteps: number[]) => {
     setMissionStepIndex(activeStep);
     setCompletedMissionSteps(completedSteps);
-    void publishPairedState(activeStep, completedSteps, missionDeckCompact);
-  }, [missionDeckCompact, publishPairedState]);
+    void patchPairedSession({ activeStep, completedSteps, compact: missionDeckCompact });
+  }, [missionDeckCompact, patchPairedSession]);
 
   const handleCompactToggle = useCallback(() => {
     const compact = !missionDeckCompact;
     setMissionDeckCompact(compact);
-    void publishPairedState(missionStepIndex, completedMissionSteps, compact);
-  }, [completedMissionSteps, missionDeckCompact, missionStepIndex, publishPairedState]);
+    void patchPairedSession({ activeStep: missionStepIndex, completedSteps: completedMissionSteps, compact });
+  }, [completedMissionSteps, missionDeckCompact, missionStepIndex, patchPairedSession]);
 
   const handlePairSessionReady = useCallback((session: PairedMissionSession) => {
     latestPairUpdate.current = session.state.updatedAt;
@@ -243,39 +270,50 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   useEffect(() => {
     if (!submissionId) return;
     const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const pairId = fragment.get("pair");
+    const pairId = fragment.get("pair") || requestedPairId;
     const token = fragment.get("token");
-    if (!pairId || !token) return;
+    if (!pairId) return;
     const controller = new AbortController();
     void (async () => {
       try {
         const response = await fetch(`/api/mission-pair/${encodeURIComponent(pairId)}?connect=1`, {
           cache: "no-store",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
           signal: controller.signal,
         });
         const payload = await response.json() as { state?: MissionPairClientState; realtime?: PairedMissionSession["realtime"]; error?: string };
         if (!response.ok || !payload.state) throw new Error(payload.error || "This mobile pairing link could not be connected.");
         if (payload.state.submissionId !== submissionId) throw new Error("This pairing link belongs to a different mission assignment.");
-        const connectedSession = { state: payload.state, token, realtime: payload.realtime ?? null };
+        const connectedSession: PairedMissionSession = { state: payload.state, token: token || null, realtime: payload.realtime ?? null };
         setPairSession(connectedSession);
         applyPairedState(payload.state);
-        window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+        if (token) window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
       } catch (error) {
         if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : "This mobile pairing link could not be connected.");
       }
     })();
     return () => controller.abort();
-  }, [applyPairedState, submissionId]);
+  }, [applyPairedState, requestedPairId, submissionId]);
+
+  useEffect(() => {
+    if (!companionMode || !pairSession || pairSession.state.deviceProfile || publishedCompanionProfile.current === pairSession.state.id) return;
+    publishedCompanionProfile.current = pairSession.state.id;
+    void collectMissionDeviceProfile()
+      .then((deviceProfile) => patchPairedSession({ deviceProfile }, pairSession))
+      .catch((error) => {
+        publishedCompanionProfile.current = null;
+        setMessage(error instanceof Error ? error.message : "This phone's device profile could not be detected.");
+      });
+  }, [companionMode, pairSession, patchPairedSession]);
 
   useEffect(() => {
     if (!pairSession) return;
     let cancelled = false;
     const poll = async () => {
       try {
-        const response = await fetch(`/api/mission-pair/${encodeURIComponent(pairSession.state.id)}`, {
+        const response = await fetch(`/api/mission-pair/${encodeURIComponent(pairSession.state.id)}${companionMode ? "?heartbeat=1" : ""}`, {
           cache: "no-store",
-          headers: { Authorization: `Bearer ${pairSession.token}` },
+          headers: pairSession.token ? { Authorization: `Bearer ${pairSession.token}` } : undefined,
         });
         const payload = await response.json() as { state?: MissionPairClientState; error?: string };
         if (!response.ok || !payload.state) throw new Error(payload.error || "Paired mission state could not be refreshed.");
@@ -291,7 +329,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [applyPairedState, pairSession]);
+  }, [applyPairedState, companionMode, pairSession]);
 
   useEffect(() => {
     if (!pairSession?.realtime) return;
@@ -302,7 +340,10 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
       const client = new Pusher(pairSession.realtime.key, { cluster: pairSession.realtime.cluster, forceTLS: true });
       const channel = client.subscribe(`mission-${pairSession.state.channelKey}`);
       channel.bind("mission-state", (state: MissionPairClientState) => {
-        if (state.submissionId === submissionId) applyPairedState(state);
+        if (state.submissionId === submissionId) {
+          applyPairedState(state);
+          setPairSession((current) => current?.state.id === state.id ? { ...current, state } : current);
+        }
       });
       disconnect = () => client.disconnect();
     }).catch((error) => {
@@ -387,6 +428,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
     setMissionDeckCompact(false);
     setPairSession(null);
     latestPairUpdate.current = "";
+    publishedCompanionProfile.current = null;
   }, []);
 
   useEffect(() => {
@@ -727,7 +769,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
               <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 font-mono text-xs text-emerald-300" role="timer">
                 <Clock3 className="size-3.5" /> {isRobloxMission ? "24-Hour Slot Reservation Active:" : "Slot Reserved:"} <Countdown expiresAt={expiresAt} /> remaining
               </div>
-            {activeMission.platform === "ROBLOX_EXPERIENCE" ? (() => {
+            {!companionMode && (activeMission.platform === "ROBLOX_EXPERIENCE" ? (() => {
               const robloxLaunchHref = buildRobloxLaunchUrl(activeMission.robloxExperienceUrl || activeMission.appUrl, activeMission.robloxPlaceId);
               return robloxLaunchHref ? (
                 <a href={robloxLaunchHref} target="_blank" rel="noopener noreferrer" className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 shadow-lg shadow-sky-500/10 transition-all hover:bg-sky-400">
@@ -738,7 +780,22 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
               <a href={activeMission.appUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-[#0E1017]/80 px-4 py-3 text-sm font-bold text-white backdrop-blur-md transition-all hover:border-zinc-700">
                 Open App / TestFlight <ArrowUpRight className="size-4" />
               </a>
-            )}
+            ))}
+            {companionMode && pairSession?.state.deviceProfile?.isMobile ? (
+              <MobileMissionGuide
+                profile={pairSession.state.deviceProfile}
+                confirmedDeviceModel={pairSession.state.confirmedDeviceModel}
+                recordingConfirmedAt={pairSession.state.recordingConfirmedAt}
+                launchUrl={missionLaunchUrl}
+                platformLabel={missionPlatformLabel}
+                onConfirmModel={(confirmedDeviceModel) => void patchPairedSession({ confirmedDeviceModel })}
+                onConfirmRecording={() => void patchPairedSession({ recordingConfirmed: true })}
+              />
+            ) : companionMode && pairSession?.state.deviceProfile ? (
+              <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 text-sm leading-6 text-amber-200">This companion link opened on a desktop-class browser. Scan the QR code with the physical iPhone, iPad, or Android device that will run the test.</div>
+            ) : companionMode ? (
+              <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-4 text-sm text-sky-200">Detecting this phone and preparing the mobile mission guide...</div>
+            ) : null}
             {isRobloxMission ? (
               <div className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 font-mono text-xs text-zinc-300">
                 <div>
@@ -761,7 +818,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
             <MissionConductor
               title={activeMission.title}
               description={activeMission.description}
-              link={activeMission.platform === "ROBLOX_EXPERIENCE" ? buildRobloxLaunchUrl(activeMission.robloxExperienceUrl || activeMission.appUrl, activeMission.robloxPlaceId) || activeMission.appUrl : activeMission.appUrl}
+              link={missionLaunchUrl}
               steps={activeMission.instructions}
               isRobloxMission={isRobloxMission}
               compact={missionDeckCompact}
@@ -769,12 +826,29 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
               completedSteps={completedMissionSteps}
               onProgressChange={handleMissionProgress}
               onToggleCompact={handleCompactToggle}
-              onPairDevice={() => setShowPairingModal(true)}
+              onPairDevice={companionMode ? undefined : () => setShowPairingModal(true)}
             />
+            {!companionMode && pairSession?.state.deviceProfile ? (
+              <div className="rounded-2xl border border-sky-500/25 bg-sky-500/5 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-sky-300">Paired Mobile Node</p>
+                    <p className="mt-2 text-base font-semibold text-white">{pairSession.state.confirmedDeviceModel || pairSession.state.deviceProfile.estimatedModel}</p>
+                    <p className="mt-1 font-mono text-xs text-zinc-500">{pairSession.state.deviceProfile.osVersion} · {pairSession.state.deviceProfile.screenWidth} × {pairSession.state.deviceProfile.screenHeight} @ {pairSession.state.deviceProfile.devicePixelRatio}x</p>
+                  </div>
+                  <div className="text-right font-mono text-[10px] uppercase tracking-[0.16em]">
+                    <p className="text-emerald-300">● Mobile connected</p>
+                    <p className={pairSession.state.recordingConfirmedAt ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{pairSession.state.recordingConfirmedAt ? "● Recording confirmed" : "○ Waiting for recording"}</p>
+                  </div>
+                </div>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800"><div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400" style={{ width: `${activeMission.instructions.length ? (pairSession.state.completedSteps.length / activeMission.instructions.length) * 100 : 0}%` }} /></div>
+                <p className="mt-2 text-xs text-zinc-500">{pairSession.state.completedSteps.length} of {activeMission.instructions.length} mission steps completed on the synchronized controller.</p>
+              </div>
+            ) : null}
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Live device telemetry</p>
-                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono text-emerald-300">Auto-detected</span>
+                <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">{pairSession?.state.deviceProfile ? "Paired mobile telemetry" : "Live device telemetry"}</p>
+                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono text-emerald-300">{pairSession?.state.deviceProfile ? "Phone synchronized" : "Auto-detected"}</span>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <div className="rounded-xl border border-zinc-800 bg-[#0E1017] p-3"><p className="text-[10px] font-mono uppercase tracking-[0.18em] text-zinc-500">OS & Build</p><p className="mt-2 font-mono text-xs text-zinc-200">{telemetry.osBuild || "Querying browser..."}</p></div>

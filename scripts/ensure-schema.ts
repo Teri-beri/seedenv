@@ -166,6 +166,11 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS "MissionPairSession_testerId_expiresAt_idx" ON "MissionPairSession"("testerId", "expires_at")`,
   `DO $$ BEGIN ALTER TABLE "MissionPairSession" ADD CONSTRAINT "MissionPairSession_submissionId_fkey" FOREIGN KEY ("submissionId") REFERENCES "Submission"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
   `DO $$ BEGIN ALTER TABLE "MissionPairSession" ADD CONSTRAINT "MissionPairSession_testerId_fkey" FOREIGN KEY ("testerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE; EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `ALTER TABLE "MissionPairSession"
+    ADD COLUMN IF NOT EXISTS "device_profile" JSONB,
+    ADD COLUMN IF NOT EXISTS "confirmed_device_model" VARCHAR(120),
+    ADD COLUMN IF NOT EXISTS "recording_confirmed_at" TIMESTAMP(3),
+    ADD COLUMN IF NOT EXISTS "last_seen_at" TIMESTAMP(3)`,
 ];
 
 async function main() {
