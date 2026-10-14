@@ -75,6 +75,26 @@ export function StripeSettingsCard({
     });
   }
 
+  function managePayoutAccount() {
+    setMessage("");
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/tester/stripe/express-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        const data = await response.json();
+        if (!response.ok || !data?.url) {
+          setMessage(data?.error || "Unable to open your Stripe Express dashboard.");
+          return;
+        }
+        window.location.assign(data.url);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Unable to open your Stripe Express dashboard.");
+      }
+    });
+  }
+
   function releasePayouts() {
     setPayoutMessage("");
     startTransition(async () => {
@@ -144,8 +164,17 @@ export function StripeSettingsCard({
           {payoutsEnabled ? <Button disabled={isPending} onClick={releasePayouts} type="button">{isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Banknote className="size-4" />}{isPending ? "Sending…" : "Receive pending payouts"}</Button> : null}
         </div>
       ) : null}
+      {isTester && connectAccountId ? (
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button disabled={!stripeConfigured || isPending} onClick={managePayoutAccount} type="button" variant="ghost">
+            {isPending ? <LoaderCircle className="size-4 animate-spin" /> : <ExternalLink className="size-4" />}
+            {isPending ? "Opening Stripe…" : "Manage Stripe Express"}
+          </Button>
+          <Link href="/dashboard/validator/payouts" className="inline-flex min-h-11 items-center gap-2 text-sm text-emerald-300">Bank schedule &amp; earned ledger <ArrowRight className="size-4" /></Link>
+        </div>
+      ) : null}
       {payoutMessage ? <p className="mt-3 text-sm text-neutral-300" role="status">{payoutMessage}</p> : null}
-      {isTester ? <Link href="/dashboard/validator/payouts" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm text-emerald-300">Bank schedule &amp; earned ledger <ArrowRight className="size-4" /></Link> : null}
+      {isTester && !connectAccountId ? <Link href="/dashboard/validator/payouts" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm text-emerald-300">Bank schedule &amp; earned ledger <ArrowRight className="size-4" /></Link> : null}
 
       {isDeveloper ? (
         <div className="mt-4 flex flex-wrap items-center gap-3">

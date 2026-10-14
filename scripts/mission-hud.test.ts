@@ -7,12 +7,16 @@ test("mission pairing uses hashed expiring tokens and synchronizes owned submiss
   let pairRow: Record<string, unknown> | null = null;
   let sessionUserId = "tester-1";
   const createdRows: Array<Record<string, unknown>> = [];
+  const deletionFilters: Array<Record<string, unknown>> = [];
   const prisma = {
     submission: {
       findFirst: async () => ({ id: "submission-1", campaignId: "cohort-1", expiresAt: new Date(Date.now() + 86_400_000) }),
     },
     missionPairSession: {
-      deleteMany: async () => ({ count: 0 }),
+      deleteMany: async ({ where }: { where: Record<string, unknown> }) => {
+        deletionFilters.push(where);
+        return { count: 0 };
+      },
       create: async ({ data }: { data: Record<string, unknown> }) => {
         createdRows.push(data);
         pairRow = {
@@ -72,6 +76,12 @@ test("mission pairing uses hashed expiring tokens and synchronizes owned submiss
     assert.match(String(createdRows[0]?.tokenHash), /^[a-f0-9]{64}$/);
     assert.match(payload.pairUrl, /\/pair\/pair-1#token=/);
     assert.doesNotMatch(payload.pairUrl.split("#")[0], /token=/, "the bearer token must stay out of server request logs");
+    assert.deepEqual(deletionFilters[0], {
+      submissionId: "submission-1",
+      expiresAt: { lte: deletionFilters[0]?.expiresAt && (deletionFilters[0].expiresAt as { lte: Date }).lte },
+    });
+    assert.ok((deletionFilters[0]?.expiresAt as { lte?: unknown })?.lte instanceof Date);
+    assert.equal("connectedAt" in deletionFilters[0], false, "creating another QR must not invalidate a link already scanned before sign-in");
 
     const pending = await pendingRoute.POST(new Request("https://seedenv.example/api/mission-pair/pending", {
       method: "POST",
@@ -162,7 +172,7 @@ test("mobile device estimation offers honest model candidates instead of claimin
 });
 
 test("mission HUD uses real QR payloads, complete compact steps, and spring odometer feedback", async () => {
-  const [pairing, resume, guide, conductor, reward, experience, monitor, signin] = await Promise.all([
+  const [pairing, resume, guide, conductor, reward, experience, monitor, signin, onboarding] = await Promise.all([
     readFile("components/tester/PairingModal.tsx", "utf8"),
     readFile("components/tester/MobilePairResume.tsx", "utf8"),
     readFile("components/tester/MobileMissionGuide.tsx", "utf8"),
@@ -171,6 +181,7 @@ test("mission HUD uses real QR payloads, complete compact steps, and spring odom
     readFile("components/mission-experience.tsx", "utf8"),
     readFile("components/console/TelemetryMonitor.tsx", "utf8"),
     readFile("components/compact-signup-form.tsx", "utf8"),
+    readFile("app/onboarding/page.tsx", "utf8"),
   ]);
 
   assert.match(pairing, /QRCode\.toDataURL\(payload\.pairUrl/);
@@ -198,5 +209,6 @@ test("mission HUD uses real QR payloads, complete compact steps, and spring odom
   assert.match(monitor, /Recording confirmed/);
   assert.match(signin, /resumesMissionPair = nextPath\.startsWith\("\/pair\/"\)/);
   assert.match(signin, /return to your connected mission automatically/);
+  assert.match(onboarding, /"\/pair"/, "onboarding must preserve the post-login mobile pairing callback");
   assert.doesNotMatch(experience, /triggerHaptic\(\);\s*triggerCompletionTone\(\);\s*setProofSubmitted/);
 });

@@ -9,7 +9,7 @@ import { ensureValidatorHandle } from "@/lib/validator-handle";
 import { billingTransaction } from "@/lib/billing-transaction";
 import { attachDeveloperReferral, DeveloperReferralError } from "@/lib/developer-referrals";
 
-const allowedNextPaths = ["/dashboard", "/console", "/admin", "/account", "/validators/join"];
+const allowedNextPaths = ["/dashboard", "/console", "/admin", "/account", "/validators/join", "/pair"];
 
 function cleanNextPath(value: string | undefined) {
   if (!value?.startsWith("/")) return "/dashboard";

@@ -33,7 +33,7 @@ function sameOrigin(request: Request) {
 
 async function authorizePairSession(id: string, token: string) {
   const authSession = await getServerSession(authOptions);
-  if (!authSession?.user?.id || authSession.user.role !== "TESTER") return { error: "Sign in as the assigned tester to use this pairing session.", status: 401 } as const;
+  if (!authSession?.user?.id) return { error: "Sign in as the assigned tester to use this pairing session.", status: 401 } as const;
   const pairSession = await prisma.missionPairSession.findUnique({
     where: { id },
     include: { submission: { select: { testerId: true, status: true, expiresAt: true, campaignId: true } } },

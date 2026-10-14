@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   const completedSteps = [...new Set(parsed.data.completedSteps)].sort((left, right) => left - right);
   const pairSession = await prisma.$transaction(async (tx) => {
     await tx.missionPairSession.deleteMany({
-      where: { submissionId: submission.id, OR: [{ expiresAt: { lte: now } }, { connectedAt: null }] },
+      where: { submissionId: submission.id, expiresAt: { lte: now } },
     });
     return tx.missionPairSession.create({
       data: {
