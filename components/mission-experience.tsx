@@ -176,6 +176,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   const [missionStepIndex, setMissionStepIndex] = useState(0);
   const [completedMissionSteps, setCompletedMissionSteps] = useState<number[]>([]);
   const [pairSession, setPairSession] = useState<PairedMissionSession | null>(null);
+  const [deviceModelDraft, setDeviceModelDraft] = useState("");
   const [mobileEvidenceOpen, setMobileEvidenceOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [scope, animate] = useAnimate();
@@ -263,6 +264,21 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
     setMissionDeckCompact(compact);
     void patchPairedSession({ activeStep: missionStepIndex, completedSteps: completedMissionSteps, compact });
   }, [completedMissionSteps, missionDeckCompact, missionStepIndex, patchPairedSession]);
+
+  const deviceModelValue = pairSession?.state.confirmedDeviceModel || pairSession?.state.deviceProfile?.estimatedModel || "Device model pending";
+
+  useEffect(() => {
+    setDeviceModelDraft(deviceModelValue);
+  }, [deviceModelValue]);
+
+  const handleDeviceModelOverride = useCallback((nextValue: string) => {
+    const trimmed = nextValue.trim();
+    const value = trimmed || pairSession?.state.deviceProfile?.estimatedModel || "Device model pending";
+    if (!pairSession) return;
+    setDeviceModelDraft(value);
+    if (pairSession.state.confirmedDeviceModel === value) return;
+    void patchPairedSession({ confirmedDeviceModel: value }, pairSession);
+  }, [pairSession, patchPairedSession]);
 
   const handlePairSessionReady = useCallback((session: PairedMissionSession) => {
     latestPairUpdate.current = session.state.updatedAt;
@@ -888,6 +904,25 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                     <p className="text-emerald-300">● Mobile connected</p>
                     <p className={pairSession.state.recordingConfirmedAt ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{pairSession.state.recordingConfirmedAt ? "● Recording confirmed" : "○ Waiting for recording"}</p>
                   </div>
+                </div>
+                <div className="mt-4 rounded-xl border border-zinc-800 bg-[#0B0F14] p-3">
+                  <label htmlFor="device-model-override" className="block text-[10px] font-mono uppercase tracking-[0.22em] text-sky-300">Device model before launch</label>
+                  <input
+                    id="device-model-override"
+                    type="text"
+                    value={deviceModelDraft}
+                    onChange={(event) => setDeviceModelDraft(event.target.value)}
+                    onBlur={() => handleDeviceModelOverride(deviceModelDraft)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        handleDeviceModelOverride(deviceModelDraft);
+                      }
+                    }}
+                    className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 font-mono text-xs text-zinc-100 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                    placeholder="e.g. iPhone 15 Pro"
+                  />
+                  <p className="mt-2 text-[10px] leading-5 text-zinc-400">This value is sent with the paired mission telemetry before the tester opens the TestFlight build.</p>
                 </div>
                 <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800"><div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400" style={{ width: `${activeMission.instructions.length ? (pairSession.state.completedSteps.length / activeMission.instructions.length) * 100 : 0}%` }} /></div>
                 <p className="mt-2 text-xs text-zinc-500">{pairSession.state.completedSteps.length} of {activeMission.instructions.length} mission steps completed from this desktop.</p>
