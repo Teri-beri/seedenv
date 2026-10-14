@@ -5,7 +5,7 @@ import { normalizeQaIntake, runQaIntakeAgent, type QaIntakeInput, type QaIntakeR
 import { composeInstructionDetail, finalizeBlueprint } from "@/lib/ai/agents/spec-architect.agent";
 import { finalizeSynthesis, type SynthesisInput } from "@/lib/ai/agents/synthesis.agent";
 import { normalizeFraudVerdict, runFraudWatchdogAgent } from "@/lib/ai/agents/fraud-watchdog.agent";
-import { buildClarificationNote, decideAuditOutcome, textSimilarity } from "@/lib/ai/qa-audit";
+import { buildClarificationNote, decideAuditOutcome, previewTesterEvidenceQuality, textSimilarity } from "@/lib/ai/qa-audit";
 import { allowAgentCall, resetAgentLimits } from "@/lib/ai/agent-route";
 import { isAutoApprovalDue, isFraudHeld } from "@/lib/auto-approval-window";
 
@@ -34,6 +34,39 @@ const intakeInput: QaIntakeInput = {
 };
 
 const intake = (overrides: Partial<QaIntakeResult> = {}): QaIntakeResult => ({ qualityScore: 2, reproductionValid: false, missingFields: ["exact steps"], action: "REQUEST_CLARIFICATION", feedbackToTester: "Please add the exact steps you took.", isDuplicate: false, duplicateOfId: null, ...overrides });
+
+test("tester evidence preview rewards recordings and flags missing reproduction detail", () => {
+  const preview = previewTesterEvidenceQuality({
+    feedbackText: "Expected checkout to complete, but it froze after tapping Pay with Apple Pay on iPhone 15. The app stayed on the loading screen.",
+    hasRecording: true,
+    hasScreenshot: true,
+    deviceModel: "iPhone 15",
+    osBuild: "iOS 18.1",
+    appBuildVersion: "1.4.2",
+    networkType: "Wi-Fi",
+    crashLogs: "EXC_BAD_ACCESS",
+    networkLogs: "POST /checkout 500",
+  });
+  assert.ok(preview.score >= 80);
+  assert.match(preview.label, /Strong evidence|Good evidence/);
+  assert.ok(preview.strengths.some((item) => item.includes("recording") || item.includes("Device and build")));
+  assert.ok(preview.gaps.length === 0 || preview.gaps.some((item) => item.includes("expected") || item.includes("steps")));
+
+  const weak = previewTesterEvidenceQuality({
+    feedbackText: "The app bugged out.",
+    hasRecording: false,
+    hasScreenshot: false,
+    deviceModel: null,
+    osBuild: null,
+    appBuildVersion: null,
+    networkType: null,
+    crashLogs: null,
+    networkLogs: null,
+  });
+  assert.ok(weak.score < 60);
+  assert.match(weak.label, /Needs a bit more detail|Low-effort report/);
+  assert.ok(weak.gaps.length > 0);
+});
 
 test("low-effort report leads to clarification with concrete missing fields", async () => {
   const { client, requests } = fakeModels([JSON.stringify({ qualityScore: 2, reproductionValid: false, missingFields: [], action: "APPROVE", feedbackToTester: "Thanks! Could you describe what happened at each step?", isDuplicate: true, duplicateOfId: "made_up" })]);

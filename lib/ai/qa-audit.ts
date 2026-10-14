@@ -50,6 +50,97 @@ export type AuditDecision = {
   autoClarify: boolean;
 };
 
+export type EvidenceTrustPreview = {
+  score: number;
+  label: string;
+  strengths: string[];
+  gaps: string[];
+  guidance: string;
+};
+
+export function previewTesterEvidenceQuality(input: {
+  feedbackText: string;
+  hasRecording: boolean;
+  hasScreenshot: boolean;
+  deviceModel?: string | null;
+  osBuild?: string | null;
+  appBuildVersion?: string | null;
+  networkType?: string | null;
+  crashLogs?: string | null;
+  networkLogs?: string | null;
+}): EvidenceTrustPreview {
+  let score = 38;
+  const strengths: string[] = [];
+  const gaps: string[] = [];
+
+  if (input.hasRecording) {
+    score += 30;
+    strengths.push("Screen recording is attached");
+  } else if (input.hasScreenshot) {
+    score += 16;
+    strengths.push("Screenshot is attached");
+  } else {
+    score -= 8;
+    gaps.push("Add a screen recording or screenshot to anchor the report.");
+  }
+
+  const feedback = input.feedbackText.trim();
+  if (feedback.length >= 120) {
+    score += 18;
+    strengths.push("Report has enough detail to be understandable");
+  } else if (feedback.length < 40) {
+    score -= 12;
+    gaps.push("Add more context about what you expected vs. what actually happened.");
+  }
+
+  if (/expected|actual|instead|before|after|when|while|but/i.test(feedback)) {
+    score += 10;
+    strengths.push("Expected vs actual behavior is described");
+  } else {
+    gaps.push("State the expected result and the actual result in plain language.");
+  }
+
+  if (/\b(step|steps|1\.|2\.|repro|reproduce|open|tap|select|click)/i.test(feedback)) {
+    score += 8;
+    strengths.push("Reproduction steps are present");
+  } else {
+    gaps.push("List the exact steps from start to finish so it can be reproduced.");
+  }
+
+  if (input.deviceModel || input.osBuild || input.appBuildVersion) {
+    score += 10;
+    strengths.push("Device and build context is included");
+  } else {
+    gaps.push("Add your device model, iOS/Android build, or app version.");
+  }
+
+  if (input.networkType || input.crashLogs || input.networkLogs) {
+    score += 8;
+    strengths.push("Network or crash context is included");
+  } else {
+    gaps.push("Add a quick note on network conditions or paste crash logs if relevant.");
+  }
+
+  if (!input.hasRecording) {
+    gaps.push("Prefer a screen recording when possible — it gives reviewers the strongest evidence.");
+  }
+
+  const normalized = Math.min(100, Math.max(0, Math.round(score)));
+  const label = normalized >= 85 ? "Strong evidence" : normalized >= 70 ? "Good evidence" : normalized >= 55 ? "Needs a bit more detail" : "Low-effort report";
+  const guidance = normalized >= 85
+    ? "This is enough to review quickly. Keep the recording in view and submit as-is."
+    : normalized >= 70
+      ? "Strong start. Add one more missing detail like exact steps or network conditions to improve trust."
+      : normalized >= 55
+        ? "The review is salvageable. Add expected vs actual results and a clearer reproduction path."
+        : "This needs more evidence before developers can act on it. Record the path to the issue and explain the exact failure.";
+
+  const uniqueStrengths = [...new Set(strengths)].slice(0, 3);
+  const uniqueGaps = [...new Set(gaps)].slice(0, 3);
+
+  return { score: normalized, label, strengths: uniqueStrengths, gaps: uniqueGaps, guidance };
+}
+
 export function decideAuditOutcome(intake: QaIntakeResult, fraud: FraudWatchdogResult | null, signals: DeterministicSignals): AuditDecision {
   let risk = fraud?.riskScore ?? 0;
   const flags: string[] = [...(fraud?.flags ?? [])];

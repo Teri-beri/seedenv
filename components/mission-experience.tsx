@@ -15,6 +15,7 @@ import { MobileMissionGuide } from "@/components/tester/MobileMissionGuide";
 import { PairingModal, type MissionPairClientState, type PairedMissionSession } from "@/components/tester/PairingModal";
 import { RewardModal } from "@/components/tester/RewardModal";
 import { collectMissionDeviceProfile } from "@/lib/mission-device-profile";
+import { previewTesterEvidenceQuality } from "@/lib/ai/qa-audit";
 import { xpForBounty } from "@/lib/rank";
 import { availableSlots, discoverMissions, type MissionFilter, type MissionSort } from "@/lib/tester-console";
 import { formatCents } from "@/lib/utils";
@@ -208,6 +209,17 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   );
   const requiresRecording = activeMission?.platform === "ROBLOX_EXPERIENCE";
   const showEvidenceForm = companionMode ? mobileEvidenceOpen : !pairSession?.state.connectedAt;
+  const evidencePreview = useMemo(() => previewTesterEvidenceQuality({
+    feedbackText: feedback,
+    hasRecording: Boolean(storedRecording || telemetry.recordingUrl || pairSession?.state.recordingConfirmedAt),
+    hasScreenshot: Boolean(preview || retainedScreenshot),
+    deviceModel: telemetry.deviceModel || pairSession?.state.confirmedDeviceModel || null,
+    osBuild: telemetry.osBuild || pairSession?.state.deviceProfile?.osVersion || null,
+    appBuildVersion: telemetry.appBuildVersion || null,
+    networkType: telemetry.networkType || null,
+    crashLogs: telemetry.crashLogs,
+    networkLogs: telemetry.networkLogs,
+  }), [feedback, pairSession?.state.confirmedDeviceModel, pairSession?.state.deviceProfile?.osVersion, pairSession?.state.recordingConfirmedAt, preview, retainedScreenshot, storedRecording, telemetry]);
 
   const filteredMissions = useMemo(() => discoverMissions(missions, query, filter, sort), [missions, query, filter, sort]);
   const showCompletedPreviews = mode === "discover" && query.trim() === "" && filter === "all";
@@ -963,6 +975,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                 <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Proof capture</p>
                 <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono text-emerald-300">{requiresRecording ? "Required by mission" : "Optional supporting proof"}</span>
               </div>
+              <p className="mt-2 text-xs leading-5 text-emerald-200">Screen recording is the main evidence source. Add it first; screenshots and crash logs are supporting context.</p>
               <div className="mt-3">
                 <p className="text-xs font-mono uppercase tracking-[0.12em] text-white/48">Screen recording <span className="normal-case tracking-normal text-zinc-600">{requiresRecording ? "(required)" : "(optional)"}</span></p>
                 <label className={`mt-1.5 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-dashed px-3 py-2.5 text-sm transition focus-within:ring-2 focus-within:ring-emerald-400/40 ${storedRecording ? "border-emerald-500/30 bg-emerald-500/5" : "border-zinc-700 hover:border-zinc-500"}`}>
@@ -1003,6 +1016,33 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                 ))}
               </div>
             </fieldset>
+            {(feedback.trim() || preview || storedRecording || telemetry.recordingUrl) ? (
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-emerald-300">AI evidence trust</p>
+                    <p className="mt-2 text-xl font-semibold text-white">{evidencePreview.score}/100</p>
+                  </div>
+                  <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-mono text-emerald-200">{evidencePreview.label}</span>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-zinc-300">{evidencePreview.guidance}</p>
+                <p className="mt-2 text-[11px] text-zinc-400">This preview mirrors the QA trust signals developers see — it does not auto-fill your report.</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-zinc-800 bg-[#0B0F14] p-3">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500">Strong signals</p>
+                    <ul className="mt-2 space-y-2 text-xs leading-5 text-zinc-200">
+                      {evidencePreview.strengths.length ? evidencePreview.strengths.map((item) => <li key={item}>• {item}</li>) : <li>• Add more detail to strengthen this submission.</li>}
+                    </ul>
+                  </div>
+                  <div className="rounded-xl border border-zinc-800 bg-[#0B0F14] p-3">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.14em] text-zinc-500">Best next steps</p>
+                    <ul className="mt-2 space-y-2 text-xs leading-5 text-zinc-300">
+                      {evidencePreview.gaps.length ? evidencePreview.gaps.map((item) => <li key={item}>• {item}</li>) : <li>• Your report is already strong enough to submit.</li>}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <label className="block text-sm font-semibold">{isRobloxMission ? "Bug notes or reproduction steps" : "Your feedback"}<textarea value={feedback} maxLength={2000} minLength={12} onChange={(event) => setFeedback(event.target.value)} placeholder={isRobloxMission ? "Describe clipping, frame drops, Luau errors, or steps to reproduce an issue." : "What did you try? What did you expect? What actually happened? Include steps to reproduce a bug."} className="mt-2 min-h-32 w-full rounded-2xl border border-stroke bg-black/24 p-4 text-sm font-normal text-white outline-none placeholder:text-white/34 focus:border-emerald-500/60" /><span className="mt-1 block text-xs font-normal text-neutral-500">At least 12 characters / {feedback.length} of 2,000</span></label>
             <div className="grid gap-3 sm:grid-cols-2"><textarea value={telemetry.crashLogs} onChange={(event) => setTelemetry((current) => ({ ...current, crashLogs: event.target.value }))} placeholder="Crash logs (optional)" className="min-h-24 w-full rounded-xl border border-stroke bg-[#0E1017] p-3 font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60" /><textarea value={telemetry.networkLogs} onChange={(event) => setTelemetry((current) => ({ ...current, networkLogs: event.target.value }))} placeholder="Network logs (optional)" className="min-h-24 w-full rounded-xl border border-stroke bg-[#0E1017] p-3 font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60" /></div>
             <Button className="w-full" onClick={handleSubmit} disabled={isPending || (requiresScreenshot && !proofHash && !retainedScreenshot) || (requiresRecording && !storedRecording && !telemetry.recordingUrl) || (isRobloxMission && (!robloxUsername.trim() || !Object.values(robloxChecklist).every(Boolean))) || appRating < 1 || feedback.trim().length < 12}>
