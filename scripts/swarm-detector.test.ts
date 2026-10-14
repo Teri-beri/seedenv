@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeCoordination, classifyForensics, computeSwarmMetrics, parseRelativeTimeOffset, parseSwarmInput } from "@/lib/swarm-detector";
+import { analyzeCoordination, classifyForensics, computeSwarmMetrics, getSanityVerdict, parseRelativeTimeOffset, parseSwarmInput } from "@/lib/swarm-detector";
 
 test("organic comments remain below the watchlist threshold", () => {
   const entries = parseSwarmInput(`alice | Search worked well, though filters could be clearer. | 2026-10-14T08:00:00Z
@@ -154,4 +154,28 @@ bob | Search is broken on my phone. | 2026-10-14T12:00:00Z
 carol | The hidden fee is bad for customers. | 2026-10-14T18:00:00Z`);
   const organicResult = classifyForensics(organic, computeSwarmMetrics(organic), analyzeCoordination(organic));
   assert.equal(organicResult.quadrant, "Genuine Backlash");
+});
+
+test("sanity verdict maps the inauthenticity index to plain-language bands", () => {
+  assert.equal(getSanityVerdict(100).title, "Manufactured Swarm");
+  assert.equal(getSanityVerdict(60).title, "Manufactured Swarm");
+  assert.equal(getSanityVerdict(59).title, "Echo Chamber");
+  assert.equal(getSanityVerdict(30).title, "Echo Chamber");
+  assert.equal(getSanityVerdict(29).title, "Organic Discourse");
+  assert.equal(getSanityVerdict(0).title, "Organic Discourse");
+
+  assert.equal(getSanityVerdict(85).tone, "alarm");
+  assert.equal(getSanityVerdict(45).tone, "caution");
+  assert.equal(getSanityVerdict(5).tone, "calm");
+});
+
+test("sanity verdict matches the forensic score of a coordinated swarm", () => {
+  const entries = parseSwarmInput(JSON.stringify([
+    { author: "bot1", text: "This fake app is a terrible scam, cancel it now", timeOffsetSec: 1 },
+    { author: "bot2", text: "This fake app is a terrible scam, cancel it now", timeOffsetSec: 2 },
+    { author: "bot3", text: "This fake app is a terrible scam, cancel it now", timeOffsetSec: 3 },
+  ]));
+  const verdict = getSanityVerdict(computeSwarmMetrics(entries).inauthenticityIndex);
+  assert.equal(verdict.title, "Manufactured Swarm");
+  assert.equal(verdict.message, "The hostility on this post is mathematically coordinated. You are not imagining it.");
 });

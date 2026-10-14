@@ -33,6 +33,39 @@ export type ForensicClassification = {
   arrivalVelocity: number;
 };
 
+export type SanityVerdict = {
+  emoji: string;
+  title: string;
+  message: string;
+  tone: "alarm" | "caution" | "calm";
+};
+
+/** Plain-language verdict shown to non-technical visitors, derived from the inauthenticity index. */
+export function getSanityVerdict(score: number): SanityVerdict {
+  if (score >= 60) {
+    return {
+      emoji: "🚨",
+      title: "Manufactured Swarm",
+      message: "The hostility on this post is mathematically coordinated. You are not imagining it.",
+      tone: "alarm",
+    };
+  }
+  if (score >= 30) {
+    return {
+      emoji: "⚠️",
+      title: "Echo Chamber",
+      message: "High repetition of party talking points mixed with real users.",
+      tone: "caution",
+    };
+  }
+  return {
+    emoji: "✅",
+    title: "Organic Discourse",
+    message: "Real people typing their own thoughts.",
+    tone: "calm",
+  };
+}
+
 const BURST_WINDOW_MS = 10 * 60 * 1000;
 const COORDINATION_SIMILARITY = 0.2;
 const HIGH_SIMILARITY_WITHOUT_TIME = 0.55;
