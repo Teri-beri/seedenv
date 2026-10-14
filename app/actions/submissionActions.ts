@@ -19,6 +19,7 @@ import { requireMember } from "@/lib/member";
 import { serializable } from "@/lib/quest-ledger";
 import { startAcceptedApplication } from "@/lib/mission-applications";
 import { versionDirections } from "@/lib/instruction-versions";
+import { publishMissionPairState, serializeMissionPairState } from "@/lib/mission-pairing";
 import { auditSubmission } from "@/lib/ai/qa-audit";
 import { recordCompliancePing } from "@/lib/compliance-pings";
 import { assertProofEditable, proofWindowMs, rejectProof, requestProofRevision, startProofRevision } from "@/lib/submission-lifecycle";
@@ -29,6 +30,7 @@ const proofSchema = z.object({
   proofImageMimeType: z.string().regex(/^image\/(png|jpe?g|webp)$/).optional(),
   proofImageHash: z.string().min(16).max(128).optional(),
   feedbackText: z.string().trim().min(12).max(2000),
+  appRating: z.number().int().min(1).max(5).optional(),
   robloxUsername: z.string().trim().regex(/^[A-Za-z0-9_]{3,20}$/, "Enter a valid Roblox username.").optional().or(z.literal("")),
   robloxChecklist: z.object({
     interfaceScaled: z.boolean(),
@@ -108,6 +110,7 @@ export async function claimTaskSlot(campaignId: string) {
         proofImageUrl: null,
         proofImageHash: null,
         feedbackText: null,
+        appRating: null,
         recordingUrl: null,
         robloxUsername: null,
         robloxChecklist: Prisma.DbNull,
@@ -142,7 +145,10 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
 
   const submission = await prisma.submission.findUnique({
     where: { id: submissionId },
-    include: { campaign: { select: { title: true, developerId: true, hardwareStrict: true, platform: true } } },
+    include: {
+      campaign: { select: { title: true, developerId: true, hardwareStrict: true, platform: true } },
+      instructionVersion: { select: { directions: true } },
+    },
   });
   if (!submission || submission.testerId !== tester.id) throw new Error("Submission not found.");
   const hardware = classifyHardwareSignals(input.hardware ?? null, await requestUserAgent());
@@ -160,13 +166,17 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
     if (input.proofImageHash && input.proofImageHash !== hash) throw new Error("Screenshot hash did not match the uploaded image. Select the file again.");
   }
   const isRoblox = submission.campaign.platform === "ROBLOX_EXPERIENCE";
+  const requiresScreenshot = !isRoblox && Boolean(
+    submission.instructionVersion
+    && versionDirections(submission.instructionVersion).some((direction) => direction.proofType === "SCREENSHOT"),
+  );
   const hasRecording = Boolean(input.recordingUrl || submission.recordingUrl);
   if (isRoblox) {
     if (!hasRecording) throw new Error("Attach a Roblox screen recording before submitting.");
     if (!input.robloxUsername) throw new Error("Enter your Roblox username for founder perks.");
     if (!input.robloxChecklist || !Object.values(input.robloxChecklist).every(Boolean)) throw new Error("Confirm all three Roblox telemetry checks before submitting.");
-  } else if (!buffer && !submission.proofImageUrl) {
-    throw new Error("Add a proof screenshot before submitting.");
+  } else if (requiresScreenshot && !buffer && !submission.proofImageUrl) {
+    throw new Error("These mission directions require a proof screenshot.");
   }
   if (hash) {
     const duplicate = await prisma.submission.findFirst({
@@ -188,16 +198,18 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
     });
   }
 
+  const proofSubmittedAt = new Date();
   const savedSubmission = await serializable(async (tx) => {
     const current = await tx.submission.findUniqueOrThrow({ where: { id: submissionId } });
     if (current.status !== SubmissionStatus.PENDING || current.testerId !== tester.id) throw new Error("This submission has already been reviewed.");
     if (current.revisionRequestedAt?.getTime() !== submission.revisionRequestedAt?.getTime() || current.revisionStartedAt?.getTime() !== submission.revisionStartedAt?.getTime()) throw new Error("Your revision changed during upload. Reload and retry.");
     assertProofEditable(current);
     if (hash && await tx.submission.findFirst({ where: { proofImageHash: hash, id: { not: submissionId }, status: { in: ["PENDING", "APPROVED"] } } })) throw new Error("This screenshot was already submitted to SeedEnv.");
-    return tx.submission.update({ where: { id: submissionId }, data: {
+    const saved = await tx.submission.update({ where: { id: submissionId }, data: {
       proofImageUrl,
       proofImageHash: hash,
       feedbackText: input.feedbackText,
+      appRating: input.appRating ?? current.appRating,
       recordingUrl: input.recordingUrl || (isStoredRecording(current.recordingUrl) ? current.recordingUrl : null),
       robloxUsername: isRoblox ? input.robloxUsername : null,
       robloxChecklist: isRoblox ? input.robloxChecklist : Prisma.DbNull,
@@ -214,12 +226,19 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
       isTouchCapable: input.hardware?.isTouchCapable ?? null,
       batteryLevel: input.hardware?.batteryLevel ?? null,
       isLowPowerMode: input.hardware?.isLowPowerMode ?? null,
-      submittedAt: new Date(),
+      submittedAt: proofSubmittedAt,
       revisionRequestedAt: null,
       revisionStartedAt: null,
       rejectionReason: null,
     } });
+    await tx.missionPairSession.updateMany({
+      where: { submissionId },
+      data: { proofSubmittedAt, lastSeenAt: proofSubmittedAt },
+    });
+    return saved;
   });
+  const pairSessions = await prisma.missionPairSession.findMany({ where: { submissionId } });
+  await Promise.all(pairSessions.map((session) => publishMissionPairState(serializeMissionPairState(session))));
   revalidatePath("/dashboard");
   revalidatePath("/console");
   // A proof submission is observed engagement, so it also records this tester's compliance day.
@@ -242,13 +261,14 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
     await sendNotificationEmail(
       developer.email,
       `New tester feedback: ${submission.campaign.title}`,
-      `Tester ${tester.username} submitted feedback for ${submission.campaign.title}.\n\n${input.feedbackText.slice(0, 3000)}\n\nReview submissions: ${origin}/console`,
+      `Tester ${tester.username} submitted feedback for ${submission.campaign.title}.${input.appRating ? ` App rating: ${input.appRating}/5.` : ""}\n\n${input.feedbackText.slice(0, 3000)}\n\nReview submissions: ${origin}/console`,
     );
   }
   if (developer?.discordWebhookUrl) {
     const message = [
       `New tester feedback for **${submission.campaign.title}**`,
       `Tester: ${tester.username}`,
+      ...(input.appRating ? [`App rating: ${input.appRating}/5`] : []),
       input.feedbackText.slice(0, 1200),
       `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "https://seedenv.com"}/console`,
     ].join("\n");

@@ -2,7 +2,7 @@
 
 import confetti from "canvas-confetti";
 import { motion, useAnimate, useReducedMotion } from "framer-motion";
-import { ArrowUpRight, CheckCircle2, Clock3, Compass, Search, ShieldCheck, Sparkles, UploadCloud, X } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Clock3, Compass, Search, ShieldCheck, Sparkles, Star, UploadCloud, X } from "lucide-react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -58,7 +58,7 @@ type Mission = {
 
 type ProofTelemetry = { osBuild: string; deviceModel: string; screenResolution: string; appBuildVersion: string; networkType: string; recordingUrl: string; crashLogs: string; networkLogs: string };
 type RobloxChecklist = { interfaceScaled: boolean; stableFramerate: boolean; consoleCaptured: boolean };
-type Assignment = { id: string; campaign: Mission; expiresAt: string; submitted: boolean; denialReviewPending?: boolean; revisionRequested?: boolean; revisionStarted?: boolean; revisionNote?: string | null; feedbackText?: string | null; proofPreviewUrl?: string | null; hasScreenshot?: boolean; hasRecording?: boolean; telemetry?: ProofTelemetry; robloxUsername?: string | null; robloxChecklist?: RobloxChecklist | null };
+type Assignment = { id: string; campaign: Mission; expiresAt: string; submitted: boolean; denialReviewPending?: boolean; revisionRequested?: boolean; revisionStarted?: boolean; revisionNote?: string | null; feedbackText?: string | null; appRating?: number | null; proofPreviewUrl?: string | null; hasScreenshot?: boolean; hasRecording?: boolean; telemetry?: ProofTelemetry; robloxUsername?: string | null; robloxChecklist?: RobloxChecklist | null };
 type MissionHistory = { id: string; campaignTitle: string; status: string; payoutCents: number; rejectionReason: string | null; expiresAt: string };
 type MissionView = "progress" | "review" | "revisions" | "history";
 
@@ -158,6 +158,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   const [preview, setPreview] = useState<string | null>(null);
   const [proofHash, setProofHash] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
+  const [appRating, setAppRating] = useState(0);
   const [robloxUsername, setRobloxUsername] = useState("");
   const [robloxChecklist, setRobloxChecklist] = useState<RobloxChecklist>(emptyRobloxChecklist);
   const [proofSubmitted, setProofSubmitted] = useState(false);
@@ -175,6 +176,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   const [missionStepIndex, setMissionStepIndex] = useState(0);
   const [completedMissionSteps, setCompletedMissionSteps] = useState<number[]>([]);
   const [pairSession, setPairSession] = useState<PairedMissionSession | null>(null);
+  const [mobileEvidenceOpen, setMobileEvidenceOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [scope, animate] = useAnimate();
   const autoClaimedMission = useRef<string | null>(null);
@@ -197,6 +199,13 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
       : activeMission?.platform === "PLAY_STORE"
         ? "Google Play Build"
         : "Web App";
+  const requiresScreenshot = Boolean(
+    activeMission
+    && activeMission.platform !== "ROBLOX_EXPERIENCE"
+    && activeMission.instructions.some((instruction) => instruction.proofType === "SCREENSHOT"),
+  );
+  const requiresRecording = activeMission?.platform === "ROBLOX_EXPERIENCE";
+  const showEvidenceForm = companionMode ? mobileEvidenceOpen : !pairSession?.state.connectedAt;
 
   const filteredMissions = useMemo(() => discoverMissions(missions, query, filter, sort), [missions, query, filter, sort]);
   const showCompletedPreviews = mode === "discover" && query.trim() === "" && filter === "all";
@@ -414,6 +423,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
     setPreview(null);
     setProofHash(null);
     setFeedback("");
+    setAppRating(0);
     setRobloxUsername("");
     setRobloxChecklist(emptyRobloxChecklist);
     setTelemetry({ osBuild: "", deviceModel: "", screenResolution: "", appBuildVersion: "", networkType: "", recordingUrl: "", crashLogs: "", networkLogs: "" });
@@ -427,6 +437,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
     setCompletedMissionSteps([]);
     setMissionDeckCompact(false);
     setPairSession(null);
+    setMobileEvidenceOpen(false);
     latestPairUpdate.current = "";
     publishedCompanionProfile.current = null;
   }, []);
@@ -446,6 +457,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
           setSubmissionId(assignment.id);
           setExpiresAt(new Date(updated.expiresAt));
           setFeedback(updated.feedbackText || "");
+          setAppRating(assignment.appRating || 0);
           setRobloxUsername(assignment.robloxUsername || "");
           setRobloxChecklist(assignment.robloxChecklist || emptyRobloxChecklist);
           setPreview(assignment.proofPreviewUrl || null);
@@ -470,6 +482,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
       setRetainedScreenshot(Boolean(assignment.hasScreenshot));
       setStoredRecording(Boolean(assignment.hasRecording));
       setFeedback(assignment.feedbackText || "");
+      setAppRating(assignment.appRating || 0);
       setRobloxUsername(assignment.robloxUsername || "");
       setRobloxChecklist(assignment.robloxChecklist || emptyRobloxChecklist);
       setPreview(assignment.proofPreviewUrl || null);
@@ -570,26 +583,51 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
     }
   }
 
-  function celebrate() {
+  const celebrate = useCallback(() => {
     if (reducedMotion) return;
     confetti({ particleCount: 180, spread: 82, origin: { y: 0.68 }, colors: ["#10B981", "#34D399", "#A7F3D0", "#F4F4F5"] });
     void animate(scope.current, { scale: [0.96, 1.04, 1], opacity: [0.6, 1] }, { duration: 0.7 });
-  }
+  }, [animate, reducedMotion, scope]);
+
+  useEffect(() => {
+    if (companionMode || proofSubmitted || !pairSession?.state.proofSubmittedAt) return;
+    const timeout = window.setTimeout(() => {
+      celebrate();
+      setProofSubmitted(true);
+      setShowRewardModal(true);
+      setMessage(`Evidence received from your phone. ${formatCents(payoutCents)} and ${xpGain} REP are earned on approval.`);
+      router.refresh();
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [celebrate, companionMode, pairSession?.state.proofSubmittedAt, payoutCents, proofSubmitted, router, xpGain]);
+
+  useEffect(() => {
+    if (!showRewardModal || companionMode) return;
+    const timeout = window.setTimeout(() => {
+      setShowRewardModal(false);
+      router.push("/dashboard/validator/payouts");
+    }, 4_500);
+    return () => window.clearTimeout(timeout);
+  }, [companionMode, router, showRewardModal]);
 
   async function handleSubmit() {
     if (proofSubmitted || expired) return;
     const isRoblox = activeMission?.platform === "ROBLOX_EXPERIENCE";
     if (!submissionId) return;
-    if (!isRoblox && !retainedScreenshot && (!selectedFile || !preview || !proofHash)) {
-      setMessage("Add a proof screenshot before submitting.");
+    if (requiresScreenshot && !retainedScreenshot && (!selectedFile || !preview || !proofHash)) {
+      setMessage("These mission directions require a proof screenshot.");
       return;
     }
-    if (isRoblox && !storedRecording && !telemetry.recordingUrl) {
+    if (requiresRecording && !storedRecording && !telemetry.recordingUrl) {
       setMessage("Attach your Roblox screen recording before submitting.");
       return;
     }
     if (isRoblox && (!robloxUsername.trim() || !Object.values(robloxChecklist).every(Boolean))) {
       setMessage("Enter your Roblox username and confirm all three telemetry checks.");
+      return;
+    }
+    if (appRating < 1 || appRating > 5) {
+      setMessage("Rate the app from 1 to 5 before submitting.");
       return;
     }
     startTransition(async () => {
@@ -599,13 +637,21 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
           hardware,
           ...(selectedFile && preview && proofHash ? { proofImageBase64: preview, proofImageMimeType: selectedFile.type, proofImageHash: proofHash } : {}),
           feedbackText: feedback,
+          appRating,
           ...(isRoblox ? { robloxUsername, robloxChecklist } : {}),
           ...telemetry,
         });
-        celebrate();
         setProofSubmitted(true);
-        setShowRewardModal(true);
-        setMessage(`Proof submitted. ${formatCents(payoutCents)} and ${xpGain} REP are earned on approval. Unreviewed proof auto-approves after 48 hours unless held for denial or fraud review.`);
+        if (companionMode) {
+          if ("vibrate" in navigator) navigator.vibrate([80, 50, 140]);
+          setActiveMission(null);
+          setMessage(null);
+          router.replace("/dashboard?view=missions");
+        } else {
+          celebrate();
+          setShowRewardModal(true);
+          setMessage(`Proof submitted. ${formatCents(payoutCents)} and ${xpGain} REP are earned on approval. Unreviewed proof auto-approves after 48 hours unless held for denial or fraud review.`);
+        }
         router.refresh();
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Could not submit proof.");
@@ -758,7 +804,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
               </div>
               <button type="button" disabled={isPending} aria-label="Close mission workspace" onClick={() => { setActiveMission(null); setMessage(null); resetProof(); }} className="rounded-lg p-2 text-neutral-500 hover:bg-white/5 hover:text-white disabled:opacity-50"><X className="size-4" /></button>
             </div>
-            <p className="rounded-lg border border-emerald-500/25 p-3 text-sm text-emerald-200">Accepted directions{activeMission.acceptedInstructionRevision ? `: version ${activeMission.acceptedInstructionRevision}` : ""}. Your work is reviewed against these saved instructions. Later edits do not change reward eligibility.{activeMission.directionsUpdated ? " The developer has published a newer version for new assignments; your steps remain unchanged." : ""}</p>
+            {!companionMode ? <p className="rounded-lg border border-emerald-500/25 p-3 text-sm text-emerald-200">Accepted directions{activeMission.acceptedInstructionRevision ? `: version ${activeMission.acceptedInstructionRevision}` : ""}. Your work is reviewed against these saved instructions. Later edits do not change reward eligibility.{activeMission.directionsUpdated ? " The developer has published a newer version for new assignments; your steps remain unchanged." : ""}</p> : null}
             {proofSubmitted ? (
               <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-5"><CheckCircle2 className="size-8 text-emerald-400" /><h3 className="mt-3 text-lg font-bold">Your feedback is with the developer.</h3><p className="mt-2 text-sm leading-6 text-neutral-400">If approved, you will earn {formatCents(payoutCents)} and {xpGain} REP. You can explore another mission while this one is reviewed.</p></div>
             ) : expired ? (
@@ -769,7 +815,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
               <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 font-mono text-xs text-emerald-300" role="timer">
                 <Clock3 className="size-3.5" /> {isRobloxMission ? "24-Hour Slot Reservation Active:" : "Slot Reserved:"} <Countdown expiresAt={expiresAt} /> remaining
               </div>
-            {!companionMode && (activeMission.platform === "ROBLOX_EXPERIENCE" ? (() => {
+            {!companionMode && !pairSession?.state.connectedAt && (activeMission.platform === "ROBLOX_EXPERIENCE" ? (() => {
               const robloxLaunchHref = buildRobloxLaunchUrl(activeMission.robloxExperienceUrl || activeMission.appUrl, activeMission.robloxPlaceId);
               return robloxLaunchHref ? (
                 <a href={robloxLaunchHref} target="_blank" rel="noopener noreferrer" className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 shadow-lg shadow-sky-500/10 transition-all hover:bg-sky-400">
@@ -784,19 +830,17 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
             {companionMode && pairSession?.state.deviceProfile?.isMobile ? (
               <MobileMissionGuide
                 profile={pairSession.state.deviceProfile}
-                confirmedDeviceModel={pairSession.state.confirmedDeviceModel}
-                recordingConfirmedAt={pairSession.state.recordingConfirmedAt}
                 launchUrl={missionLaunchUrl}
                 platformLabel={missionPlatformLabel}
-                onConfirmModel={(confirmedDeviceModel) => void patchPairedSession({ confirmedDeviceModel })}
-                onConfirmRecording={() => void patchPairedSession({ recordingConfirmed: true })}
+                evidenceReady={mobileEvidenceOpen}
+                onEvidenceReady={() => setMobileEvidenceOpen(true)}
               />
             ) : companionMode && pairSession?.state.deviceProfile ? (
               <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-4 text-sm leading-6 text-amber-200">This companion link opened on a desktop-class browser. Scan the QR code with the physical iPhone, iPad, or Android device that will run the test.</div>
             ) : companionMode ? (
               <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-4 text-sm text-sky-200">Detecting this phone and preparing the mobile mission guide...</div>
             ) : null}
-            {isRobloxMission ? (
+            {!companionMode && isRobloxMission ? (
               <div className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 font-mono text-xs text-zinc-300">
                 <div>
                   <p className="text-[10px] uppercase tracking-[0.24em] text-sky-300">In-Game Telemetry Protocol</p>
@@ -815,19 +859,22 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                 ))}
               </div>
             ) : null}
-            <MissionConductor
-              title={activeMission.title}
-              description={activeMission.description}
-              link={missionLaunchUrl}
-              steps={activeMission.instructions}
-              isRobloxMission={isRobloxMission}
-              compact={missionDeckCompact}
-              activeStepIndex={missionStepIndex}
-              completedSteps={completedMissionSteps}
-              onProgressChange={handleMissionProgress}
-              onToggleCompact={handleCompactToggle}
-              onPairDevice={companionMode ? undefined : () => setShowPairingModal(true)}
-            />
+            {!companionMode ? (
+              <MissionConductor
+                title={activeMission.title}
+                description={activeMission.description}
+                link={missionLaunchUrl}
+                steps={activeMission.instructions}
+                isRobloxMission={isRobloxMission}
+                launchOnPhone={Boolean(pairSession?.state.connectedAt)}
+                compact={missionDeckCompact}
+                activeStepIndex={missionStepIndex}
+                completedSteps={completedMissionSteps}
+                onProgressChange={handleMissionProgress}
+                onToggleCompact={handleCompactToggle}
+                onPairDevice={() => setShowPairingModal(true)}
+              />
+            ) : null}
             {!companionMode && pairSession?.state.deviceProfile ? (
               <div className="rounded-2xl border border-sky-500/25 bg-sky-500/5 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -842,9 +889,16 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                   </div>
                 </div>
                 <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800"><div className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400" style={{ width: `${activeMission.instructions.length ? (pairSession.state.completedSteps.length / activeMission.instructions.length) * 100 : 0}%` }} /></div>
-                <p className="mt-2 text-xs text-zinc-500">{pairSession.state.completedSteps.length} of {activeMission.instructions.length} mission steps completed on the synchronized controller.</p>
+                <p className="mt-2 text-xs text-zinc-500">{pairSession.state.completedSteps.length} of {activeMission.instructions.length} mission steps completed from this desktop.</p>
               </div>
             ) : null}
+            {!showEvidenceForm && !companionMode ? (
+              <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-300">Phone owns evidence submission</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-300">Keep the mission steps open here. When testing is finished, return to SeedEnv on the paired phone, attach the requested evidence, add a rating, and submit. This desktop will display the REP animation automatically.</p>
+              </div>
+            ) : null}
+            <div className={showEvidenceForm ? "contents" : "hidden"}>
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">{pairSession?.state.deviceProfile ? "Paired mobile telemetry" : "Live device telemetry"}</p>
@@ -857,7 +911,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                 <div className="rounded-xl border border-zinc-800 bg-[#0E1017] p-3"><p className="text-[10px] font-mono uppercase tracking-[0.18em] text-zinc-500">GPU renderer</p><p className="mt-2 font-mono text-xs text-zinc-200">{detectedGpu || "Querying WebGL..."}</p></div>
               </div>
             </div>
-            {!isRobloxMission ? <label className="block cursor-pointer rounded-2xl border border-dashed border-zinc-700 bg-[#0A0D12] p-5 text-center backdrop-blur-md transition-all hover:border-zinc-700 focus-within:ring-2 focus-within:ring-emerald-400/40">
+            {requiresScreenshot ? <label className="block cursor-pointer rounded-2xl border border-dashed border-zinc-700 bg-[#0A0D12] p-5 text-center backdrop-blur-md transition-all hover:border-zinc-700 focus-within:ring-2 focus-within:ring-emerald-400/40">
               <input className="sr-only" aria-label="Choose proof screenshot" type="file" disabled={isPending} accept="image/png,image/jpeg,image/webp" onChange={(event) => void handleFile(event.target.files?.[0] || null)} />
               {preview ? <Image src={preview} unoptimized alt="Proof preview" width={640} height={420} className="max-h-56 w-full rounded-2xl object-cover" /> : <UploadCloud className="mx-auto size-10 text-emerald-400" />}
               <p className="mt-3 font-semibold text-white">Upload proof screenshot</p>
@@ -866,10 +920,10 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Proof capture</p>
-                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono text-emerald-300">{isRobloxMission ? "Roblox · required" : "Standard · optional"}</span>
+                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[10px] font-mono text-emerald-300">{requiresRecording ? "Required by mission" : "Optional supporting proof"}</span>
               </div>
               <div className="mt-3">
-                <p className="text-xs font-mono uppercase tracking-[0.12em] text-white/48">Screen recording <span className="normal-case tracking-normal text-zinc-600">{isRobloxMission ? "(required)" : "(optional)"}</span></p>
+                <p className="text-xs font-mono uppercase tracking-[0.12em] text-white/48">Screen recording <span className="normal-case tracking-normal text-zinc-600">{requiresRecording ? "(required)" : "(optional)"}</span></p>
                 <label className={`mt-1.5 flex cursor-pointer items-center justify-between gap-3 rounded-lg border border-dashed px-3 py-2.5 text-sm transition focus-within:ring-2 focus-within:ring-emerald-400/40 ${storedRecording ? "border-emerald-500/30 bg-emerald-500/5" : "border-zinc-700 hover:border-zinc-500"}`}>
                   <input className="sr-only" aria-label="Upload screen recording" type="file" accept={recordingTypes.join(",")} disabled={isPending || recordingUpload.state === "uploading"} onChange={(event) => { void handleRecording(event.target.files?.[0] || null); event.target.value = ""; }} />
                   <span className="min-w-0 truncate text-zinc-300">{recordingUpload.state === "uploading" ? `Uploading ${recordingUpload.name}…` : storedRecording ? `Recording attached${recordingUpload.name ? ` · ${recordingUpload.name}` : ""}` : `Upload MP4, MOV, or WebM (max ${isRobloxMission ? "150MB" : "50MB"})`}</span>
@@ -889,11 +943,31 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                 ] as const).map(([key, label]) => <label key={key} className="flex items-start gap-3 rounded-lg border border-zinc-800 bg-black/20 p-3 text-sm text-zinc-300"><input type="checkbox" className="mt-0.5 size-4 rounded border-zinc-700 bg-zinc-950 text-sky-400 focus:ring-sky-500" checked={robloxChecklist[key]} onChange={(event) => setRobloxChecklist((current) => ({ ...current, [key]: event.target.checked }))} /><span>{label}</span></label>)}
               </fieldset>
             </section> : null}
+            <fieldset className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+              <legend className="px-1 text-sm font-semibold text-zinc-200">Overall app rating</legend>
+              <p className="mt-1 text-xs leading-5 text-zinc-500">This structured rating is sent directly to the developer with your evidence.</p>
+              <div className="mt-3 flex gap-2" role="radiogroup" aria-label="Overall app rating">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <button
+                    key={rating}
+                    type="button"
+                    role="radio"
+                    aria-checked={appRating === rating}
+                    aria-label={`${rating} out of 5 stars`}
+                    onClick={() => setAppRating(rating)}
+                    className={`grid size-11 place-items-center rounded-xl border transition ${rating <= appRating ? "border-amber-400/40 bg-amber-400/10 text-amber-300" : "border-zinc-800 bg-zinc-950 text-zinc-600 hover:text-zinc-300"}`}
+                  >
+                    <Star className="size-5" fill={rating <= appRating ? "currentColor" : "none"} />
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <label className="block text-sm font-semibold">{isRobloxMission ? "Bug notes or reproduction steps" : "Your feedback"}<textarea value={feedback} maxLength={2000} minLength={12} onChange={(event) => setFeedback(event.target.value)} placeholder={isRobloxMission ? "Describe clipping, frame drops, Luau errors, or steps to reproduce an issue." : "What did you try? What did you expect? What actually happened? Include steps to reproduce a bug."} className="mt-2 min-h-32 w-full rounded-2xl border border-stroke bg-black/24 p-4 text-sm font-normal text-white outline-none placeholder:text-white/34 focus:border-emerald-500/60" /><span className="mt-1 block text-xs font-normal text-neutral-500">At least 12 characters / {feedback.length} of 2,000</span></label>
             <div className="grid gap-3 sm:grid-cols-2"><textarea value={telemetry.crashLogs} onChange={(event) => setTelemetry((current) => ({ ...current, crashLogs: event.target.value }))} placeholder="Crash logs (optional)" className="min-h-24 w-full rounded-xl border border-stroke bg-[#0E1017] p-3 font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60" /><textarea value={telemetry.networkLogs} onChange={(event) => setTelemetry((current) => ({ ...current, networkLogs: event.target.value }))} placeholder="Network logs (optional)" className="min-h-24 w-full rounded-xl border border-stroke bg-[#0E1017] p-3 font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60" /></div>
-            <Button className="w-full" onClick={handleSubmit} disabled={isPending || (!isRobloxMission && !proofHash && !retainedScreenshot) || (isRobloxMission && (!storedRecording && !telemetry.recordingUrl || !robloxUsername.trim() || !Object.values(robloxChecklist).every(Boolean))) || feedback.trim().length < 12}>
+            <Button className="w-full" onClick={handleSubmit} disabled={isPending || (requiresScreenshot && !proofHash && !retainedScreenshot) || (requiresRecording && !storedRecording && !telemetry.recordingUrl) || (isRobloxMission && (!robloxUsername.trim() || !Object.values(robloxChecklist).every(Boolean))) || appRating < 1 || feedback.trim().length < 12}>
               <CheckCircle2 className="size-4" /> {isPending ? "Submitting..." : isRobloxMission ? "Submit Roblox Telemetry Proof →" : "Submit for review"}
             </Button>
+            </div>
             </>
             )}
             {message && <p role="status" className="rounded-2xl border border-zinc-700 bg-zinc-800/60 p-3 text-sm text-zinc-200">{message}</p>}
@@ -920,7 +994,10 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
         open={showRewardModal}
         initialRep={reputation}
         addedRep={xpGain}
-        onClose={() => setShowRewardModal(false)}
+        onClose={() => {
+          setShowRewardModal(false);
+          router.push("/dashboard/validator/payouts");
+        }}
         triggerHaptic={triggerHaptic}
         triggerTone={triggerCompletionTone}
       />

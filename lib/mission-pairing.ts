@@ -18,6 +18,7 @@ export type MissionPairState = {
   confirmedDeviceModel: string | null;
   connectedAt: string | null;
   recordingConfirmedAt: string | null;
+  proofSubmittedAt: string | null;
   lastSeenAt: string | null;
   expiresAt: string;
   updatedAt: string;
@@ -52,6 +53,7 @@ export function serializeMissionPairState(session: {
   confirmedDeviceModel: string | null;
   connectedAt: Date | null;
   recordingConfirmedAt: Date | null;
+  proofSubmittedAt: Date | null;
   lastSeenAt: Date | null;
   expiresAt: Date;
   updatedAt: Date;
@@ -67,6 +69,7 @@ export function serializeMissionPairState(session: {
     confirmedDeviceModel: session.confirmedDeviceModel,
     connectedAt: session.connectedAt?.toISOString() ?? null,
     recordingConfirmedAt: session.recordingConfirmedAt?.toISOString() ?? null,
+    proofSubmittedAt: session.proofSubmittedAt?.toISOString() ?? null,
     lastSeenAt: session.lastSeenAt?.toISOString() ?? null,
     expiresAt: session.expiresAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),

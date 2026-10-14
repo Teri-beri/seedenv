@@ -37,6 +37,7 @@ type ReviewSubmission = {
   robloxUsername: string | null;
   robloxChecklist: unknown;
   feedbackText: string | null;
+  appRating: number | null;
   osBuild: string | null;
   deviceModel: string | null;
   screenResolution: string | null;
@@ -975,6 +976,7 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                 )) : <p className="text-sm text-neutral-500">No campaign-specific steps were saved.</p>}
                 <div className="rounded-xl border border-white/10 bg-black/20 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">Tester feedback · {active.tester.username}</p>
+                  <p className="mt-2 font-mono text-sm text-amber-300">{active.appRating ? `${"★".repeat(active.appRating)}${"☆".repeat(5 - active.appRating)} · ${active.appRating}/5` : "No app rating submitted"}</p>
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-200">{active.feedbackText || "No written feedback submitted."}</p>
                   {active.robloxUsername ? <div className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/5 p-3">
                     <p className="font-mono text-xs text-sky-300">Roblox validator: @{active.robloxUsername}</p>

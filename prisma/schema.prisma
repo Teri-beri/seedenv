@@ -748,6 +748,7 @@ model Submission {
   robloxChecklist      Json?                     @map("roblox_checklist")
   proofImageHash       String?
   feedbackText         String?
+  appRating            Int?                      @map("app_rating")
   osBuild              String?
   deviceModel          String?
   screenResolution     String?
@@ -824,6 +825,7 @@ model MissionPairSession {
   confirmedDeviceModel String?    @map("confirmed_device_model") @db.VarChar(120)
   connectedAt          DateTime?  @map("connected_at")
   recordingConfirmedAt DateTime?  @map("recording_confirmed_at")
+  proofSubmittedAt     DateTime?  @map("proof_submitted_at")
   lastSeenAt           DateTime?  @map("last_seen_at")
   expiresAt            DateTime   @map("expires_at")
   createdAt            DateTime   @default(now()) @map("created_at")

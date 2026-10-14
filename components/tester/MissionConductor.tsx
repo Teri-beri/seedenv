@@ -19,6 +19,7 @@ type MissionConductorProps = {
   link: string;
   steps: MissionStep[];
   isRobloxMission?: boolean;
+  launchOnPhone?: boolean;
   onPairDevice?: () => void;
   compact?: boolean;
   onToggleCompact?: () => void;
@@ -53,6 +54,7 @@ export function MissionConductor({
   link,
   steps,
   isRobloxMission = false,
+  launchOnPhone = false,
   onPairDevice,
   compact = false,
   onToggleCompact,
@@ -122,9 +124,15 @@ export function MissionConductor({
             <p className="mt-2 text-zinc-300">{description}</p>
           </div>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-            <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 transition hover:bg-emerald-400">
-              {isRobloxMission ? "Launch Roblox Server" : "Open App / TestFlight"} <ArrowUpRight className="size-4" />
-            </a>
+            {launchOnPhone ? (
+              <div className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-3 text-xs font-bold tracking-tight text-sky-200">
+                Launch build from paired phone <Smartphone className="size-4" />
+              </div>
+            ) : (
+              <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 transition hover:bg-emerald-400">
+                {isRobloxMission ? "Launch Roblox Server" : "Open App / TestFlight"} <ArrowUpRight className="size-4" />
+              </a>
+            )}
             <button type="button" onClick={() => completeStep(safeStepIndex)} disabled={!currentStep || completed.has(safeStepIndex)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-xs font-bold tracking-tight text-white transition hover:border-zinc-600 disabled:cursor-default disabled:text-emerald-300">
               {completed.has(safeStepIndex) ? "Step Complete" : safeStepIndex < steps.length - 1 ? "Mark Step Complete" : "Complete Walkthrough"} {completed.has(safeStepIndex) ? <CheckCircle2 className="size-4" /> : <StepForward className="size-4" />}
             </button>

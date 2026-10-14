@@ -182,7 +182,10 @@ const statements = [
     ADD COLUMN IF NOT EXISTS "device_profile" JSONB,
     ADD COLUMN IF NOT EXISTS "confirmed_device_model" VARCHAR(120),
     ADD COLUMN IF NOT EXISTS "recording_confirmed_at" TIMESTAMP(3),
+    ADD COLUMN IF NOT EXISTS "proof_submitted_at" TIMESTAMP(3),
     ADD COLUMN IF NOT EXISTS "last_seen_at" TIMESTAMP(3)`,
+  `ALTER TABLE "Submission" ADD COLUMN IF NOT EXISTS "app_rating" INTEGER`,
+  `DO $$ BEGIN ALTER TABLE "Submission" ADD CONSTRAINT "Submission_app_rating_check" CHECK ("app_rating" IS NULL OR ("app_rating" >= 1 AND "app_rating" <= 5)); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
 ];
 
 async function main() {

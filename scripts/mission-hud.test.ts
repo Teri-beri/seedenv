@@ -172,7 +172,7 @@ test("mobile device estimation offers honest model candidates instead of claimin
 });
 
 test("mission HUD uses real QR payloads, complete compact steps, and spring odometer feedback", async () => {
-  const [pairing, resume, guide, conductor, reward, experience, monitor, signin, onboarding] = await Promise.all([
+  const [pairing, resume, guide, conductor, reward, experience, monitor, signin, onboarding, submissionAction] = await Promise.all([
     readFile("components/tester/PairingModal.tsx", "utf8"),
     readFile("components/tester/MobilePairResume.tsx", "utf8"),
     readFile("components/tester/MobileMissionGuide.tsx", "utf8"),
@@ -182,6 +182,7 @@ test("mission HUD uses real QR payloads, complete compact steps, and spring odom
     readFile("components/console/TelemetryMonitor.tsx", "utf8"),
     readFile("components/compact-signup-form.tsx", "utf8"),
     readFile("app/onboarding/page.tsx", "utf8"),
+    readFile("app/actions/submissionActions.ts", "utf8"),
   ]);
 
   assert.match(pairing, /QRCode\.toDataURL\(payload\.pairUrl/);
@@ -189,10 +190,10 @@ test("mission HUD uses real QR payloads, complete compact steps, and spring odom
   assert.match(resume, /mission-pair\/pending/);
   assert.match(resume, /callbackUrl/);
   assert.match(resume, /companion/);
-  assert.match(guide, /Start native screen recording/);
-  assert.match(guide, /Control Center/);
-  assert.match(guide, /Quick Settings/);
-  assert.match(guide, /I started screen recording/);
+  assert.match(guide, /Your computer is showing the mission steps/);
+  assert.match(guide, /Open \{platformLabel\}/);
+  assert.match(guide, /I finished testing · Add evidence/);
+  assert.doesNotMatch(guide, /instructionTitle|completedSteps|Start native screen recording/);
   assert.match(conductor, /steps\.map\(\(step, index\)/);
   assert.match(conductor, /navigator\.vibrate\(35\)/);
   assert.match(conductor, /createOscillator/);
@@ -205,6 +206,14 @@ test("mission HUD uses real QR payloads, complete compact steps, and spring odom
   assert.match(experience, /collectHardwareSignals/);
   assert.match(experience, /collectMissionDeviceProfile/);
   assert.match(experience, /Paired Mobile Node/);
+  assert.match(experience, /!companionMode \? \(\s*<MissionConductor/);
+  assert.match(experience, /pairSession\?\.state\.proofSubmittedAt/);
+  assert.match(experience, /router\.push\("\/dashboard\/validator\/payouts"\)/);
+  assert.match(experience, /Overall app rating/);
+  assert.match(conductor, /Launch build from paired phone/);
+  assert.match(submissionAction, /appRating: z\.number\(\)\.int\(\)\.min\(1\)\.max\(5\)/);
+  assert.match(submissionAction, /data: \{ proofSubmittedAt, lastSeenAt: proofSubmittedAt \}/);
+  assert.match(submissionAction, /publishMissionPairState\(serializeMissionPairState\(session\)\)/);
   assert.match(monitor, /LIVE VALIDATOR NODES/);
   assert.match(monitor, /Recording confirmed/);
   assert.match(signin, /resumesMissionPair = nextPath\.startsWith\("\/pair\/"\)/);

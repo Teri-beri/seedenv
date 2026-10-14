@@ -18,6 +18,7 @@ export type MissionPairClientState = {
   confirmedDeviceModel: string | null;
   connectedAt: string | null;
   recordingConfirmedAt: string | null;
+  proofSubmittedAt: string | null;
   lastSeenAt: string | null;
   expiresAt: string;
   updatedAt: string;
@@ -138,13 +139,13 @@ export function PairingModal({ open, submissionId, activeStep, completedSteps, c
               <p className="text-[10px] font-mono uppercase tracking-[0.25em]">Pair mobile session</p>
             </div>
             <h3 className="mt-3 text-xl font-semibold text-white">Sync your live mission</h3>
-            <p className="mt-2 text-sm leading-6 text-zinc-400">Scan this encrypted session link with the phone signed into your SeedEnv tester account. Progress will stay synchronized across both screens.</p>
+            <p className="mt-2 text-sm leading-6 text-zinc-400">Scan this encrypted link with the testing phone. Your computer keeps the mission steps while the phone launches the build and submits evidence.</p>
 
             <div className="mt-4 grid grid-cols-3 gap-2">
               {[
                 ["1", "Scan", "Use the testing phone"],
                 ["2", "Sign in", "Your slot stays reserved"],
-                ["3", "Resume", "Phone guide opens"],
+                ["3", "Launch", "Open the test build"],
               ].map(([number, title, detail]) => (
                 <div key={number} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-2.5 text-center">
                   <span className="mx-auto grid size-6 place-items-center rounded-full bg-sky-500 text-[10px] font-bold text-zinc-950">{number}</span>
