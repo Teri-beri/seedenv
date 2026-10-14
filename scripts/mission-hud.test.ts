@@ -208,6 +208,7 @@ test("mission HUD uses real QR payloads, complete compact steps, and spring odom
   assert.match(experience, /Paired Mobile Node/);
   assert.match(experience, /!companionMode \? \(\s*<MissionConductor/);
   assert.match(experience, /pairSession\?\.state\.proofSubmittedAt/);
+  assert.match(experience, /payload\.state\.connectedAt\) setShowPairingModal\(false\)/);
   assert.match(experience, /router\.push\("\/dashboard\/validator\/payouts"\)/);
   assert.match(experience, /Overall app rating/);
   assert.match(conductor, /Launch build from paired phone/);

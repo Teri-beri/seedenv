@@ -329,6 +329,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
         if (cancelled) return;
         applyPairedState(payload.state);
         setPairSession((current) => current ? { ...current, state: payload.state as MissionPairClientState } : current);
+        if (!companionMode && payload.state.connectedAt) setShowPairingModal(false);
       } catch (error) {
         if (!cancelled) setMessage(error instanceof Error ? error.message : "Paired mission state could not be refreshed.");
       }
