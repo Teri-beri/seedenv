@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { requireMember } from "@/lib/member";
 import { serializable } from "@/lib/quest-ledger";
 import { createMissionApplication, reviewMissionApplication, closeMissionApplication, MissionApplicationError } from "@/lib/mission-applications";
 import { prisma } from "@/lib/prisma";
 import { acceptApplicationWithFunding } from "@/lib/slot-funding";
+import { notifyDeveloperOfMissionRequest } from "@/lib/mission-request-notifications";
 
 export async function requestMission(campaignId: string, note: string) {
   const input = z.object({
@@ -17,8 +19,11 @@ export async function requestMission(campaignId: string, note: string) {
   try {
     const member = await requireMember();
     if (member.role !== "TESTER") return { ok: false as const, message: "Switch to your tester workspace before requesting to join." };
-    await serializable((tx) => createMissionApplication(tx, member.id, input.data.campaignId, input.data.note));
+    const application = await serializable((tx) => createMissionApplication(tx, member.id, input.data.campaignId, input.data.note));
     for (const path of ["/dashboard", "/applications", "/console"]) revalidatePath(path);
+    after(() => notifyDeveloperOfMissionRequest(application.id).catch((error) => {
+      console.warn("SeedEnv tester request email failed:", error instanceof Error ? error.message : error);
+    }));
     return { ok: true as const, message: "Request sent. The developer will decide whether to accept you." };
   } catch (error) {
     if (error instanceof MissionApplicationError) return { ok: false as const, message: error.message };

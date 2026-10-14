@@ -16,19 +16,22 @@ function escapeHtml(value: string) {
   })[character] || character);
 }
 
-export async function sendNotificationEmail(to: string, subject: string, text: string) {
+export async function sendNotificationEmail(to: string, subject: string, text: string, idempotencyKey?: string) {
   const apiKey = process.env.RESEND_API_KEY?.trim().replace(/^['"]|['"]$/g, "");
   if (!apiKey) return false;
 
   try {
     const resend = new Resend(apiKey);
-    const { error } = await resend.emails.send({
-      from: process.env.AUTH_EMAIL_FROM?.trim() || "SeedEnv Authentication <auth@seedenv.com>",
-      to,
-      subject,
-      text,
-      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;white-space:pre-wrap">${escapeHtml(text)}</div>`,
-    });
+    const { error } = await resend.emails.send(
+      {
+        from: process.env.AUTH_EMAIL_FROM?.trim() || "SeedEnv Authentication <auth@seedenv.com>",
+        to,
+        subject,
+        text,
+        html: `<div style="font-family:Arial,sans-serif;line-height:1.6;white-space:pre-wrap">${escapeHtml(text)}</div>`,
+      },
+      idempotencyKey ? { idempotencyKey } : undefined,
+    );
     if (error) {
       console.warn("SeedEnv notification email failed:", error.message);
       return false;

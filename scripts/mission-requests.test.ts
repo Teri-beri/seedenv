@@ -6,6 +6,7 @@ test("join actions return readable expected errors and never report failed reque
   let role = "TESTER";
   let failure: Error | null = null;
   let saved = 0;
+  const notified: string[] = [];
   const revalidated: string[] = [];
   const logged: unknown[] = [];
   const modules = [
@@ -19,11 +20,14 @@ test("join actions return readable expected errors and never report failed reque
         assert.equal(note, "A relevant tester application.");
         if (failure) throw failure;
         saved++;
+        return { id: "application-1" };
       },
       reviewMissionApplication: async () => {},
       closeMissionApplication: async () => {},
     } }),
     mock.module("next/cache", { namedExports: { revalidatePath: (path: string) => revalidated.push(path) } }),
+    mock.module("next/server", { namedExports: { after: (work: () => void | Promise<void>) => work() } }),
+    mock.module("../lib/mission-request-notifications.ts", { namedExports: { notifyDeveloperOfMissionRequest: async (id: string) => { notified.push(id); return true; } } }),
   ];
   const logger = mock.method(console, "error", (...args: unknown[]) => { logged.push(args); });
   try {
@@ -31,6 +35,7 @@ test("join actions return readable expected errors and never report failed reque
     const good = await requestMission("cohort", "  A relevant tester application.  ");
     assert.equal(good.ok, true);
     assert.equal(saved, 1);
+    assert.deepEqual(notified, ["application-1"]);
     assert.deepEqual(revalidated, ["/dashboard", "/applications", "/console"]);
     for (const message of [
       "You cannot apply to your own cohort.",

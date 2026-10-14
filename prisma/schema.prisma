@@ -111,7 +111,7 @@ model User {
   githubUsername            String?                 @map("github_username")
   discordUrl                String?                 @map("discord_url")
   twitterHandle             String?                 @map("twitter_handle")
-  notificationPreferences   Json                    @default("{\"email_tester_feedback\":true,\"email_ledger_updates\":true,\"email_announcements\":false}") @map("notification_preferences")
+  notificationPreferences   Json                    @default("{\"email_tester_requests\":true,\"email_tester_feedback\":true,\"email_ledger_updates\":true,\"email_announcements\":false}") @map("notification_preferences")
   messageRequestsEnabled    Boolean                 @default(true)
   following                 UserFollow[]            @relation("Following")
   followers                 UserFollow[]            @relation("Followers")
