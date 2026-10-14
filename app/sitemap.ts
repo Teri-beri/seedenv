@@ -36,6 +36,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/blog`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE_URL}/guides`, changeFrequency: "monthly", priority: 0.8 },
     ...testingGuides.map((guide) => ({ url: `${SITE_URL}/guides/${guide.slug}`, changeFrequency: "monthly" as const, priority: 0.7 })),
+    { url: `${SITE_URL}/tools/swarm-detector`, changeFrequency: "monthly", priority: 0.7 },
     { url: `${SITE_URL}/auth/signin`, changeFrequency: "yearly", priority: 0.5 },
     { url: `${SITE_URL}/faq`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/about`, changeFrequency: "monthly", priority: 0.6 },
