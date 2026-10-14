@@ -62,10 +62,11 @@ const filters: Array<{ id: MissionFilter; label: string }> = [
   { id: "WEB_STAGING", label: "Web apps" },
   { id: "TESTFLIGHT", label: "iOS / TestFlight" },
   { id: "PLAY_STORE", label: "Android" },
+  { id: "ROBLOX_EXPERIENCE", label: "Roblox" },
   { id: "high-bounty", label: "$5+ rewards" },
 ];
 
-const platformLabels: Record<string, string> = { WEB_STAGING: "Web · PWA", TESTFLIGHT: "iOS · TestFlight", PLAY_STORE: "Android · Play" };
+const platformLabels: Record<string, string> = { WEB_STAGING: "Web · PWA", TESTFLIGHT: "iOS · TestFlight", PLAY_STORE: "Android · Play", ROBLOX_EXPERIENCE: "Roblox · Experience" };
 const completedMissionPreviews = [
   {
     title: "FinFlow Staging Auth",

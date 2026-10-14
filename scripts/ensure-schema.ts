@@ -110,6 +110,13 @@ const statements = [
     ADD COLUMN IF NOT EXISTS "launched_at" TIMESTAMP(3),
     ADD COLUMN IF NOT EXISTS "fill_guarantee_credited_cents" INTEGER NOT NULL DEFAULT 0`,
   `CREATE INDEX IF NOT EXISTS "AppCampaign_launched_at_idx" ON "AppCampaign"("launched_at")`,
+  `ALTER TYPE "PlatformType" ADD VALUE IF NOT EXISTS 'ROBLOX_EXPERIENCE'`,
+  `DO $$ BEGIN CREATE TYPE "RobloxAuditFocus" AS ENUM ('MOBILE_GUI_SCALING', 'LOW_END_MEMORY_THROTTLE', 'CONCURRENT_SERVER_STRESS', 'DATASTORE_EXPLOIT_VERIFICATION', 'CONSOLE_CONTROLLER_MAPPING'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `ALTER TABLE "AppCampaign"
+    ADD COLUMN IF NOT EXISTS "roblox_experience_url" TEXT,
+    ADD COLUMN IF NOT EXISTS "roblox_universe_id" TEXT,
+    ADD COLUMN IF NOT EXISTS "roblox_audit_focus" "RobloxAuditFocus",
+    ADD COLUMN IF NOT EXISTS "min_memory_gb" INTEGER`,
 ];
 
 async function main() {

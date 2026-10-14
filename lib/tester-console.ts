@@ -1,4 +1,4 @@
-export type MissionFilter = "all" | "WEB_STAGING" | "TESTFLIGHT" | "PLAY_STORE" | "high-bounty";
+export type MissionFilter = "all" | "WEB_STAGING" | "TESTFLIGHT" | "PLAY_STORE" | "ROBLOX_EXPERIENCE" | "high-bounty";
 export type MissionSort = "reward" | "slots";
 
 export const testerViews = [

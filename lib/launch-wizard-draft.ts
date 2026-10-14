@@ -12,8 +12,12 @@ export const launchWizardDraftSchema = z.object({
   version: z.literal(1),
   form: z.object({
     title: z.string().max(90),
-    platform: z.enum(["TESTFLIGHT", "WEB_STAGING", "PLAY_STORE"]),
+    platform: z.enum(["TESTFLIGHT", "WEB_STAGING", "PLAY_STORE", "ROBLOX_EXPERIENCE"]),
     appUrl: z.string().max(4000),
+    robloxExperienceUrl: z.string().max(4000).optional(),
+    robloxUniverseId: z.string().max(20).optional(),
+    robloxAuditFocus: z.enum(["MOBILE_GUI_SCALING", "LOW_END_MEMORY_THROTTLE", "CONCURRENT_SERVER_STRESS", "DATASTORE_EXPLOIT_VERIFICATION", "CONSOLE_CONTROLLER_MAPPING"]).nullable().optional(),
+    minMemoryGB: z.number().int().min(1).max(64).nullable().optional(),
     iconUrl: z.string().max(4000).optional(),
     targetVibe: z.string().max(80),
     description: z.string().max(1400),

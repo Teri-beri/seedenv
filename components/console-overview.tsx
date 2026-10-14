@@ -37,6 +37,7 @@ const platformLabels: Record<PlatformType, string> = {
   [PlatformType.TESTFLIGHT]: "iOS TestFlight",
   [PlatformType.PLAY_STORE]: "Android Play Console",
   [PlatformType.WEB_STAGING]: "Web staging",
+  [PlatformType.ROBLOX_EXPERIENCE]: "Roblox Experience",
 };
 
 function plural(count: number, one: string, many = `${one}s`) {

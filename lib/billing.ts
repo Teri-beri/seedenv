@@ -28,6 +28,7 @@ export function platformTag(platform: PlatformType | null | undefined) {
   if (platform === "TESTFLIGHT") return "iOS";
   if (platform === "PLAY_STORE") return "Android";
   if (platform === "WEB_STAGING") return "Web";
+  if (platform === "ROBLOX_EXPERIENCE") return "Roblox";
   return null;
 }
 

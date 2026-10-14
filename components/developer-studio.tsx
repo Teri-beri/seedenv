@@ -1,8 +1,8 @@
 "use client";
 
-import { PlatformType, TaskProofType } from "@prisma/client";
+import { PlatformType, RobloxAuditFocus, TaskProofType } from "@prisma/client";
 import { motion } from "framer-motion";
-import { ArrowDown, ArrowUp, BadgeDollarSign, Boxes, CheckCircle2, ExternalLink, FileJson, ImageIcon, ImagePlus, LoaderCircle, Play, Plus, RotateCcw, Terminal, Trash2, XCircle } from "lucide-react";
+import { ArrowDown, ArrowUp, BadgeDollarSign, Boxes, CheckCircle2, ExternalLink, FileJson, Gamepad2, ImageIcon, ImagePlus, LoaderCircle, Play, Plus, RotateCcw, Terminal, Trash2, XCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,6 +22,7 @@ import { useLaunchAutosave } from "@/components/use-launch-autosave";
 import { CohortPromoInput, type AppliedCohortPromo } from "@/components/cohort-promo-input";
 import { CheckoutSummaryModal } from "@/components/campaign/CheckoutSummaryModal";
 import { ArtifactsToolbar, type ArtifactFilter } from "@/components/console/ArtifactsToolbar";
+import { isRobloxExperienceUrl, ROBLOX_AUDIT_FOCUS_LABELS } from "@/lib/roblox-cohorts";
 
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
@@ -84,6 +85,10 @@ type CampaignDraft = {
   title: string;
   platform: PlatformType;
   appUrl: string;
+  robloxExperienceUrl: string | null;
+  robloxUniverseId: string | null;
+  robloxAuditFocus: RobloxAuditFocus | null;
+  minMemoryGB: number | null;
   iconUrl: string | null;
   targetVibe: string;
   description: string;
@@ -127,6 +132,10 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     title: initialDraft.title,
     platform: initialDraft.platform,
     appUrl: initialDraft.appUrl,
+    robloxExperienceUrl: initialDraft.robloxExperienceUrl || "",
+    robloxUniverseId: initialDraft.robloxUniverseId || "",
+    robloxAuditFocus: initialDraft.robloxAuditFocus,
+    minMemoryGB: initialDraft.minMemoryGB,
     iconUrl: initialDraft.iconUrl || "",
     targetVibe: initialDraft.targetVibe,
     description: initialDraft.description,
@@ -145,6 +154,10 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     title: "",
     platform: PlatformType.TESTFLIGHT,
     appUrl: "",
+    robloxExperienceUrl: "",
+    robloxUniverseId: "",
+    robloxAuditFocus: null,
+    minMemoryGB: null,
     iconUrl: "",
     targetVibe: vibes[0],
     description: "",
@@ -222,6 +235,12 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
       if (title.length < 4 || title.length > 90) nextErrors.title = "Use 4 to 90 characters for the app title.";
       const appUrl = parseHttpUrl(form.appUrl);
       if (!appUrl) nextErrors.appUrl = "Enter a valid HTTP or HTTPS app URL.";
+      if (form.platform === PlatformType.ROBLOX_EXPERIENCE) {
+        if (!form.robloxExperienceUrl || !isRobloxExperienceUrl(form.robloxExperienceUrl)) nextErrors.robloxExperienceUrl = "Enter a valid https://www.roblox.com/games/{placeId}/... URL.";
+        if (form.robloxUniverseId && !/^\d{1,20}$/.test(form.robloxUniverseId)) nextErrors.robloxUniverseId = "Use a numeric Roblox Universe or Place ID.";
+        if (!form.robloxAuditFocus) nextErrors.robloxAuditFocus = "Choose the primary Roblox audit focus.";
+        if (form.minMemoryGB !== null && form.minMemoryGB !== undefined && (!Number.isInteger(form.minMemoryGB) || form.minMemoryGB < 1 || form.minMemoryGB > 64)) nextErrors.minMemoryGB = "Use a minimum-memory target between 1 and 64 GB.";
+      }
       if ((form.targetVibe || "").trim().length < 3) nextErrors.targetVibe = "Choose a target audience.";
       if (form.description.trim().length < 24) nextErrors.description = "Add at least 24 characters so testers know what to validate.";
       if (form.description.length > 1400) nextErrors.description = "Mission brief must be 1,400 characters or fewer.";
@@ -490,17 +509,50 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                 </div>
                 {activeBundle ? <p className="mt-2 text-xs leading-5 text-zinc-500">{activeBundle.summary}</p> : null}
               </fieldset>
-              <AiSpecDrafter inputs={aiInputs} onInputsChange={setAiInputs} onApply={applyBlueprint} platform={form.platform === PlatformType.WEB_STAGING ? "WEB" : form.platform === PlatformType.PLAY_STORE ? "ANDROID" : "IOS"} />
+              <AiSpecDrafter inputs={aiInputs} onInputsChange={setAiInputs} onApply={applyBlueprint} platform={form.platform === PlatformType.WEB_STAGING ? "WEB" : form.platform === PlatformType.PLAY_STORE ? "ANDROID" : form.platform === PlatformType.ROBLOX_EXPERIENCE ? "ROBLOX" : "IOS"} />
               <Field error={errors.title} label="App title" maxLength={90} required value={form.title} onChange={(value) => updateFormField("title", value)} />
               <label className="space-y-2 text-sm font-semibold text-white/72">
                 Platform
-                <select disabled={Boolean(activeBundle?.platform)} style={{ colorScheme: "dark" }} value={form.platform} onChange={(event) => updateFormField("platform", event.target.value as PlatformType)} className={`${selectClass} disabled:opacity-60`}>
+                <select disabled={Boolean(activeBundle?.platform)} style={{ colorScheme: "dark" }} value={form.platform} onChange={(event) => {
+                  const platform = event.target.value as PlatformType;
+                  setForm((current) => ({
+                    ...current,
+                    platform,
+                    ...(platform === PlatformType.ROBLOX_EXPERIENCE
+                      ? { appUrl: current.robloxExperienceUrl || current.appUrl, robloxExperienceUrl: current.robloxExperienceUrl || current.appUrl, targetVibe: current.targetVibe === vibes[0] ? "Roblox players & creators" : current.targetVibe }
+                      : {}),
+                  }));
+                  setErrors({});
+                }} className={`${selectClass} disabled:opacity-60`}>
                   <option style={optionStyle} value={PlatformType.TESTFLIGHT}>TestFlight</option>
                   <option style={optionStyle} value={PlatformType.WEB_STAGING}>Web URL</option>
                   <option style={optionStyle} value={PlatformType.PLAY_STORE}>Staging APK / Play Store</option>
+                  <option style={optionStyle} value={PlatformType.ROBLOX_EXPERIENCE}>Roblox Experience</option>
                 </select>
               </label>
-              <Field error={errors.appUrl} label="App / TestFlight URL" maxLength={2048} placeholder="https://..." required type="url" value={form.appUrl} onChange={(value) => updateFormField("appUrl", value)} />
+              {form.platform === PlatformType.ROBLOX_EXPERIENCE ? (
+                <>
+                  <Field error={errors.robloxExperienceUrl || errors.appUrl} label="Roblox experience URL" maxLength={2048} placeholder="https://www.roblox.com/games/123456789/experience" required type="url" value={form.robloxExperienceUrl || ""} onChange={(value) => setForm((current) => ({ ...current, robloxExperienceUrl: value, appUrl: value }))} />
+                  <Field error={errors.robloxUniverseId} label="Universe / Place ID (optional)" maxLength={20} placeholder="123456789" value={form.robloxUniverseId || ""} onChange={(value) => updateFormField("robloxUniverseId", value.replace(/\D/g, "").slice(0, 20))} />
+                  <label className="space-y-2 text-sm font-semibold text-white/72">
+                    Primary audit focus
+                    <select aria-invalid={Boolean(errors.robloxAuditFocus)} style={{ colorScheme: "dark" }} value={form.robloxAuditFocus || ""} onChange={(event) => updateFormField("robloxAuditFocus", event.target.value as RobloxAuditFocus)} className={selectClass}>
+                      <option style={optionStyle} value="">Choose a Roblox audit focus</option>
+                      {Object.entries(ROBLOX_AUDIT_FOCUS_LABELS).map(([value, label]) => <option key={value} style={optionStyle} value={value}>{label}</option>)}
+                    </select>
+                    {errors.robloxAuditFocus ? <span className="block text-xs font-normal text-rose-300">{errors.robloxAuditFocus}</span> : null}
+                  </label>
+                  <label className="space-y-2 text-sm font-semibold text-white/72">
+                    Minimum tester memory (optional)
+                    <div className="relative">
+                      <input aria-invalid={Boolean(errors.minMemoryGB)} className={`${selectClass} pr-12`} min={1} max={64} step={1} type="number" value={form.minMemoryGB ?? ""} onChange={(event) => updateFormField("minMemoryGB", event.target.value ? Number(event.target.value) : null)} />
+                      <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center font-mono text-xs text-zinc-500">GB</span>
+                    </div>
+                    <span className="block text-xs font-normal text-zinc-500">Use this to target low-memory mobile and console validation profiles.</span>
+                    {errors.minMemoryGB ? <span className="block text-xs font-normal text-rose-300">{errors.minMemoryGB}</span> : null}
+                  </label>
+                </>
+              ) : <Field error={errors.appUrl} label="App / TestFlight URL" maxLength={2048} placeholder="https://..." required type="url" value={form.appUrl} onChange={(value) => updateFormField("appUrl", value)} />}
               <div className="space-y-2 text-sm font-semibold text-white/72">
                 <p>App icon</p>
                 <div className="flex flex-wrap items-center gap-3">
@@ -711,7 +763,9 @@ function LaunchPreview({ form }: { form: CampaignInput }) {
     ? "TestFlight"
     : form.platform === PlatformType.WEB_STAGING
       ? "Web"
-      : "Play Store";
+      : form.platform === PlatformType.ROBLOX_EXPERIENCE
+        ? "Roblox Experience"
+        : "Play Store";
   let previewIconUrl = "";
   try {
     const parsedIconUrl = new URL(form.iconUrl || "");
@@ -736,7 +790,7 @@ function LaunchPreview({ form }: { form: CampaignInput }) {
           <div className="p-4">
             <div className="flex items-start gap-3">
               <div className="relative grid size-14 shrink-0 place-items-center overflow-hidden rounded-xl border border-white/10 bg-[#141720]">
-                <Boxes className="size-6 text-amber-400" />
+                {form.platform === PlatformType.ROBLOX_EXPERIENCE ? <Gamepad2 className="size-6 text-emerald-400" /> : <Boxes className="size-6 text-amber-400" />}
                 {previewIconUrl && failedIconUrl !== previewIconUrl ? <Image alt="Campaign icon preview" className="object-cover" fill onError={() => setFailedIconUrl(previewIconUrl)} sizes="56px" src={previewIconUrl} unoptimized /> : null}
               </div>
               <div className="min-w-0 flex-1">
@@ -745,6 +799,12 @@ function LaunchPreview({ form }: { form: CampaignInput }) {
               </div>
             </div>
             <span className="mt-4 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs font-medium text-neutral-300">{platformLabel}</span>
+            {form.platform === PlatformType.ROBLOX_EXPERIENCE ? (
+              <div className="mt-3 flex flex-wrap gap-2 font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+                {form.robloxAuditFocus ? <span className="rounded border border-zinc-800 px-2 py-1">{ROBLOX_AUDIT_FOCUS_LABELS[form.robloxAuditFocus]}</span> : null}
+                {form.minMemoryGB ? <span className="rounded border border-zinc-800 px-2 py-1">{form.minMemoryGB} GB min memory</span> : null}
+              </div>
+            ) : null}
             <p className="mt-4 min-h-16 text-sm leading-6 text-neutral-400">{form.description.trim() || "Your mission brief will show testers what to explore and what feedback you need."}</p>
             <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3 text-xs">
               <span className="text-neutral-500">Tester reward</span>
@@ -1001,6 +1061,7 @@ function QueueFilterButton({ filter, active, onClick }: { filter: { value: "all"
 function platformLabel(platform: PlatformType) {
   if (platform === PlatformType.TESTFLIGHT) return "iOS TestFlight";
   if (platform === PlatformType.PLAY_STORE) return "Android Play Console";
+  if (platform === PlatformType.ROBLOX_EXPERIENCE) return "Roblox Experience";
   return "Web staging";
 }
 

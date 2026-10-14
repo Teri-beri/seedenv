@@ -35,6 +35,15 @@ enum PlatformType {
   TESTFLIGHT
   WEB_STAGING
   PLAY_STORE
+  ROBLOX_EXPERIENCE
+}
+
+enum RobloxAuditFocus {
+  MOBILE_GUI_SCALING
+  LOW_END_MEMORY_THROTTLE
+  CONCURRENT_SERVER_STRESS
+  DATASTORE_EXPLOIT_VERIFICATION
+  CONSOLE_CONTROLLER_MAPPING
 }
 
 enum CampaignStatus {
@@ -307,6 +316,10 @@ model AppCampaign {
   title                      String
   platform                   PlatformType
   appUrl                     String
+  robloxExperienceUrl        String?                    @map("roblox_experience_url")
+  robloxUniverseId           String?                    @map("roblox_universe_id")
+  robloxAuditFocus           RobloxAuditFocus?          @map("roblox_audit_focus")
+  minMemoryGB                Int?                       @map("min_memory_gb")
   iconUrl                    String?
   targetVibe                 String
   description                String

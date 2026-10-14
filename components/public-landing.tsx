@@ -2,7 +2,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { ArrowRight, CheckCircle2, CircleHelp, Code2, FileText, Fingerprint, Globe, Layers, LockKeyhole, Menu, Search, ShieldCheck, Smartphone, Terminal, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleHelp, Code2, FileText, Fingerprint, Gamepad2, Globe, Layers, LockKeyhole, Menu, Search, ShieldCheck, Smartphone, Terminal, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -25,7 +25,7 @@ type Mission = {
   developerId?: string;
   title: string;
   iconUrl: string | null;
-  platform: "TESTFLIGHT" | "PLAY_STORE" | "WEB_STAGING";
+  platform: "TESTFLIGHT" | "PLAY_STORE" | "WEB_STAGING" | "ROBLOX_EXPERIENCE";
   targetVibe: string;
   description: string;
   bountyPerTaskUsd: number;
@@ -49,7 +49,7 @@ const sectionClass = "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8";
 const sectionShell = "relative scroll-mt-14 border-t border-zinc-800/60 py-16 sm:py-24";
 const surfaceTint = "bg-[#12161F]/20";
 const labelClass = "font-mono text-xs uppercase text-zinc-400";
-const platformLabels = { TESTFLIGHT: "iOS / TestFlight", PLAY_STORE: "Android / Play Console", WEB_STAGING: "Web / PWA" };
+const platformLabels = { TESTFLIGHT: "iOS / TestFlight", PLAY_STORE: "Android / Play Console", WEB_STAGING: "Web / PWA", ROBLOX_EXPERIENCE: "Roblox / Experience" };
 
 const reportPreview = (scenario: SandboxScenario) => JSON.stringify({
   device: scenario.device,
@@ -165,7 +165,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
               <span className="text-zinc-600" aria-hidden="true">|</span>
               <span className="text-zinc-400 transition-colors group-hover:text-zinc-200">{missions.length ? "Inspect Open Slots" : "View Cohorts"} <span aria-hidden="true">→</span></span>
             </a>
-            <h1 className="mt-4 max-w-5xl text-4xl font-semibold leading-tight text-white md:text-5xl">Find beta testers for your iOS, Android &amp; web app.</h1>
+            <h1 className="mt-4 max-w-5xl text-4xl font-semibold leading-tight text-white md:text-5xl">Find beta testers for your iOS, Android, web, or Roblox experience.</h1>
             <p className="mt-5 max-w-3xl text-base leading-7 text-zinc-400">Run TestFlight, Google Play or web testing cohorts before launch. Define scenarios, collect structured bug reports and UX feedback, and review real-device evidence.</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={developerHref} className={primaryAction} onClick={() => trackAnalytics("signup_start", { role: "DEVELOPER", callbackUrl: "/console?view=new-drop" })}>Deploy a Cohort <ArrowRight className="size-4" /></Link>
@@ -200,6 +200,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
                   { id: "TESTFLIGHT", label: "iOS TestFlight" },
                   { id: "PLAY_STORE", label: "Android Play Internal" },
                   { id: "WEB_STAGING", label: "Web PWA" },
+                  { id: "ROBLOX_EXPERIENCE", label: "Roblox" },
                 ]}
                 onChange={setFilter}
               />
@@ -383,7 +384,7 @@ function CohortRow({ mission, signedIn, own, onJoin }: { mission: Mission; signe
   return (
     <tr className="bg-[#0A0D12] transition-colors hover:bg-[#12161F]">
       <td className="w-64 px-4 py-5"><div className="flex items-start gap-3">
-        <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 p-1">{iconUrl && !imageFailed ? <Image src={iconUrl} alt="" width={44} height={44} className="size-full rounded-lg object-cover" unoptimized onError={() => setImageFailed(true)} /> : mission.platform === "WEB_STAGING" ? <Globe className="size-5 text-zinc-400" /> : <Smartphone className="size-5 text-zinc-400" />}</span>
+        <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 p-1">{iconUrl && !imageFailed ? <Image src={iconUrl} alt="" width={44} height={44} className="size-full rounded-lg object-cover" unoptimized onError={() => setImageFailed(true)} /> : mission.platform === "WEB_STAGING" ? <Globe className="size-5 text-zinc-400" /> : mission.platform === "ROBLOX_EXPERIENCE" ? <Gamepad2 className="size-5 text-emerald-400" /> : <Smartphone className="size-5 text-zinc-400" />}</span>
         <div className="min-w-0"><h3 className="break-words text-base font-semibold text-white"><CohortBriefLink className="hover:text-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400" campaignId={mission.id}>{mission.title}</CohortBriefLink></h3><p className="mt-1 font-mono text-xs text-emerald-400">{platformLabels[mission.platform]}</p><CohortBriefLink className="mt-2 inline-flex min-h-9 items-center text-xs text-zinc-400 hover:text-emerald-300" campaignId={mission.id}>View full brief <ArrowRight className="ml-1 size-3" /></CohortBriefLink></div>
       </div></td>
       <td className="max-w-sm px-4 py-5"><p className="line-clamp-2 text-sm leading-6 text-zinc-200">{mission.instructions.map((item) => item.instructionTitle).join(" / ") || "Acceptance criteria in the cohort brief"}</p><p className="mt-2 line-clamp-2 text-xs leading-5 text-zinc-500">{mission.description}</p></td>

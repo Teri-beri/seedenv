@@ -7,7 +7,7 @@ import type { AiDraftInputs } from "@/lib/launch-wizard-draft";
 
 const fieldClass = "w-full rounded-xl border border-zinc-800 bg-black/30 px-3 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-zinc-500";
 
-export function AiSpecDrafter({ platform, onApply, inputs, onInputsChange }: { platform: "IOS" | "ANDROID" | "WEB"; onApply: (blueprint: SpecBlueprint) => void; inputs: AiDraftInputs; onInputsChange: (inputs: AiDraftInputs) => void }) {
+export function AiSpecDrafter({ platform, onApply, inputs, onInputsChange }: { platform: "IOS" | "ANDROID" | "WEB" | "ROBLOX"; onApply: (blueprint: SpecBlueprint) => void; inputs: AiDraftInputs; onInputsChange: (inputs: AiDraftInputs) => void }) {
   const { open, description, notes, audience } = inputs;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);

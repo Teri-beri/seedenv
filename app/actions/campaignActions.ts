@@ -1,6 +1,6 @@
 "use server";
 
-import { CampaignStatus, CohortFundingModel, CohortType, PlatformType, TaskProofType, TransactionStatus, TransactionType } from "@prisma/client";
+import { CampaignStatus, CohortFundingModel, CohortType, PlatformType, RobloxAuditFocus, TaskProofType, TransactionStatus, TransactionType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
@@ -21,6 +21,7 @@ import { queueFollowerEmails } from "@/lib/social-connections";
 import { REFERRAL_RULES } from "@/lib/config/referral";
 import { releaseUnfundedFeeBenefits, reserveAutomaticFeeBenefits } from "@/lib/services/billing.service";
 import { assertTestFlightOwner, isTestFlightUrl, TestFlightOwnershipError } from "@/lib/services/testflight-ownership.service";
+import { isRobloxExperienceUrl } from "@/lib/roblox-cohorts";
 
 const taskInstructionSchema = z.object({
   instructionTitle: z.string().min(3).max(90),
@@ -39,6 +40,10 @@ const campaignSchema = z.object({
   title: z.string().min(4).max(90),
   platform: z.nativeEnum(PlatformType),
   appUrl: httpUrlSchema,
+  robloxExperienceUrl: z.string().trim().optional().or(z.literal("")),
+  robloxUniverseId: z.string().trim().regex(/^\d{1,20}$/, "Use a numeric Roblox Universe or Place ID.").optional().or(z.literal("")),
+  robloxAuditFocus: z.nativeEnum(RobloxAuditFocus).nullable().optional(),
+  minMemoryGB: z.number().int().min(1, "Minimum memory must be at least 1 GB.").max(64, "Minimum memory cannot exceed 64 GB.").nullable().optional(),
   iconUrl: httpUrlSchema.optional().or(z.literal("")),
   targetVibe: z.string().min(3).max(80),
   description: z.string().min(24).max(1400),
@@ -56,6 +61,14 @@ const campaignSchema = z.object({
 }).refine((input) => !input.discoveryAllowed || input.discoveryMinRep <= Math.max(...input.instructions.map((item) => item.minimumRep)), {
   message: "The Discovery REP floor cannot exceed the highest task requirement.",
   path: ["discoveryMinRep"],
+}).superRefine((input, context) => {
+  if (input.platform !== PlatformType.ROBLOX_EXPERIENCE) return;
+  if (!input.robloxExperienceUrl || !isRobloxExperienceUrl(input.robloxExperienceUrl)) {
+    context.addIssue({ code: "custom", path: ["robloxExperienceUrl"], message: "Enter a Roblox experience URL in the form https://www.roblox.com/games/{placeId}/..." });
+  }
+  if (!input.robloxAuditFocus) {
+    context.addIssue({ code: "custom", path: ["robloxAuditFocus"], message: "Choose the primary Roblox audit focus." });
+  }
 });
 
 export type CampaignInput = z.infer<typeof campaignSchema>;
@@ -94,7 +107,11 @@ function buildCampaignData(input: CampaignInput, developerId: string, status: Ca
       developerId,
       title: input.title,
       platform: terms.platform,
-      appUrl: input.appUrl,
+      appUrl: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? input.robloxExperienceUrl! : input.appUrl,
+      robloxExperienceUrl: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? input.robloxExperienceUrl || null : null,
+      robloxUniverseId: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? input.robloxUniverseId || null : null,
+      robloxAuditFocus: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? input.robloxAuditFocus ?? null : null,
+      minMemoryGB: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? input.minMemoryGB ?? null : null,
       iconUrl: input.iconUrl || null,
       targetVibe: input.targetVibe,
       description: input.description,
