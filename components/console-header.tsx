@@ -6,7 +6,7 @@ import { UserDropdown, type DropdownAccount } from "@/components/user-dropdown";
 import { SegmentedTabLinks } from "@/components/ui/SegmentedTabs";
 import { useDismissableMenu } from "@/components/use-dismissable-menu";
 
-export type ConsoleView = "overview" | "new-drop" | "review-deck" | "asset-vault" | "billing" | "messages";
+export type ConsoleView = "overview" | "new-drop" | "review-deck" | "asset-vault" | "monitor" | "billing" | "messages";
 
 export type CohortRuleLink = { label: string; href: string; tone?: "default" | "caution" };
 
@@ -15,6 +15,7 @@ const tabs = [
   { label: "Tester requests", href: "/applications", view: null },
   { label: "Submissions", href: "/console?view=review-deck", view: "review-deck" },
   { label: "Artifacts", href: "/console?view=asset-vault", view: "asset-vault" },
+  { label: "Monitor", href: "/console/monitor", view: "monitor" },
   { label: "Billing", href: "/console?view=billing", view: "billing" },
   { label: "Launch Circle", href: "/launch-circle", view: null },
   { label: "Messages", href: "/messages", view: "messages" },

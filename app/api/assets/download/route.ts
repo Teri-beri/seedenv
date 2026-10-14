@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { isStoredRecording } from "@/lib/recording";
 import { downloadProofObject, getProofImageUrl } from "@/lib/storage";
 
-const MAX_RECORDING_BYTES = 50 * 1024 * 1024;
+const MAX_RECORDING_BYTES = 150 * 1024 * 1024;
 
 function evidenceJson(submission: {
   id: string;

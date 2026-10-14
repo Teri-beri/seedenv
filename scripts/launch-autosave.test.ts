@@ -10,6 +10,7 @@ const draft: LaunchWizardDraft = {
     targetVibe: "Social & UGC", description: "", totalSlots: 25, bountyPerTaskUsd: 4,
     instructions: [{ instructionTitle: "", instructionDetail: "", proofType: "SCREENSHOT", minimumRep: 0 }],
     discoveryAllowed: false, discoveryMinRep: 0, cohortType: "STANDARD_QA", hardwareStrict: true,
+    robloxMobileOnly: true, robloxAllowIpad: false, robloxAllowDesktop: false,
   },
   step: 2, highestStep: 2, topUpTesters: 5, iconFileName: "icon.png",
   ai: { ...emptyAiDraftInputs, description: "Unfinished app description", open: true },

@@ -1,6 +1,6 @@
 "use server";
 
-import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
+import { CampaignStatus, Prisma, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -21,7 +21,7 @@ import { startAcceptedApplication } from "@/lib/mission-applications";
 import { versionDirections } from "@/lib/instruction-versions";
 import { auditSubmission } from "@/lib/ai/qa-audit";
 import { recordCompliancePing } from "@/lib/compliance-pings";
-import { assertProofEditable, rejectProof, requestProofRevision, startProofRevision } from "@/lib/submission-lifecycle";
+import { assertProofEditable, proofWindowMs, rejectProof, requestProofRevision, startProofRevision } from "@/lib/submission-lifecycle";
 import { reconcileReferralMilestone } from "@/lib/services/billing.service";
 
 const proofSchema = z.object({
@@ -29,6 +29,12 @@ const proofSchema = z.object({
   proofImageMimeType: z.string().regex(/^image\/(png|jpe?g|webp)$/).optional(),
   proofImageHash: z.string().min(16).max(128).optional(),
   feedbackText: z.string().trim().min(12).max(2000),
+  robloxUsername: z.string().trim().regex(/^[A-Za-z0-9_]{3,20}$/, "Enter a valid Roblox username.").optional().or(z.literal("")),
+  robloxChecklist: z.object({
+    interfaceScaled: z.boolean(),
+    stableFramerate: z.boolean(),
+    consoleCaptured: z.boolean(),
+  }).optional(),
   recordingUrl: z.string().url().refine((value) => /^https?:\/\//i.test(value), "Recording links must use HTTP or HTTPS.").optional().or(z.literal("")),
   osBuild: z.string().max(120).optional().or(z.literal("")),
   deviceModel: z.string().max(120).optional().or(z.literal("")),
@@ -63,7 +69,7 @@ async function requestUserAgent() {
 
 export async function claimTaskSlot(campaignId: string) {
   const tester = await requireMember("TESTER");
-  const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+  const expiresAt = new Date(Date.now() + proofWindowMs);
 
   return serializable(async (tx) => {
     const campaign = await tx.appCampaign.findUnique({ where: { id: campaignId } });
@@ -103,6 +109,8 @@ export async function claimTaskSlot(campaignId: string) {
         proofImageHash: null,
         feedbackText: null,
         recordingUrl: null,
+        robloxUsername: null,
+        robloxChecklist: Prisma.DbNull,
         osBuild: null,
         deviceModel: null,
         screenResolution: null,
@@ -134,7 +142,7 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
 
   const submission = await prisma.submission.findUnique({
     where: { id: submissionId },
-    include: { campaign: { select: { title: true, developerId: true, hardwareStrict: true } } },
+    include: { campaign: { select: { title: true, developerId: true, hardwareStrict: true, platform: true } } },
   });
   if (!submission || submission.testerId !== tester.id) throw new Error("Submission not found.");
   const hardware = classifyHardwareSignals(input.hardware ?? null, await requestUserAgent());
@@ -151,7 +159,15 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
     hash = createHash("sha256").update(buffer).digest("hex");
     if (input.proofImageHash && input.proofImageHash !== hash) throw new Error("Screenshot hash did not match the uploaded image. Select the file again.");
   }
-  if (!buffer && !submission.proofImageUrl) throw new Error("Add a proof screenshot before submitting.");
+  const isRoblox = submission.campaign.platform === "ROBLOX_EXPERIENCE";
+  const hasRecording = Boolean(input.recordingUrl || submission.recordingUrl);
+  if (isRoblox) {
+    if (!hasRecording) throw new Error("Attach a Roblox screen recording before submitting.");
+    if (!input.robloxUsername) throw new Error("Enter your Roblox username for founder perks.");
+    if (!input.robloxChecklist || !Object.values(input.robloxChecklist).every(Boolean)) throw new Error("Confirm all three Roblox telemetry checks before submitting.");
+  } else if (!buffer && !submission.proofImageUrl) {
+    throw new Error("Add a proof screenshot before submitting.");
+  }
   if (hash) {
     const duplicate = await prisma.submission.findFirst({
       where: {
@@ -183,6 +199,8 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
       proofImageHash: hash,
       feedbackText: input.feedbackText,
       recordingUrl: input.recordingUrl || (isStoredRecording(current.recordingUrl) ? current.recordingUrl : null),
+      robloxUsername: isRoblox ? input.robloxUsername : null,
+      robloxChecklist: isRoblox ? input.robloxChecklist : Prisma.DbNull,
       osBuild: input.osBuild || null,
       deviceModel: input.deviceModel || null,
       screenResolution: input.screenResolution || null,

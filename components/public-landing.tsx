@@ -161,12 +161,12 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
                 {missions.length ? <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:animate-none" /> : null}
                 <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
               </span>
-              <span className="font-semibold text-emerald-300">{missions.length ? "Live Cohorts Active" : "Pre-launch validation"}</span>
+              <span className="font-semibold text-emerald-300">{missions.length ? "Live Cohorts Active" : "Independent Software Infrastructure"}</span>
               <span className="text-zinc-600" aria-hidden="true">|</span>
               <span className="text-zinc-400 transition-colors group-hover:text-zinc-200">{missions.length ? "Inspect Open Slots" : "View Cohorts"} <span aria-hidden="true">→</span></span>
             </a>
-            <h1 className="mt-4 max-w-5xl text-4xl font-semibold leading-tight text-white md:text-5xl">Find beta testers for your iOS, Android, web, or Roblox experience.</h1>
-            <p className="mt-5 max-w-3xl text-base leading-7 text-zinc-400">Run TestFlight, Google Play or web testing cohorts before launch. Define scenarios, collect structured bug reports and UX feedback, and review real-device evidence.</p>
+            <h1 className="mt-4 max-w-4xl text-4xl font-semibold leading-tight text-white md:text-5xl">Pre-launch device validation built for indie builders.</h1>
+            <p className="mt-5 max-w-3xl text-base leading-7 text-zinc-400">Built by developers who got tired of ghosted TestFlight links and emulator spam. Deploy targeted test cohorts across iOS, Android, web, and Roblox, stream raw device telemetry, and reward verified physical nodes.</p>
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={developerHref} className={primaryAction} onClick={() => trackAnalytics("signup_start", { role: "DEVELOPER", callbackUrl: "/console?view=new-drop" })}>Deploy a Cohort <ArrowRight className="size-4" /></Link>
               <Link href={landingViewHref("cohorts")} className={secondaryAction}>Explore Live Board</Link>
@@ -174,6 +174,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
             <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 font-mono text-xs text-zinc-400">
               <span className="flex items-center gap-2"><Smartphone className="size-4 text-emerald-400" /> TestFlight / Play Console</span>
               <span className="flex items-center gap-2"><Globe className="size-4 text-emerald-400" /> Web / PWA</span>
+              <span className="flex items-center gap-2"><Gamepad2 className="size-4 text-emerald-400" /> Roblox Experience</span>
             </div>
           </div>
         </section>

@@ -9,6 +9,7 @@ import { createMissionApplication, reviewMissionApplication, closeMissionApplica
 import { prisma } from "@/lib/prisma";
 import { acceptApplicationWithFunding } from "@/lib/slot-funding";
 import { notifyDeveloperOfMissionRequest } from "@/lib/mission-request-notifications";
+import { notifyTesterOfMissionAcceptance } from "@/lib/mission-acceptance-notifications";
 
 export async function requestMission(campaignId: string, note: string) {
   const input = z.object({
@@ -40,6 +41,9 @@ export async function decideApplication(id: string, decision: "accept" | "declin
     // Return charge failures as text: production server actions hide thrown error messages.
     try {
       const result = await acceptApplicationWithFunding(member.id, id);
+      if (result.accepted) after(() => notifyTesterOfMissionAcceptance(id).catch((error) => {
+        console.warn("SeedEnv tester acceptance email failed:", error instanceof Error ? error.message : error);
+      }));
       revalidatePath("/applications");
       revalidatePath("/dashboard");
       revalidatePath("/console");
@@ -49,6 +53,9 @@ export async function decideApplication(id: string, decision: "accept" | "declin
     }
   }
   await serializable((tx) => reviewMissionApplication(tx, member.id, id, decision));
+  if (decision === "accept") after(() => notifyTesterOfMissionAcceptance(id).catch((error) => {
+    console.warn("SeedEnv tester acceptance email failed:", error instanceof Error ? error.message : error);
+  }));
   revalidatePath("/applications");
   revalidatePath("/dashboard");
   return decision === "accept" ? "Accepted. The tester has up to 24 hours to start." : "Declined. Any reserved pass was returned.";

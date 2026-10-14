@@ -1,7 +1,7 @@
 "use client";
 
 import { UserRole } from "@prisma/client";
-import { Boxes, BriefcaseBusiness, CreditCard, Flame, Gamepad2, LayoutDashboard, LoaderCircle, Medal, MessagesSquare, PlusCircle, Settings, ShieldCheck, Sprout, Trophy, UserRound } from "lucide-react";
+import { Activity, Boxes, BriefcaseBusiness, CreditCard, Flame, Gamepad2, LayoutDashboard, LoaderCircle, Medal, MessagesSquare, PlusCircle, Settings, ShieldCheck, Sprout, Trophy, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -23,6 +23,7 @@ const developerItems = [
   { label: "New Drop", view: "new-drop", icon: PlusCircle },
   { label: "Submissions", view: "review-deck", icon: ShieldCheck },
   { label: "Artifacts", view: "asset-vault", icon: Boxes },
+  { label: "Monitor", view: "monitor", icon: Activity },
   { label: "Billing", view: "billing", icon: CreditCard },
 ];
 
@@ -100,10 +101,10 @@ export function DeveloperBottomNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const view = searchParams.get("view") || "overview";
-  const items = [...developerItems.map((item) => ({ label: item.view === "overview" ? "Home" : item.view === "new-drop" ? "New" : item.view === "review-deck" ? "Review" : item.view === "asset-vault" ? "Assets" : "Billing", href: `/console?view=${item.view}`, icon: item.icon, active: pathname === "/console" && view === item.view })), { label: "Settings", href: "/account", icon: Settings, active: pathname === "/account" }];
+  const items = [...developerItems.map((item) => ({ label: item.view === "overview" ? "Home" : item.view === "new-drop" ? "New" : item.view === "review-deck" ? "Review" : item.view === "asset-vault" ? "Assets" : item.view === "monitor" ? "Monitor" : "Billing", href: item.view === "monitor" ? "/console/monitor" : `/console?view=${item.view}`, icon: item.icon, active: item.view === "monitor" ? pathname === "/console/monitor" : pathname === "/console" && view === item.view })), { label: "Settings", href: "/account", icon: Settings, active: pathname === "/account" }];
   return (
     <nav aria-label="Developer app navigation" className="mobile-app-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-zinc-800 bg-zinc-950/95 px-1 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:hidden">
-      <div className="grid grid-cols-6 gap-0.5">
+      <div className="grid grid-cols-7 gap-0.5">
         {items.map(({ label, href, icon: Icon, active }) => <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold ${active ? "bg-zinc-800/80 text-white" : "text-zinc-400"}`}><Icon className="size-5" />{label}</Link>)}
       </div>
     </nav>

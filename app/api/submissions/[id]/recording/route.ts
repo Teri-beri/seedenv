@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 const headers = { "Cache-Control": "private, no-store" };
 const MAX_RECORDING_BYTES = 50 * 1024 * 1024;
+const MAX_ROBLOX_RECORDING_BYTES = 150 * 1024 * 1024;
 const extensions: Record<string, string> = { "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm" };
 
 function matchesSignature(buffer: Buffer, contentType: string) {
@@ -31,13 +32,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const contentType = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
   const extension = extensions[contentType];
   if (!extension) return NextResponse.json({ message: "Upload an MP4, MOV, or WebM recording." }, { status: 415, headers });
-  const declaredLength = Number(request.headers.get("content-length") || 0);
-  if (declaredLength > MAX_RECORDING_BYTES) return NextResponse.json({ message: "Recordings must be 50MB or smaller." }, { status: 413, headers });
-
   const { id } = await params;
-  const submission = await prisma.submission.findUnique({ where: { id } });
+  const submission = await prisma.submission.findUnique({ where: { id }, include: { campaign: { select: { platform: true } } } });
   if (!submission || submission.testerId !== session.user.id) return NextResponse.json({ message: "Submission unavailable." }, { status: 404, headers });
   if (submission.status !== SubmissionStatus.PENDING) return NextResponse.json({ message: "This submission is no longer pending." }, { status: 409, headers });
+  const maxRecordingBytes = submission.campaign.platform === "ROBLOX_EXPERIENCE" ? MAX_ROBLOX_RECORDING_BYTES : MAX_RECORDING_BYTES;
+  const maxRecordingMegabytes = maxRecordingBytes / 1024 / 1024;
+  const declaredLength = Number(request.headers.get("content-length") || 0);
+  if (declaredLength > maxRecordingBytes) return NextResponse.json({ message: `Recordings must be ${maxRecordingMegabytes}MB or smaller.` }, { status: 413, headers });
   try {
     assertProofEditable(submission);
   } catch (error) {
@@ -46,7 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const buffer = Buffer.from(await request.arrayBuffer());
   if (!buffer.length) return NextResponse.json({ message: "The recording was empty." }, { status: 400, headers });
-  if (buffer.length > MAX_RECORDING_BYTES) return NextResponse.json({ message: "Recordings must be 50MB or smaller." }, { status: 413, headers });
+  if (buffer.length > maxRecordingBytes) return NextResponse.json({ message: `Recordings must be ${maxRecordingMegabytes}MB or smaller.` }, { status: 413, headers });
   if (!matchesSignature(buffer, contentType)) return NextResponse.json({ message: "The file does not look like a valid video." }, { status: 415, headers });
 
   try {

@@ -13,6 +13,7 @@ import { isStoredRecording } from "@/lib/recording";
 import { autoApproveDeadlineFrom as autoApproveDeadline } from "@/lib/auto-approval-window";
 import { formatCents } from "@/lib/utils";
 import { formatRankLevel, validatorNodeId } from "@/lib/validator-identity";
+import { parseRobloxSubmissionChecklist } from "@/lib/roblox-cohorts";
 
 type ConsoleMission = Pick<AppCampaign, "id" | "title" | "appUrl" | "iconUrl" | "targetVibe" | "description" | "bountyPerTaskUsd" | "totalSlots" | "claimedSlots" | "completedSlots" | "platform" | "discoveryAllowed" | "discoveryMinRep" | "estimatedMinutes" | "testerPerk"> & { instructions: TaskInstruction[]; acceptedInstructionRevision?: number; directionsUpdated?: boolean; ownedByTester?: boolean };
 
@@ -137,6 +138,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
               revisionRequested: Boolean(item.revisionRequestedAt), revisionStarted: Boolean(item.revisionStartedAt), revisionNote: item.rejectionReason,
               denialReviewPending: item.denialReviewPending,
               feedbackText: item.feedbackText, proofPreviewUrl: item.proofPreviewUrl, hasScreenshot: Boolean(item.proofImageUrl), hasRecording: isStoredRecording(item.recordingUrl),
+              robloxUsername: item.robloxUsername, robloxChecklist: parseRobloxSubmissionChecklist(item.robloxChecklist),
               telemetry: { osBuild: item.osBuild || "", deviceModel: item.deviceModel || "", screenResolution: item.screenResolution || "", appBuildVersion: item.appBuildVersion || "", networkType: item.networkType || "", recordingUrl: isStoredRecording(item.recordingUrl) ? "" : item.recordingUrl || "", crashLogs: item.crashLogs || "", networkLogs: item.networkLogs || "" },
             }))} history={recent.map((item) => ({
               id: item.id, campaignTitle: item.campaign.title, status: item.status, payoutCents: item.payoutCents,

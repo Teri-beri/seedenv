@@ -22,7 +22,7 @@ import { useLaunchAutosave } from "@/components/use-launch-autosave";
 import { CohortPromoInput, type AppliedCohortPromo } from "@/components/cohort-promo-input";
 import { CheckoutSummaryModal } from "@/components/campaign/CheckoutSummaryModal";
 import { ArtifactsToolbar, type ArtifactFilter } from "@/components/console/ArtifactsToolbar";
-import { isRobloxExperienceUrl, ROBLOX_AUDIT_FOCUS_LABELS } from "@/lib/roblox-cohorts";
+import { extractRobloxPlaceId, isRobloxAccessMethod, parseRobloxSubmissionChecklist, ROBLOX_AUDIT_FOCUS_LABELS } from "@/lib/roblox-cohorts";
 
 type ReviewSubmission = {
   revisionRequestedAt?: Date | null;
@@ -34,6 +34,8 @@ type ReviewSubmission = {
   id: string;
   proofImageUrl: string | null;
   recordingUrl: string | null;
+  robloxUsername: string | null;
+  robloxChecklist: unknown;
   feedbackText: string | null;
   osBuild: string | null;
   deviceModel: string | null;
@@ -87,8 +89,12 @@ type CampaignDraft = {
   appUrl: string;
   robloxExperienceUrl: string | null;
   robloxUniverseId: string | null;
+  robloxPlaceId?: string | null;
   robloxAuditFocus: RobloxAuditFocus | null;
   minMemoryGB: number | null;
+  robloxMobileOnly?: boolean;
+  robloxAllowIpad?: boolean;
+  robloxAllowDesktop?: boolean;
   iconUrl: string | null;
   targetVibe: string;
   description: string;
@@ -134,8 +140,12 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     appUrl: initialDraft.appUrl,
     robloxExperienceUrl: initialDraft.robloxExperienceUrl || "",
     robloxUniverseId: initialDraft.robloxUniverseId || "",
+    robloxPlaceId: initialDraft.robloxPlaceId || "",
     robloxAuditFocus: initialDraft.robloxAuditFocus,
     minMemoryGB: initialDraft.minMemoryGB,
+    robloxMobileOnly: initialDraft.robloxMobileOnly ?? true,
+    robloxAllowIpad: initialDraft.robloxAllowIpad ?? false,
+    robloxAllowDesktop: initialDraft.robloxAllowDesktop ?? false,
     iconUrl: initialDraft.iconUrl || "",
     targetVibe: initialDraft.targetVibe,
     description: initialDraft.description,
@@ -156,8 +166,12 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     appUrl: "",
     robloxExperienceUrl: "",
     robloxUniverseId: "",
+    robloxPlaceId: "",
     robloxAuditFocus: null,
     minMemoryGB: null,
+    robloxMobileOnly: true,
+    robloxAllowIpad: false,
+    robloxAllowDesktop: false,
     iconUrl: "",
     targetVibe: vibes[0],
     description: "",
@@ -233,13 +247,14 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     if (stepToValidate === 1) {
       const title = form.title.trim();
       if (title.length < 4 || title.length > 90) nextErrors.title = "Use 4 to 90 characters for the app title.";
-      const appUrl = parseHttpUrl(form.appUrl);
-      if (!appUrl) nextErrors.appUrl = "Enter a valid HTTP or HTTPS app URL.";
       if (form.platform === PlatformType.ROBLOX_EXPERIENCE) {
-        if (!form.robloxExperienceUrl || !isRobloxExperienceUrl(form.robloxExperienceUrl)) nextErrors.robloxExperienceUrl = "Enter a valid https://www.roblox.com/games/{placeId}/... URL.";
+        const accessMethod = form.robloxExperienceUrl || "";
+        if (!isRobloxAccessMethod(accessMethod)) nextErrors.robloxExperienceUrl = "Enter a Roblox private server URL, experience URL, or numeric place ID.";
         if (form.robloxUniverseId && !/^\d{1,20}$/.test(form.robloxUniverseId)) nextErrors.robloxUniverseId = "Use a numeric Roblox Universe or Place ID.";
         if (!form.robloxAuditFocus) nextErrors.robloxAuditFocus = "Choose the primary Roblox audit focus.";
         if (form.minMemoryGB !== null && form.minMemoryGB !== undefined && (!Number.isInteger(form.minMemoryGB) || form.minMemoryGB < 1 || form.minMemoryGB > 64)) nextErrors.minMemoryGB = "Use a minimum-memory target between 1 and 64 GB.";
+      } else if (!parseHttpUrl(form.appUrl)) {
+        nextErrors.appUrl = "Enter a valid HTTP or HTTPS app URL.";
       }
       if ((form.targetVibe || "").trim().length < 3) nextErrors.targetVibe = "Choose a target audience.";
       if (form.description.trim().length < 24) nextErrors.description = "Add at least 24 characters so testers know what to validate.";
@@ -519,8 +534,12 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                     ...current,
                     platform,
                     ...(platform === PlatformType.ROBLOX_EXPERIENCE
-                      ? { appUrl: current.robloxExperienceUrl || current.appUrl, robloxExperienceUrl: current.robloxExperienceUrl || current.appUrl, targetVibe: current.targetVibe === vibes[0] ? "Roblox players & creators" : current.targetVibe }
-                      : {}),
+                      ? {
+                          appUrl: current.robloxExperienceUrl || "",
+                          robloxExperienceUrl: current.robloxExperienceUrl || "",
+                          targetVibe: current.targetVibe === vibes[0] ? "Roblox players & creators" : current.targetVibe,
+                        }
+                      : current.platform === PlatformType.ROBLOX_EXPERIENCE ? { appUrl: "" } : {}),
                   }));
                   setErrors({});
                 }} className={`${selectClass} disabled:opacity-60`}>
@@ -532,16 +551,27 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               </label>
               {form.platform === PlatformType.ROBLOX_EXPERIENCE ? (
                 <>
-                  <Field error={errors.robloxExperienceUrl || errors.appUrl} label="Roblox experience URL" maxLength={2048} placeholder="https://www.roblox.com/games/123456789/experience" required type="url" value={form.robloxExperienceUrl || ""} onChange={(value) => setForm((current) => ({ ...current, robloxExperienceUrl: value, appUrl: value }))} />
+                  <Field error={errors.robloxExperienceUrl || errors.appUrl} label="Roblox Server Access URL" maxLength={2048} placeholder="https://www.roblox.com/share?code=...&type=Server or placeId" required type="text" value={form.robloxExperienceUrl || ""} onChange={(value) => {
+                    setForm((current) => ({ ...current, robloxExperienceUrl: value, appUrl: value, robloxPlaceId: extractRobloxPlaceId(value) || "" }));
+                  }} />
+                  <p className="-mt-1 font-mono text-[11px] text-zinc-500">Use a private server share link or VIP server URL to isolate testing from public production traffic.</p>
                   <Field error={errors.robloxUniverseId} label="Universe / Place ID (optional)" maxLength={20} placeholder="123456789" value={form.robloxUniverseId || ""} onChange={(value) => updateFormField("robloxUniverseId", value.replace(/\D/g, "").slice(0, 20))} />
                   <label className="space-y-2 text-sm font-semibold text-white/72">
-                    Primary audit focus
+                    Audit presets
                     <select aria-invalid={Boolean(errors.robloxAuditFocus)} style={{ colorScheme: "dark" }} value={form.robloxAuditFocus || ""} onChange={(event) => updateFormField("robloxAuditFocus", event.target.value as RobloxAuditFocus)} className={selectClass}>
-                      <option style={optionStyle} value="">Choose a Roblox audit focus</option>
+                      <option style={optionStyle} value="">Select a Roblox validation preset</option>
                       {Object.entries(ROBLOX_AUDIT_FOCUS_LABELS).map(([value, label]) => <option key={value} style={optionStyle} value={value}>{label}</option>)}
                     </select>
                     {errors.robloxAuditFocus ? <span className="block text-xs font-normal text-rose-300">{errors.robloxAuditFocus}</span> : null}
                   </label>
+                  <div className="space-y-2 text-sm font-semibold text-white/72">
+                    <span>Tester device constraints</span>
+                    <div className="grid gap-2 rounded-2xl border border-zinc-800 bg-[#0C0F15] p-3">
+                      <label className="flex items-center gap-3 text-sm font-medium text-zinc-200"><input type="checkbox" checked={form.robloxMobileOnly ?? true} onChange={(event) => updateFormField("robloxMobileOnly", event.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-400 focus:ring-emerald-500" /> Mobile Only (iOS & Android)</label>
+                      <label className="flex items-center gap-3 text-sm font-medium text-zinc-200"><input type="checkbox" checked={form.robloxAllowIpad ?? false} onChange={(event) => updateFormField("robloxAllowIpad", event.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-400 focus:ring-emerald-500" /> iPad / Tablets</label>
+                      <label className="flex items-center gap-3 text-sm font-medium text-zinc-200"><input type="checkbox" checked={form.robloxAllowDesktop ?? false} onChange={(event) => updateFormField("robloxAllowDesktop", event.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-400 focus:ring-emerald-500" /> Desktop / PC</label>
+                    </div>
+                  </div>
                   <label className="space-y-2 text-sm font-semibold text-white/72">
                     Minimum tester memory (optional)
                     <div className="relative">
@@ -875,6 +905,7 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
     .map(([value, label]) => ({ value, label, count: value === "all" ? totalCount : submissions.filter((submission) => matchesFilter(submission, value)).length }));
   const visible = submissions.filter((submission) => matchesFilter(submission, queueFilter));
   const active = visible.find((submission) => submission.id === selectedId) || visible[0];
+  const activeRobloxChecklist = parseRobloxSubmissionChecklist(active?.robloxChecklist);
 
   function confirmDecision() {
     if (!active || !decision) return;
@@ -927,7 +958,7 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
           </aside>
 
           <article className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5 sm:p-6">
-            {active.revisionRequestedAt ? <p className="mb-5 whitespace-pre-wrap break-words rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-sm leading-6 text-zinc-300">{active.rejectionReason}{"\n"}The tester chooses when to start a fresh 30-minute editing window. Approval becomes available after resubmission.</p> : null}
+            {active.revisionRequestedAt ? <p className="mb-5 whitespace-pre-wrap break-words rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-sm leading-6 text-zinc-300">{active.rejectionReason}{"\n"}The tester chooses when to start a fresh 24-hour editing window. Approval becomes available after resubmission.</p> : null}
             <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.9fr)]">
               <div className="space-y-4">
                 <div>
@@ -945,6 +976,15 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                 <div className="rounded-xl border border-white/10 bg-black/20 p-4">
                   <p className="text-xs uppercase tracking-[0.16em] text-neutral-500">Tester feedback · {active.tester.username}</p>
                   <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-200">{active.feedbackText || "No written feedback submitted."}</p>
+                  {active.robloxUsername ? <div className="mt-3 rounded-lg border border-sky-500/20 bg-sky-500/5 p-3">
+                    <p className="font-mono text-xs text-sky-300">Roblox validator: @{active.robloxUsername}</p>
+                    <p className="mt-1 text-xs text-zinc-500">Use this username to award the studio&apos;s permanent founder or backer perk.</p>
+                    {activeRobloxChecklist ? <ul className="mt-2 space-y-1 text-xs text-zinc-400">
+                      <li>{activeRobloxChecklist.interfaceScaled ? "✓" : "○"} Interface scaling verified</li>
+                      <li>{activeRobloxChecklist.stableFramerate ? "✓" : "○"} Stable gameplay framerate verified</li>
+                      <li>{activeRobloxChecklist.consoleCaptured ? "✓" : "○"} /console telemetry captured</li>
+                    </ul> : null}
+                  </div> : null}
                   <div className="mt-3 grid gap-2 text-xs text-neutral-500 sm:grid-cols-2">
                     <p>OS / build: <span className="text-neutral-300">{active.osBuild || active.appBuildVersion || "Not captured"}</span></p>
                     <p>Device: <span className="text-neutral-300">{active.deviceModel || "Not captured"}</span></p>

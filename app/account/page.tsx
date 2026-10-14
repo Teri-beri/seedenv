@@ -49,6 +49,7 @@ function normalizeNotificationPreferences(value: unknown): NotificationPreferenc
   return {
     email_tester_requests: typeof saved.email_tester_requests === "boolean" ? saved.email_tester_requests : true,
     email_tester_feedback: typeof saved.email_tester_feedback === "boolean" ? saved.email_tester_feedback : true,
+    email_telemetry_incidents: typeof saved.email_telemetry_incidents === "boolean" ? saved.email_telemetry_incidents : true,
     email_ledger_updates: typeof saved.email_ledger_updates === "boolean" ? saved.email_ledger_updates : true,
     email_announcements: typeof saved.email_announcements === "boolean" ? saved.email_announcements : false,
   };

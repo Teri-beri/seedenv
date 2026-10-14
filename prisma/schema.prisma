@@ -54,6 +54,12 @@ enum CampaignStatus {
   COMPLETED
 }
 
+enum IncidentSeverity {
+  INFO
+  WARN
+  CRITICAL
+}
+
 enum TaskProofType {
   SCREENSHOT
   TEXT_FEEDBACK
@@ -120,7 +126,7 @@ model User {
   githubUsername            String?                 @map("github_username")
   discordUrl                String?                 @map("discord_url")
   twitterHandle             String?                 @map("twitter_handle")
-  notificationPreferences   Json                    @default("{\"email_tester_requests\":true,\"email_tester_feedback\":true,\"email_ledger_updates\":true,\"email_announcements\":false}") @map("notification_preferences")
+  notificationPreferences   Json                    @default("{\"email_tester_requests\":true,\"email_tester_feedback\":true,\"email_telemetry_incidents\":true,\"email_ledger_updates\":true,\"email_announcements\":false}") @map("notification_preferences")
   messageRequestsEnabled    Boolean                 @default(true)
   following                 UserFollow[]            @relation("Following")
   followers                 UserFollow[]            @relation("Followers")
@@ -179,6 +185,8 @@ model User {
   reports                   CommunityReport[]
   campaigns                 AppCampaign[]           @relation("DeveloperCampaigns")
   submissions               Submission[]            @relation("TesterSubmissions")
+  telemetryIncidents        TelemetryIncident[]     @relation("IncidentValidator")
+  missionPairSessions       MissionPairSession[]
   transactions              WalletTransaction[]
   billingProfile            BillingProfile?
   supportTickets            SupportTicket[]
@@ -318,8 +326,10 @@ model AppCampaign {
   appUrl                     String
   robloxExperienceUrl        String?                    @map("roblox_experience_url")
   robloxUniverseId           String?                    @map("roblox_universe_id")
+  robloxPlaceId              String?                    @map("roblox_place_id")
   robloxAuditFocus           RobloxAuditFocus?          @map("roblox_audit_focus")
   minMemoryGB                Int?                       @map("min_memory_gb")
+  robloxDeviceConstraints    Json?                      @map("roblox_device_constraints")
   iconUrl                    String?
   targetVibe                 String
   description                String
@@ -359,6 +369,7 @@ model AppCampaign {
   promoRedemptions           CohortPromoRedemption[]
   clicks                     CohortClick[]
   communityPosts             CommunityPost[]
+  telemetryIncidents         TelemetryIncident[]
   referralPolicyVersion      Int                        @default(0)
   firstCohortFeeWaived       Boolean                    @default(false)
   referralDiscountPercent    Int                        @default(0)
@@ -388,16 +399,16 @@ model CohortCompliance {
 }
 
 model DailyPingLog {
-  id               String           @id @default(cuid())
-  complianceId     String
-  compliance       CohortCompliance @relation(fields: [complianceId], references: [id], onDelete: Cascade)
-  validatorId      String
-  validatorHandle  String
-  dayNumber        Int
-  deviceModel      String
-  osVersion        String
-  sessionDuration  Int
-  timestamp        DateTime         @default(now())
+  id              String           @id @default(cuid())
+  complianceId    String
+  compliance      CohortCompliance @relation(fields: [complianceId], references: [id], onDelete: Cascade)
+  validatorId     String
+  validatorHandle String
+  dayNumber       Int
+  deviceModel     String
+  osVersion       String
+  sessionDuration Int
+  timestamp       DateTime         @default(now())
 
   @@index([complianceId, dayNumber])
 }
@@ -659,20 +670,20 @@ enum CommunityCommentTag {
 }
 
 model CommunityPost {
-  id            String             @id @default(cuid())
+  id            String                 @id @default(cuid())
   authorId      String
-  author        User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author        User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
   body          String
-  hidden        Boolean            @default(false)
-  publicVisible Boolean            @default(false)
-  tag           CommunityPostTag   @default(CHANGELOG)
-  campaignId    String?            @map("campaign_id")
-  campaign      AppCampaign?       @relation(fields: [campaignId], references: [id], onDelete: SetNull)
-  buildLabel    String?            @map("build_label") @db.VarChar(40)
+  hidden        Boolean                @default(false)
+  publicVisible Boolean                @default(false)
+  tag           CommunityPostTag       @default(CHANGELOG)
+  campaignId    String?                @map("campaign_id")
+  campaign      AppCampaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  buildLabel    String?                @map("build_label") @db.VarChar(40)
   comments      CommunityComment[]
   helpfulVotes  CommunityPostHelpful[]
   reports       CommunityReport[]
-  createdAt     DateTime           @default(now())
+  createdAt     DateTime               @default(now())
 
   @@index([hidden, createdAt])
   @@index([campaignId, createdAt])
@@ -732,6 +743,8 @@ model Submission {
   instructionVersion   CohortInstructionVersion? @relation(fields: [instructionVersionId], references: [id], onDelete: Restrict)
   proofImageUrl        String?
   recordingUrl         String?
+  robloxUsername       String?                   @map("roblox_username")
+  robloxChecklist      Json?                     @map("roblox_checklist")
   proofImageHash       String?
   feedbackText         String?
   osBuild              String?
@@ -748,6 +761,7 @@ model Submission {
   isLowPowerMode       Boolean?
   hardwareFlags        String[]                  @default([])
   githubIssueUrl       String?
+  pairSessions         MissionPairSession[]
   audit                SubmissionAudit?
   status               SubmissionStatus          @default(PENDING)
   rejectionReason      String?
@@ -771,6 +785,47 @@ model Submission {
   @@index([proofImageHash])
   @@index([expiresAt, status])
   @@index([status, submittedAt])
+}
+
+model TelemetryIncident {
+  id              String           @id @default(cuid())
+  cohortId        String
+  cohort          AppCampaign      @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  validatorId     String?
+  validator       User?            @relation("IncidentValidator", fields: [validatorId], references: [id], onDelete: SetNull)
+  severity        IncidentSeverity @default(WARN)
+  statusCode      String           @db.VarChar(64)
+  endpoint        String?          @db.VarChar(300)
+  deviceModel     String           @db.VarChar(120)
+  osVersion       String           @db.VarChar(120)
+  message         String           @db.VarChar(1000)
+  payloadSnapshot Json?
+  githubIssueUrl  String?          @map("github_issue_url")
+  createdAt       DateTime         @default(now())
+
+  @@index([cohortId, createdAt])
+  @@index([cohortId, severity, createdAt])
+  @@index([validatorId, createdAt])
+}
+
+model MissionPairSession {
+  id             String     @id @default(cuid())
+  submissionId   String
+  submission     Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  testerId       String
+  tester         User       @relation(fields: [testerId], references: [id], onDelete: Cascade)
+  tokenHash      String     @unique @map("token_hash") @db.VarChar(64)
+  channelKey     String     @unique @map("channel_key") @db.VarChar(64)
+  activeStep     Int        @default(0) @map("active_step")
+  completedSteps Int[]      @default([]) @map("completed_steps")
+  compact        Boolean    @default(false)
+  connectedAt    DateTime?  @map("connected_at")
+  expiresAt      DateTime   @map("expires_at")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  @@index([submissionId, expiresAt])
+  @@index([testerId, expiresAt])
 }
 
 model WalletTransaction {

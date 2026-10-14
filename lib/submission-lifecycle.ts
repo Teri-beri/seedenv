@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 export const rejectionReasonSchema = z.enum(["Blurry Image", "Irrelevant Content", "Incomplete Steps", "Low Effort", "Generic Feedback", "Did not follow test script", "Incomplete video proof", "Required participation period not completed"]);
-export const revisionWindowMs = 30 * 60 * 1000;
+export const proofWindowMs = 24 * 60 * 60 * 1000;
 export class ProofReviewError extends Error {}
 
 export function needsRevision(item: { revisionRequestedAt?: Date | string | null }) {
@@ -35,7 +35,7 @@ export async function startProofRevision(tx: Prisma.TransactionClient, testerId:
   if (!item || item.testerId !== testerId || item.status !== "PENDING" || !needsRevision(item)) throw new Error("A pending revision request for your submission is required.");
   if (item.denialReviewPending) throw new Error("This proof is held for manual denial review.");
   if (item.revisionStartedAt && item.expiresAt > new Date()) return item;
-  return tx.submission.update({ where: { id }, data: { revisionStartedAt: new Date(), expiresAt: new Date(Date.now() + revisionWindowMs) } });
+  return tx.submission.update({ where: { id }, data: { revisionStartedAt: new Date(), expiresAt: new Date(Date.now() + proofWindowMs) } });
 }
 
 export async function rejectProof(tx: Prisma.TransactionClient, reviewerId: string, admin: boolean, id: string, reason: string) {
@@ -67,6 +67,6 @@ export async function confirmProofDenial(tx: Prisma.TransactionClient, reviewerI
 export function assertProofEditable(item: { expiresAt: Date; revisionRequestedAt: Date | null; revisionStartedAt: Date | null; feedbackText: string | null; proofImageUrl: string | null; denialReviewPending?: boolean }) {
   if (item.denialReviewPending) throw new Error("This proof and its unpaid reward are held for manual review.");
   if (needsRevision(item) && !item.revisionStartedAt) throw new Error("Start your requested revision before editing proof.");
-  if (item.expiresAt <= new Date()) throw new Error(needsRevision(item) ? "The revision editing window expired. Start the revision again." : "The 30-minute lock expired. Request a fresh slot.");
+  if (item.expiresAt <= new Date()) throw new Error(needsRevision(item) ? "The revision editing window expired. Start the revision again." : "The 24-hour reservation expired. Request a fresh slot.");
   if (!needsRevision(item) && (item.feedbackText || item.proofImageUrl)) throw new Error("Proof is already awaiting review. Wait for a developer revision request before changing it.");
 }

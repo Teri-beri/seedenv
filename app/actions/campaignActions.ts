@@ -1,6 +1,6 @@
 "use server";
 
-import { CampaignStatus, CohortFundingModel, CohortType, PlatformType, RobloxAuditFocus, TaskProofType, TransactionStatus, TransactionType } from "@prisma/client";
+import { CampaignStatus, CohortFundingModel, CohortType, PlatformType, Prisma, RobloxAuditFocus, TaskProofType, TransactionStatus, TransactionType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
@@ -21,7 +21,7 @@ import { queueFollowerEmails } from "@/lib/social-connections";
 import { REFERRAL_RULES } from "@/lib/config/referral";
 import { releaseUnfundedFeeBenefits, reserveAutomaticFeeBenefits } from "@/lib/services/billing.service";
 import { assertTestFlightOwner, isTestFlightUrl, TestFlightOwnershipError } from "@/lib/services/testflight-ownership.service";
-import { isRobloxExperienceUrl } from "@/lib/roblox-cohorts";
+import { buildRobloxLaunchUrl, extractRobloxPlaceId, isRobloxAccessMethod, isRobloxExperienceUrl, isRobloxPlaceId } from "@/lib/roblox-cohorts";
 
 const taskInstructionSchema = z.object({
   instructionTitle: z.string().min(3).max(90),
@@ -39,11 +39,15 @@ const httpUrlSchema = z.string().url().refine((value) => {
 const campaignSchema = z.object({
   title: z.string().min(4).max(90),
   platform: z.nativeEnum(PlatformType),
-  appUrl: httpUrlSchema,
-  robloxExperienceUrl: z.string().trim().optional().or(z.literal("")),
+  appUrl: z.string().trim().max(4000),
+  robloxExperienceUrl: z.string().trim().max(4000).optional().or(z.literal("")),
   robloxUniverseId: z.string().trim().regex(/^\d{1,20}$/, "Use a numeric Roblox Universe or Place ID.").optional().or(z.literal("")),
+  robloxPlaceId: z.string().trim().regex(/^\d{1,20}$/, "Use a numeric Roblox place ID.").optional().or(z.literal("")),
   robloxAuditFocus: z.nativeEnum(RobloxAuditFocus).nullable().optional(),
   minMemoryGB: z.number().int().min(1, "Minimum memory must be at least 1 GB.").max(64, "Minimum memory cannot exceed 64 GB.").nullable().optional(),
+  robloxMobileOnly: z.boolean().optional().default(true),
+  robloxAllowIpad: z.boolean().optional().default(false),
+  robloxAllowDesktop: z.boolean().optional().default(false),
   iconUrl: httpUrlSchema.optional().or(z.literal("")),
   targetVibe: z.string().min(3).max(80),
   description: z.string().min(24).max(1400),
@@ -62,16 +66,28 @@ const campaignSchema = z.object({
   message: "The Discovery REP floor cannot exceed the highest task requirement.",
   path: ["discoveryMinRep"],
 }).superRefine((input, context) => {
-  if (input.platform !== PlatformType.ROBLOX_EXPERIENCE) return;
-  if (!input.robloxExperienceUrl || !isRobloxExperienceUrl(input.robloxExperienceUrl)) {
-    context.addIssue({ code: "custom", path: ["robloxExperienceUrl"], message: "Enter a Roblox experience URL in the form https://www.roblox.com/games/{placeId}/..." });
+  if (input.platform !== PlatformType.ROBLOX_EXPERIENCE) {
+    const appUrlResult = httpUrlSchema.safeParse(input.appUrl);
+    if (!appUrlResult.success) {
+      context.addIssue({ code: "custom", path: ["appUrl"], message: appUrlResult.error.issues[0]?.message || "Enter a valid HTTP or HTTPS app URL." });
+    }
+    return;
+  }
+  const accessMethod = input.robloxExperienceUrl || "";
+  if (!isRobloxAccessMethod(accessMethod)) {
+    context.addIssue({ code: "custom", path: ["robloxExperienceUrl"], message: "Enter a Roblox private server URL, experience URL, or numeric place ID." });
   }
   if (!input.robloxAuditFocus) {
     context.addIssue({ code: "custom", path: ["robloxAuditFocus"], message: "Choose the primary Roblox audit focus." });
   }
 });
 
-export type CampaignInput = z.infer<typeof campaignSchema>;
+export type CampaignInput = Omit<z.infer<typeof campaignSchema>, "robloxMobileOnly" | "robloxAllowIpad" | "robloxAllowDesktop"> & {
+  robloxPlaceId?: string;
+  robloxMobileOnly?: boolean;
+  robloxAllowIpad?: boolean;
+  robloxAllowDesktop?: boolean;
+};
 
 // Bundle slots, rewards, fee, and platform are fixed server-side so the client cannot alter a flat-priced package.
 function resolveCohortTerms(input: CampaignInput) {
@@ -99,6 +115,10 @@ function buildCampaignData(input: CampaignInput, developerId: string, status: Ca
   const terms = resolveCohortTerms(input);
   const testerPayoutPoolUsd = terms.totalSlots * terms.bountyPerTaskUsd;
   const { totalBudgetUsd, platformFeeUsd, escrowTotalCents } = quoteCampaignFunding(testerPayoutPoolUsd, input.cohortType, platformFeeWaived, discountPercent);
+  const robloxAccessMethod = input.robloxExperienceUrl?.trim() || "";
+  const robloxPlaceId = isRobloxPlaceId(robloxAccessMethod)
+    ? robloxAccessMethod
+    : input.robloxPlaceId || extractRobloxPlaceId(robloxAccessMethod);
 
   return {
     escrowTotalCents,
@@ -107,11 +127,19 @@ function buildCampaignData(input: CampaignInput, developerId: string, status: Ca
       developerId,
       title: input.title,
       platform: terms.platform,
-      appUrl: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? input.robloxExperienceUrl! : input.appUrl,
-      robloxExperienceUrl: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? input.robloxExperienceUrl || null : null,
+      appUrl: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? buildRobloxLaunchUrl(robloxAccessMethod, robloxPlaceId)! : input.appUrl,
+      robloxExperienceUrl: terms.platform === PlatformType.ROBLOX_EXPERIENCE && isRobloxExperienceUrl(robloxAccessMethod) ? robloxAccessMethod : null,
       robloxUniverseId: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? input.robloxUniverseId || null : null,
+      robloxPlaceId: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? robloxPlaceId : null,
       robloxAuditFocus: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? input.robloxAuditFocus ?? null : null,
       minMemoryGB: terms.platform === PlatformType.ROBLOX_EXPERIENCE ? input.minMemoryGB ?? null : null,
+      robloxDeviceConstraints: terms.platform === PlatformType.ROBLOX_EXPERIENCE
+        ? {
+            mobileOnly: input.robloxMobileOnly ?? true,
+            allowIpad: input.robloxAllowIpad ?? false,
+            allowDesktop: input.robloxAllowDesktop ?? false,
+          }
+        : Prisma.DbNull,
       iconUrl: input.iconUrl || null,
       targetVibe: input.targetVibe,
       description: input.description,

@@ -44,3 +44,15 @@ services:
         sync: false
       - key: SEEDENV_ANALYTICS_OWNER_EMAIL
         sync: false
+      - key: PUSHER_APP_ID
+        sync: false
+      - key: PUSHER_KEY
+        sync: false
+      - key: PUSHER_SECRET
+        sync: false
+      - key: PUSHER_CLUSTER
+        value: mt1
+      - key: NEXT_PUBLIC_PUSHER_KEY
+        sync: false
+      - key: NEXT_PUBLIC_PUSHER_CLUSTER
+        value: mt1

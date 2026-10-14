@@ -160,6 +160,7 @@ test("promo launch, paid consumption, retries, access and concurrent caps (isola
       targetVibe: "Test", description: "A test cohort with actionable mobile app feedback.",
       totalSlots: 25, bountyPerTaskUsd: 4, instructions: [{ instructionTitle: "Test navigation", instructionDetail: "Explore navigation and report reproducible failures.", proofType: "TEXT_FEEDBACK" as const, minimumRep: 0 }],
       discoveryAllowed: false, discoveryMinRep: 0, cohortType: "STANDARD_QA" as const, hardwareStrict: true, promoCode: marker,
+      robloxMobileOnly: true, robloxAllowIpad: false, robloxAllowDesktop: false,
     };
     const first = await successfulLaunch(input);
     assert.ok(first.launched);

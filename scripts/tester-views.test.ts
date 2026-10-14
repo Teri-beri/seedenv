@@ -102,7 +102,7 @@ test("mission desk consolidates status and empty states without changing timer s
   assert.match(source, /\{ id: "revisions", label: "Revisions", badge: revisionAssignments\.length \}/);
   assert.match(source, /\{ id: "history", label: "History", badge: completedHistory\.length \}/);
   assert.match(source, /No active validation runs/);
-  assert.match(source, /Accepted invitations remain available for up to 24 hours; the 30-minute proof timer starts only after you begin\./);
+  assert.match(source, /Accepted invitations and active proof reservations remain available for up to 24 hours\./);
   assert.match(source, /href="\/dashboard\?view=discover">Browse Open Missions/);
   assert.doesNotMatch(source, /Your next contribution|No missions in progress yet/);
 });

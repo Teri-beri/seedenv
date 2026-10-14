@@ -200,7 +200,7 @@ function ClearanceStep({ viewer, scan }: { viewer: NonNullable<JoinViewer>; scan
       <Panel>
         <h3 className="text-sm font-semibold text-zinc-100">How missions work</h3>
         <ol className="mt-3 space-y-2 text-sm leading-6 text-zinc-400">
-          <li><span className="font-mono text-xs text-emerald-400">01</span> Claim a slot. It&apos;s reserved for you for 30 minutes.</li>
+          <li><span className="font-mono text-xs text-emerald-400">01</span> Claim a slot. It&apos;s reserved for you for 24 hours.</li>
           <li><span className="font-mono text-xs text-emerald-400">02</span> Install the build, follow the steps, and submit a screenshot plus notes or a recording.</li>
           <li><span className="font-mono text-xs text-emerald-400">03</span> Developers have 48 hours to review. If they don&apos;t, your proof is approved automatically and the reward is released.</li>
         </ol>

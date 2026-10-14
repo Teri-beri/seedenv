@@ -27,6 +27,7 @@ const accountSettingsSchema = z.object({
 const notificationPreferencesSchema = z.object({
   email_tester_requests: z.boolean(),
   email_tester_feedback: z.boolean(),
+  email_telemetry_incidents: z.boolean(),
   email_ledger_updates: z.boolean(),
   email_announcements: z.boolean(),
 }).strict();

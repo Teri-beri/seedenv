@@ -27,6 +27,7 @@ import { COHORT_PLATFORM_FEE_RATE } from "@/lib/pricing";
 import { launchDraftKey, launchWizardDraftsSchema } from "@/lib/launch-wizard-draft";
 import { canManageCohortPromos } from "@/lib/cohort-promos";
 import { automaticFeeBenefits } from "@/lib/services/billing.service";
+import { parseRobloxDeviceConstraints } from "@/lib/roblox-cohorts";
 
 export const dynamic = "force-dynamic";
 
@@ -169,6 +170,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
         include: { instructions: { orderBy: { stepNumber: "asc" } }, promoRedemptions: { include: { promoCode: { select: { code: true } } } } },
       })
     : null;
+  const launchDraftRobloxConstraints = parseRobloxDeviceConstraints(launchDraft?.robloxDeviceConstraints);
   const savedWizard = activeView === "new-drop"
     ? launchWizardDraftsSchema.parse(security?.launchWizardDrafts ?? {})[launchDraftKey(launchDraft?.id)]
     : undefined;
@@ -226,7 +228,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
           <ActiveCohorts cohorts={cohortRows} total={activeCohortCount} />
           <ReleaseReports rows={releaseReports} />
         </> : null}
-        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}`} userId={session.user.id} automaticBenefits={feeBenefits} savedWizard={savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} approvedSubmissionCount={approvedSubmissionCount} activeCohort={(activeView === "review-deck" || activeView === "asset-vault") && campaigns[0] ? { id: campaigns[0].id, title: campaigns[0].title, platform: campaigns[0].platform, totalSlots: campaigns[0].totalSlots, claimedSlots: campaigns[0].claimedSlots } : null} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft ? { ...launchDraft, promoCode: launchDraft.promoRedemptions.map((entry) => entry.promoCode.code).join(",") || launchDraft.promoCodeDraft || undefined, promoReserved: Boolean(launchDraft.promoRedemptions.length) } : undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
+        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}`} userId={session.user.id} automaticBenefits={feeBenefits} savedWizard={savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} approvedSubmissionCount={approvedSubmissionCount} activeCohort={(activeView === "review-deck" || activeView === "asset-vault") && campaigns[0] ? { id: campaigns[0].id, title: campaigns[0].title, platform: campaigns[0].platform, totalSlots: campaigns[0].totalSlots, claimedSlots: campaigns[0].claimedSlots } : null} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft ? { ...launchDraft, robloxMobileOnly: launchDraftRobloxConstraints.mobileOnly, robloxAllowIpad: launchDraftRobloxConstraints.allowIpad, robloxAllowDesktop: launchDraftRobloxConstraints.allowDesktop, promoCode: launchDraft.promoRedemptions.map((entry) => entry.promoCode.code).join(",") || launchDraft.promoCodeDraft || undefined, promoReserved: Boolean(launchDraft.promoRedemptions.length) } : undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
         {heldDenials.length ? <section className="mt-6 space-y-3 rounded-xl border border-amber-500/30 p-5">
           <h2 className="font-semibold text-amber-200">Denials awaiting manual review</h2>
           <p className="text-sm text-zinc-400">Oldest 100 cases. These places and unpaid rewards stay reserved until SeedEnv approves the work or confirms denial. They cannot auto-approve, be edited, or be reused while held.</p>

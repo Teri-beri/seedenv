@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 const preferencesList: Array<{ key: keyof NotificationPreferences; title: string; detail: string }> = [
   { key: "email_tester_requests", title: "Tester requests", detail: "Email me when a tester requests to join one of my cohorts." },
   { key: "email_tester_feedback", title: "Tester feedback", detail: "Email me when testers submit feedback or proof." },
+  { key: "email_telemetry_incidents", title: "Critical telemetry incidents", detail: "Email me immediately when an active tester reports critical degradation." },
   { key: "email_ledger_updates", title: "Ledger updates", detail: "Email me about payouts, escrow, and ledger activity." },
   { key: "email_announcements", title: "Product announcements", detail: "Occasional SeedEnv product news and release notes." },
 ];
