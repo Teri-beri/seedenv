@@ -35,7 +35,9 @@ test("each tester screen renders only its own sections and marks the selected na
       assert.ok(html.includes('href="/launch-circle"'));
       assert.ok(!html.includes('href="#'));
       assert.equal(html.includes("Available payout"), view.id === "discover");
-      assert.ok(html.includes("$0.00 Cash Out"));
+      // The amount always renders; the "Cash Out" wording is hidden on phones to keep the app bar on one line.
+      assert.ok(html.includes("$0.00"));
+      assert.ok(/\$0\.00<span class="[^"]*hidden sm:inline[^"]*"> Cash Out<\/span>/.test(html));
       if (view.id === "reputation") {
         assert.ok(html.includes('aria-label="Reputation summary"'));
         assert.ok(html.includes("Clearance tier"));
@@ -105,6 +107,38 @@ test("mission desk consolidates status and empty states without changing timer s
   assert.match(source, /Accepted invitations and active proof reservations remain available for up to 24 hours\./);
   assert.match(source, /href="\/dashboard\?view=discover">Browse Open Missions/);
   assert.doesNotMatch(source, /Your next contribution|No missions in progress yet/);
+});
+
+test("the mobile app shell never pans sideways and keeps desktop layout intact", async () => {
+  const tabs = await readFile(new URL("../components/ui/SegmentedTabs.tsx", import.meta.url), "utf8");
+  // A flex parent lets an unconstrained inline-flex track grow to max-content and scroll the whole page.
+  assert.match(tabs, /inline-flex max-w-full"\} min-w-0/);
+  assert.match(tabs, /segmented-tabs /);
+  assert.match(tabs, /segmented-tabs-item relative/);
+  assert.match(tabs, /segmented-tabs-label relative/);
+
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  // `clip` rather than `hidden`, so the sticky app bar and bottom tab bar keep working.
+  assert.match(css, /@media \(max-width: 1023px\) \{\s*\/\*[\s\S]*?\*\/\s*html,\s*body \{[\s\S]*?overflow-x: clip;[\s\S]*?overscroll-behavior-x: none;/);
+  assert.doesNotMatch(css, /scroll-snap-type: x mandatory/);
+  // Mobile pills wrap onto new rows instead of becoming a sideways track.
+  assert.match(css, /\.segmented-tabs \{[\s\S]*?flex-wrap: wrap;[\s\S]*?overflow: visible;/);
+  // Every desktop-only rule must stay behind a mobile media query.
+  const mobileBlocks = css.split("@media (max-width: 639px)").length - 1;
+  assert.ok(mobileBlocks >= 2, "mobile app-shell rules must stay scoped to the phone breakpoint");
+
+  const leaderboard = await readFile(new URL("../components/tester/LeaderboardTable.tsx", import.meta.url), "utf8");
+  // Phones get stacked rows; the 680px-wide table stays desktop-only.
+  assert.match(leaderboard, /sm:hidden" aria-label="Leaderboard standings"/);
+  assert.match(leaderboard, /mt-4 hidden overflow-x-auto sm:block/);
+  assert.match(leaderboard, /min-w-\[680px\]/);
+
+  const nav = await readFile(new URL("../components/navigation.tsx", import.meta.url), "utf8");
+  // Six tabs only fit a phone with short labels, and the full label must stay in the accessible name.
+  assert.match(nav, /shortLabel: "Missions"/);
+  assert.match(nav, /shortLabel: "Ranks"/);
+  assert.match(nav, /aria-label=\{label\}/);
+  assert.match(nav, /min-h-14/);
 });
 
 test("segmented tabs animate a per-group indicator and keep every group id unique", async () => {

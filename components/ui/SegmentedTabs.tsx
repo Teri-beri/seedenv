@@ -37,11 +37,13 @@ export interface SegmentedTabLinksProps<T extends string = string> {
   itemClassName?: string;
 }
 
+// `max-w-full min-w-0` keeps the scroller from stretching past its parent. Without it a flex
+// parent lets the track grow to max-content and the whole page gains a sideways scrollbar.
 const containerClass = (fullWidth: boolean, className: string) =>
-  `${fullWidth ? "flex w-full" : "inline-flex"} items-center gap-1 overflow-x-auto rounded-lg border border-zinc-800/90 bg-[#0c0e12] p-1 ${className}`;
+  `segmented-tabs ${fullWidth ? "flex w-full" : "inline-flex max-w-full"} min-w-0 items-center gap-1 overflow-x-auto rounded-lg border border-zinc-800/90 bg-[#0c0e12] p-1 ${className}`;
 
 const itemClass = (isActive: boolean, fullWidth: boolean, extra: string) =>
-  `relative shrink-0 select-none rounded-md px-3 py-2 font-mono text-xs transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${fullWidth ? "flex-1" : ""} ${isActive ? "font-medium text-zinc-100" : "text-zinc-400 hover:text-zinc-200"} ${extra}`;
+  `segmented-tabs-item relative shrink-0 select-none rounded-md px-3 py-2 font-mono text-xs transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${fullWidth ? "flex-1" : ""} ${isActive ? "font-medium text-zinc-100" : "text-zinc-400 hover:text-zinc-200"} ${extra}`;
 
 function TabPill({ groupId, reduceMotion }: { groupId: string; reduceMotion: boolean | null }) {
   return (
@@ -56,7 +58,7 @@ function TabPill({ groupId, reduceMotion }: { groupId: string; reduceMotion: boo
 
 function TabContent({ tab, isActive }: { tab: SegmentedTab; isActive: boolean }) {
   return (
-    <span className="relative z-10 flex items-center justify-center gap-1.5 whitespace-nowrap">
+    <span className="segmented-tabs-label relative z-10 flex items-center justify-center gap-1.5 whitespace-nowrap">
       {tab.label}
       {tab.badge === undefined ? null : (
         <span

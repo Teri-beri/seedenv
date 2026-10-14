@@ -72,12 +72,12 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
                 ]}
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Link className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-medium text-emerald-200 transition hover:border-emerald-400/50 hover:text-emerald-100" href="/account?tab=portfolio#stripe-setup">
-                {formatCents(pendingPayoutCents)} Cash Out
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <Link className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-medium text-emerald-200 transition hover:border-emerald-400/50 hover:text-emerald-100" href="/account?tab=portfolio#stripe-setup">
+                {formatCents(pendingPayoutCents)}<span className="hidden sm:inline"> Cash Out</span>
               </Link>
-              <Link className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 px-3 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-700 hover:text-white" href="/account">
-                <Settings className="size-3.5" /> Account
+              <Link aria-label="Account" className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-300 transition hover:border-zinc-700 hover:text-white sm:min-h-0 sm:px-3" href="/account">
+                <Settings className="size-3.5" /><span className="hidden sm:inline">Account</span>
               </Link>
             </div>
           </div>
@@ -99,7 +99,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
             <p className="mt-1.5 text-sm leading-6 text-zinc-400">{activeView === "reputation" ? "Track proof verification history, unlock higher-trust opportunities, and build audit credibility." : selectedView.description}</p>
           </div>
 
-          {activeView === "discover" ? <section className="grid grid-cols-2 gap-3 lg:grid-cols-3" aria-label="Flight deck status">
+          {activeView === "discover" ? <section className="grid grid-cols-2 gap-3 max-sm:[&>*:last-child]:col-span-2 lg:grid-cols-3" aria-label="Flight deck status">
             <DeckCard label="Active in review" value={formatCents(auditCents)} detail={inReview.length ? `${inReview.length} proof${inReview.length === 1 ? "" : "s"} in review${nextReleaseHours !== null ? ` · next auto-release ${nextReleaseHours <= 1 ? "within 1h" : `in ${nextReleaseHours}h`}` : ""}` : "No proofs awaiting review"} />
             <DeckCard label="Available payout" value={formatCents(pendingPayoutCents)} detail={pendingPayoutCents > 0 ? "Approved and waiting for Stripe" : "Approved rewards land here"} />
             <DeckCard label="Lifetime earned" value={formatCents(approved?._sum.payoutCents || 0)} detail={quality === null ? `${approvedCount} approved` : `${approvedCount} approved · ${quality}% approval`} />

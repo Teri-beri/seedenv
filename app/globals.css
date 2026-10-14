@@ -50,10 +50,21 @@ select {
   -webkit-tap-highlight-color: transparent;
 }
 
+@media (max-width: 1023px) {
+  /* A mobile app never pans sideways. `clip` (not `hidden`) keeps position: sticky working. */
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+  }
+}
+
 @media (max-width: 639px) {
   .mobile-app-shell {
     min-height: 100dvh;
     padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+    overscroll-behavior-y: contain;
   }
 
   .mobile-app-shell input:not([type="file"]),
@@ -320,25 +331,77 @@ select {
     padding-top: max(0.875rem, env(safe-area-inset-top));
   }
 
-  .mobile-card-stack {
+  /* Chrome (header/tab bar) should feel like native UI, not selectable web text. */
+  .mobile-app-header,
+  .mobile-app-tabbar {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .mobile-app-header > div {
+    gap: 0.5rem;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .mobile-app-header a,
+  .mobile-app-header button {
+    white-space: nowrap;
+  }
+
+  /* Segmented pills wrap onto new rows instead of becoming a sideways scroller. */
+  .segmented-tabs {
     display: flex;
-    gap: 1rem;
-    margin-left: -1rem;
-    margin-right: -1rem;
-    overflow-x: auto;
-    padding: 0 1rem 0.75rem;
-    scroll-padding-left: 1rem;
-    scroll-snap-type: x mandatory;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    overflow: visible;
+  }
+
+  .segmented-tabs > .segmented-tabs-item {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 6.5rem;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 1;
+  }
+
+  .segmented-tabs .segmented-tabs-label {
+    white-space: normal;
+    text-align: center;
+  }
+
+  /* Anything that still opts into a sideways track scrolls inside itself, never the page. */
+  .mobile-app-shell [class*="overflow-x-"] {
+    overscroll-behavior-x: contain;
     scrollbar-width: none;
   }
 
-  .mobile-card-stack::-webkit-scrollbar {
+  .mobile-app-shell [class*="overflow-x-"]::-webkit-scrollbar {
     display: none;
   }
 
-  .mobile-card-stack > article {
-    min-width: min(86vw, 360px);
-    scroll-snap-align: start;
+  .mobile-app-shell table {
+    width: 100%;
+  }
+
+  /* Comfortable native tap targets. */
+  .mobile-app-shell :is(button, a[href], summary, [role="button"], [role="tab"]):not(.segmented-tabs-item) {
+    touch-action: manipulation;
+  }
+
+  .mobile-app-tabbar a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@media (display-mode: standalone) and (max-width: 639px) {
+  .mobile-app-shell {
+    /* Installed to the home screen there is no browser chrome to absorb the gesture. */
+    overscroll-behavior: none;
   }
 }
 

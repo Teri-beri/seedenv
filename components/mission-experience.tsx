@@ -176,7 +176,8 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   const [missionStepIndex, setMissionStepIndex] = useState(0);
   const [completedMissionSteps, setCompletedMissionSteps] = useState<number[]>([]);
   const [pairSession, setPairSession] = useState<PairedMissionSession | null>(null);
-  const [deviceModelDraft, setDeviceModelDraft] = useState("");
+  const [deviceModelDraft, setDeviceModelDraft] = useState<string | null>(null);
+  const [syncedDeviceModel, setSyncedDeviceModel] = useState("");
   const [mobileEvidenceOpen, setMobileEvidenceOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [scope, animate] = useAnimate();
@@ -267,9 +268,13 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
 
   const deviceModelValue = pairSession?.state.confirmedDeviceModel || pairSession?.state.deviceProfile?.estimatedModel || "Device model pending";
 
-  useEffect(() => {
-    setDeviceModelDraft(deviceModelValue);
-  }, [deviceModelValue]);
+  // Drop the local edit as soon as the paired session reports a new model, without an effect round-trip.
+  if (syncedDeviceModel !== deviceModelValue) {
+    setSyncedDeviceModel(deviceModelValue);
+    setDeviceModelDraft(null);
+  }
+
+  const deviceModelInputValue = deviceModelDraft ?? deviceModelValue;
 
   const handleDeviceModelOverride = useCallback((nextValue: string) => {
     const trimmed = nextValue.trim();
@@ -910,13 +915,13 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                   <input
                     id="device-model-override"
                     type="text"
-                    value={deviceModelDraft}
+                    value={deviceModelInputValue}
                     onChange={(event) => setDeviceModelDraft(event.target.value)}
-                    onBlur={() => handleDeviceModelOverride(deviceModelDraft)}
+                    onBlur={() => handleDeviceModelOverride(deviceModelInputValue)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         event.preventDefault();
-                        handleDeviceModelOverride(deviceModelDraft);
+                        handleDeviceModelOverride(deviceModelInputValue);
                       }
                     }}
                     className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-2 font-mono text-xs text-zinc-100 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"

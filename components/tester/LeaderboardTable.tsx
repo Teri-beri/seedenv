@@ -76,12 +76,60 @@ export function LeaderboardTable({ entries, currentUser }: { entries: Leaderboar
   const rows = useMemo(() => rankRows(hasCompetitors ? realRows : benchmarkRows, mode), [hasCompetitors, mode, realRows]);
   const currentRank = hasCompetitors ? rankRows(realRows, mode).findIndex((entry) => entry.id === currentUser.id) + 1 : 0;
   const currentData = realRows.find((entry) => entry.id === currentUser.id);
+  const currentPassRate = currentData?.passRate ?? currentUser.passRate;
+
+  const displayRows = [
+    ...rows.filter((row) => row.id !== currentUser.id).slice(0, 5).map((row, index) => ({
+      key: row.id,
+      rank: `#${String(index + 1).padStart(2, "0")}`,
+      username: row.username,
+      avatarUrl: row.avatarUrl,
+      sample: Boolean(row.sample),
+      tierLabel: rankThresholds[row.rankTier].label,
+      runs: mode === "season" ? row.seasonRuns : row.approvedRuns,
+      metric: mode === "pass-rate" ? (row.passRate === null ? "--" : `${row.passRate}%`) : `${row.xpPoints.toLocaleString()} REP`,
+      isCurrent: false,
+    })),
+    {
+      key: currentUser.id,
+      rank: currentRank ? `#${String(currentRank).padStart(2, "0")}` : "#--",
+      username: currentUser.username,
+      avatarUrl: null,
+      sample: true,
+      tierLabel: rankThresholds[currentUser.rankTier].label,
+      runs: mode === "season" ? currentData?.seasonRuns ?? 0 : currentUser.approvedRuns,
+      metric: mode === "pass-rate" ? (currentPassRate === null ? "--" : `${currentPassRate}%`) : `${currentUser.xpPoints.toLocaleString()} REP`,
+      isCurrent: true,
+    },
+  ];
+  const runsLabel = mode === "season" ? "approved" : "missions";
 
   return (
     <div className="mt-5">
       <SegmentedTabs groupId="leaderboard-mode" label="Leaderboard ranking" activeId={mode} tabs={boardTabs} onChange={setMode} />
       {!hasCompetitors ? <p className="mt-3 rounded-lg border border-dashed border-zinc-800 px-3 py-2 text-xs text-zinc-500"><span className="font-semibold text-zinc-300">Benchmark examples</span> · These rows illustrate competitive targets and are not live SeedEnv activity.</p> : null}
-      <div className="mt-4 overflow-x-auto">
+
+      {/* Phones get stacked cards so the board never needs a sideways swipe. */}
+      <ul className="mt-4 space-y-2 sm:hidden" aria-label="Leaderboard standings">
+        {displayRows.map((row) => (
+          <li key={row.key} className={`flex items-center gap-3 rounded-xl px-3 py-3 ${row.isCurrent ? "border border-emerald-500/20 bg-emerald-500/5" : "bg-black/15"}`}>
+            <span className={`w-9 shrink-0 font-mono text-sm font-semibold ${row.isCurrent ? "text-emerald-400" : "text-zinc-500"}`}>{row.rank}</span>
+            <span className="relative flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zinc-700 bg-zinc-800 text-xs uppercase text-zinc-400">
+              {row.avatarUrl ? <Image src={row.avatarUrl} alt="" fill sizes="36px" className="object-cover" /> : row.username.slice(0, 1)}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-baseline gap-1.5 text-sm font-semibold text-zinc-100">
+                <span className="truncate">{row.sample ? `@${row.username}` : <Link className="hover:text-emerald-300" href={`/u/${encodeURIComponent(row.username)}`}>@{row.username}</Link>}</span>
+                {row.isCurrent ? <span className="shrink-0 text-xs font-normal text-emerald-400">You</span> : null}
+              </span>
+              <span className="mt-0.5 block truncate text-xs text-zinc-500">{row.tierLabel} · {row.runs} {runsLabel}</span>
+            </span>
+            <span className="shrink-0 font-mono text-sm text-amber-300">{row.metric}</span>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-4 hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[680px] border-separate border-spacing-y-2 text-left">
           <thead className="font-mono text-[10px] uppercase tracking-wider text-zinc-600"><tr><th className="px-3 py-2">Rank</th><th className="px-3 py-2">Validator</th><th className="px-3 py-2">Tier</th><th className="px-3 py-2">{mode === "season" ? "This month" : "Approved runs"}</th><th className="px-3 py-2">{mode === "pass-rate" ? "Pass rate" : "Reputation"}</th></tr></thead>
           <tbody>

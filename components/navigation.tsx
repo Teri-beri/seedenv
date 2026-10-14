@@ -10,12 +10,12 @@ import { resolveTesterView } from "@/lib/tester-console";
 import { activateAccountWorkspace, type WorkspaceRole } from "@/app/actions/accountActions";
 
 const testerItems = [
-  { label: "Discover", icon: Gamepad2, href: "/dashboard?view=discover", view: "discover" },
-  { label: "My missions", icon: Flame, href: "/dashboard?view=missions", view: "missions" },
-  { label: "Reputation", icon: Medal, href: "/dashboard?view=reputation", view: "reputation" },
-  { label: "Leaderboard", icon: Trophy, href: "/dashboard?view=leaderboard", view: "leaderboard" },
-  { label: "Circle", icon: MessagesSquare, href: "/launch-circle", view: null },
-  { label: "Settings", icon: UserRound, href: "/account", view: null },
+  { label: "Discover", shortLabel: "Discover", icon: Gamepad2, href: "/dashboard?view=discover", view: "discover" },
+  { label: "My missions", shortLabel: "Missions", icon: Flame, href: "/dashboard?view=missions", view: "missions" },
+  { label: "Reputation", shortLabel: "Rep", icon: Medal, href: "/dashboard?view=reputation", view: "reputation" },
+  { label: "Leaderboard", shortLabel: "Ranks", icon: Trophy, href: "/dashboard?view=leaderboard", view: "leaderboard" },
+  { label: "Circle", shortLabel: "Circle", icon: MessagesSquare, href: "/launch-circle", view: null },
+  { label: "Settings", shortLabel: "Account", icon: UserRound, href: "/account", view: null },
 ];
 
 const developerItems = [
@@ -83,13 +83,13 @@ export function TesterBottomNav() {
   }, [pathname, searchParams, router]);
   return (
     <nav aria-label="Tester app navigation" className="mobile-app-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-stroke bg-obsidian/94 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
-      <div className="mx-auto grid max-w-lg grid-cols-6 gap-0.5">
-        {testerItems.map(({ label, icon: Icon, href, view: itemView }) => {
+      <div className="mx-auto grid max-w-lg grid-cols-6 gap-0">
+        {testerItems.map(({ label, shortLabel, icon: Icon, href, view: itemView }) => {
           const active = pathname === "/account" || pathname === "/launch-circle" ? href === pathname : pathname === "/dashboard" && itemView === view;
           return (
-          <Link key={label} aria-current={active ? "page" : undefined} className={`flex min-h-12 min-w-0 flex-col items-center justify-center rounded-2xl px-1 py-2 text-center text-[10px] font-semibold transition hover:bg-violet-500/10 hover:text-white ${active ? "bg-violet-500/15 text-violet-200" : "text-muted"}`} href={href}>
-            <Icon className="mx-auto mb-1 size-4" />
-            {label}
+          <Link key={label} aria-label={label} aria-current={active ? "page" : undefined} className={`flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-0.5 py-1.5 text-center text-[10px] font-semibold leading-none transition-colors active:bg-violet-500/20 ${active ? "text-violet-200" : "text-muted"}`} href={href}>
+            <span className={`flex size-8 items-center justify-center rounded-full transition-colors ${active ? "bg-violet-500/20" : "bg-transparent"}`}><Icon className="size-[18px]" /></span>
+            <span className="w-full truncate">{shortLabel}</span>
           </Link>
         ); })}
       </div>
