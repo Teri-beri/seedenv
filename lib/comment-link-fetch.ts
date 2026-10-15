@@ -246,8 +246,17 @@ async function fetchRedditComments(url: URL, timeoutMs: number, env: NodeJS.Proc
   return { comments: parseRedditListing(payload), source: "Reddit public JSON" };
 }
 
-export async function fetchCommentsForLink(
-  platform: LinkPlatform,
+/**
+ * Hard ceiling on comments pulled per scan. The detector's statistics converge long before this,
+ * and the provider bills per comment, so the cap is what keeps one viral post from costing more
+ * than the ad view that paid for it.
+ */
+const COMMENT_CAP = Math.min(
+  Math.max(Number.parseInt(process.env.LINK_COMMENT_CAP ?? "", 10) || 150, 25),
+  500,
+);
+
+export async function fetchCommentsForLink(  platform: LinkPlatform,
   url: URL,
   options: { timeoutMs?: number; env?: NodeJS.ProcessEnv } = {},
 ): Promise<LinkFetchResult> {
@@ -268,13 +277,24 @@ export async function fetchCommentsForLink(
   if (!provider) return { status: "guidance", platform, message: PLATFORM_GUIDANCE[platform] };
 
   try {
-    const endpoint = `https://api.apify.com/v2/acts/${encodeURIComponent(provider.actor)}/run-sync-get-dataset-items?token=${encodeURIComponent(provider.token)}`;
+    const endpoint = `https://api.apify.com/v2/acts/${encodeURIComponent(provider.actor)}/run-sync-get-dataset-items?token=${encodeURIComponent(provider.token)}&maxItems=${COMMENT_CAP}`;
     const payload = await fetchJson(
       endpoint,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postURLs: [url.toString()], startUrls: [{ url: url.toString() }], maxItems: 300 }),
+        // Providers bill per comment returned and each actor names its cap differently, so send
+        // every known spelling. An uncapped scan of a viral post can cost many dollars.
+        body: JSON.stringify({
+          postURLs: [url.toString()],
+          startUrls: [{ url: url.toString() }],
+          maxItems: COMMENT_CAP,
+          maxComments: COMMENT_CAP,
+          commentsPerPost: COMMENT_CAP,
+          resultsLimit: COMMENT_CAP,
+          limit: COMMENT_CAP,
+          maxRepliesPerComment: 0,
+        }),
       },
       timeoutMs * 4,
     );

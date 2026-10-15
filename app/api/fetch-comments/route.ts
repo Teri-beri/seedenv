@@ -6,6 +6,7 @@ import {
   detectLinkPlatform,
   fetchCommentsForLink,
 } from "@/lib/comment-link-fetch";
+import { consumeScanTicket, verifyScanTicket } from "@/lib/scan-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 const bodySchema = z.object({
   url: z.string().trim().min(8).max(500),
   platform: z.string().trim().max(40).optional(),
+  challenge: z.string().trim().min(16).max(400),
 });
 
 export async function POST(request: Request) {
@@ -27,7 +29,6 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "Send a post link between 8 and 500 characters." }, { status: 400 });
   }
-
   const target = detectLinkPlatform(body.url);
   if (!target) {
     return NextResponse.json(
@@ -43,6 +44,14 @@ export async function POST(request: Request) {
       { status: 429 },
     );
   }
+
+  // Each scan bills a licensed provider per comment, so it has to be funded by an ad view first.
+  const ticket = verifyScanTicket(body.challenge, target.url.toString());
+  if (!ticket.ok) {
+    return NextResponse.json({ error: ticket.message, reason: ticket.reason }, { status: 402 });
+  }
+  // Burned before the provider call so parallel replays of one pass cannot double-spend.
+  consumeScanTicket(ticket.nonce);
 
   try {
     const result = await fetchCommentsForLink(target.platform, target.url);

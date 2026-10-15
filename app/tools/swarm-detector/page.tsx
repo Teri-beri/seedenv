@@ -20,6 +20,10 @@ type PlatformPreset = "developer" | "tiktok" | "x" | "reddit" | "youtube" | "ins
 type CopyState = "idle" | "copied" | "error";
 type AnalysisTab = "radar" | "matrix";
 type IngestMode = "paste" | "link";
+type AdGate = { challenge: string; nonce: string; url: string; watchMs: number; startedAt: number };
+type ScanTicketPayload =
+  | { challenge: string; nonce: string; watchMs: number; platform: string }
+  | { error: string };
 type LinkFetchPayload =
   | { status: "ok"; platform: string; source: string; comments: Array<{ author: string; text: string; timeOffsetSec: number | null }> }
   | { status: "guidance"; platform: string; message: string }
@@ -182,6 +186,8 @@ export default function SwarmDetectorPage() {
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkNotice, setLinkNotice] = useState<string | null>(null);
+  const [adGate, setAdGate] = useState<AdGate | null>(null);
+  const [adRemainingMs, setAdRemainingMs] = useState(0);
   const [auditPhase, setAuditPhase] = useState<number | null>(null);
   const [hasResults, setHasResults] = useState(true);
   const [inputDirty, setInputDirty] = useState(false);
@@ -192,6 +198,14 @@ export default function SwarmDetectorPage() {
   const auditTimers = useRef<number[]>([]);
 
   useEffect(() => () => auditTimers.current.forEach((timer) => window.clearTimeout(timer)), []);
+
+  useEffect(() => {
+    if (!adGate) return;
+    const tick = () => setAdRemainingMs(Math.max(0, adGate.startedAt + adGate.watchMs - Date.now()));
+    tick();
+    const timer = window.setInterval(tick, 200);
+    return () => window.clearInterval(timer);
+  }, [adGate]);
 
   const entries = useMemo(() => parseSwarmInput(auditedInput), [auditedInput]);
   const metrics = useMemo(() => computeSwarmMetrics(entries), [entries]);
@@ -248,7 +262,7 @@ export default function SwarmDetectorPage() {
     ];
   };
 
-  const fetchFromLink = async () => {
+  const startLinkScan = async () => {
     const url = linkUrl.trim();
     if (!url) {
       setLinkError("Paste a public post link first.");
@@ -258,10 +272,38 @@ export default function SwarmDetectorPage() {
     setLinkError(null);
     setLinkNotice(null);
     try {
+      const response = await fetch("/api/scan-ticket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const payload = (await response.json()) as ScanTicketPayload;
+      if (!response.ok || !("challenge" in payload)) {
+        setLinkError("error" in payload ? payload.error : "That link couldn't be prepared. Try the Paste Comments tab.");
+        return;
+      }
+      setAdGate({ challenge: payload.challenge, nonce: payload.nonce, url, watchMs: payload.watchMs, startedAt: Date.now() });
+      setAdRemainingMs(payload.watchMs);
+    } catch (error) {
+      console.error("Swarm scan ticket failed:", error);
+      setLinkError("That link couldn't be reached. Switch to the “Paste Comments” tab for instant offline processing.");
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  const completeLinkScan = async () => {
+    if (!adGate) return;
+    const gate = adGate;
+    setAdGate(null);
+    setLinkLoading(true);
+    setLinkError(null);
+    setLinkNotice(null);
+    try {
       const response = await fetch("/api/fetch-comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, platform: platformPreset }),
+        body: JSON.stringify({ url: gate.url, platform: platformPreset, challenge: gate.challenge }),
       });
       const payload = (await response.json()) as LinkFetchPayload;
       if ("error" in payload) {
@@ -407,13 +449,17 @@ export default function SwarmDetectorPage() {
               <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                 <div className="relative flex-1">
                   <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-600" />
-                  <input id="swarm-link-input" type="url" inputMode="url" spellCheck={false} value={linkUrl} onChange={(event) => { setLinkUrl(event.target.value); setLinkError(null); setLinkNotice(null); }} onKeyDown={(event) => { if (event.key === "Enter" && !linkLoading) void fetchFromLink(); }} placeholder="https://www.tiktok.com/@creator/video/... or https://x.com/..." className="min-h-12 w-full rounded-xl border border-zinc-800 bg-black/40 py-2 pl-9 pr-3 font-mono text-sm text-zinc-200 outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/10" />
+                  <input id="swarm-link-input" type="url" inputMode="url" spellCheck={false} value={linkUrl} onChange={(event) => { setLinkUrl(event.target.value); setLinkError(null); setLinkNotice(null); }} onKeyDown={(event) => { if (event.key === "Enter" && !linkLoading) void startLinkScan(); }} placeholder="https://www.tiktok.com/@creator/video/... or https://x.com/..." className="min-h-12 w-full rounded-xl border border-zinc-800 bg-black/40 py-2 pl-9 pr-3 font-mono text-sm text-zinc-200 outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/10" />
                 </div>
-                <button type="button" onClick={() => void fetchFromLink()} disabled={linkLoading || auditPhase !== null} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-2 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60">
+                <button type="button" onClick={() => void startLinkScan()} disabled={linkLoading || auditPhase !== null} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-2 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60">
                   {linkLoading ? <Loader2 className="size-4 animate-spin" /> : <ScanSearch className="size-4" />}
                   {linkLoading ? "Fetching thread..." : "Fetch & Scan Thread"}
                 </button>
               </div>
+              <p className="mt-3 flex items-start gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs leading-5 text-emerald-200/90">
+                <Megaphone className="mt-0.5 size-4 shrink-0 text-emerald-400" />
+                <span>Link scans pull live comments from a paid data provider, so each one is unlocked by a short ad. Scanning a different post needs a new unlock. <span className="text-emerald-300">The Paste Comments tab stays free and unlimited.</span></span>
+              </p>
               <p className="mt-3 text-xs leading-5 text-zinc-500"><span className="text-zinc-400">Note:</span> Public platform bot protections limit direct server requests. If a link times out or requires login verification, switch to the &ldquo;Paste Comments&rdquo; tab for instant offline processing.</p>
               <p className="mt-2 font-mono text-[10px] uppercase leading-4 tracking-[0.14em] text-zinc-600">Reddit links read the platform&rsquo;s own public JSON feed · supported: reddit, tiktok, x, instagram, youtube</p>
               {linkNotice ? <p className="mt-3 text-sm text-emerald-300">{linkNotice}</p> : null}
@@ -513,7 +559,83 @@ export default function SwarmDetectorPage() {
 
         <LegalDisclaimer />
       </div>
+
+      {adGate ? (
+        <AdGateDialog
+          remainingMs={adRemainingMs}
+          watchMs={adGate.watchMs}
+          nonce={adGate.nonce}
+          onCancel={() => setAdGate(null)}
+          onContinue={() => void completeLinkScan()}
+        />
+      ) : null}
     </main>
+  );
+}
+
+/**
+ * Funds the scan before any provider credit is spent. The countdown here is only the visitor's
+ * cue — the server independently refuses a pass that comes back early, so closing this dialog or
+ * calling the API directly does not skip the ad.
+ */
+function AdGateDialog({
+  remainingMs,
+  watchMs,
+  nonce,
+  onCancel,
+  onContinue,
+}: {
+  remainingMs: number;
+  watchMs: number;
+  nonce: string;
+  onCancel: () => void;
+  onContinue: () => void;
+}) {
+  const seconds = Math.ceil(remainingMs / 1000);
+  const ready = remainingMs <= 0;
+  const progress = watchMs > 0 ? Math.min(100, ((watchMs - remainingMs) / watchMs) * 100) : 100;
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Unlock this scan" className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-4 backdrop-blur-sm sm:items-center">
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-zinc-800 bg-[#09090b] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-3">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">Unlocking your scan</p>
+          <button type="button" onClick={onCancel} className="min-h-9 rounded-lg px-2 text-sm text-zinc-500 transition hover:text-white">Cancel</button>
+        </div>
+
+        {/*
+          Ad slot. Drop a network's embed (Monetag, Adsterra, Ad Manager rewarded, ...) in here and
+          pass `nonce` through as the network's reward/sub-id macro so its server-to-server
+          postback can hit /api/ad-reward. Until then this house placeholder holds the space.
+        */}
+        <div data-ad-slot="swarm-scan-unlock" data-reward-id={nonce} className="flex min-h-48 flex-col items-center justify-center gap-3 border-b border-zinc-800 bg-gradient-to-b from-zinc-900/60 to-black px-5 py-8 text-center">
+          <Megaphone className="size-7 text-emerald-400" />
+          <p className="text-sm font-semibold text-zinc-200">Your scan is being funded</p>
+          <p className="max-w-sm text-xs leading-5 text-zinc-500">Live comment scans are billed per comment by a licensed data provider. This short break covers that cost so the tool can stay free to use.</p>
+        </div>
+
+        <div className="px-5 py-4">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+            <div className="h-full rounded-full bg-emerald-400 transition-[width] duration-200 ease-linear" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p aria-live="polite" className="font-mono text-xs text-zinc-500">
+              {ready ? "Ready — your scan is unlocked." : `Unlocks in ${seconds}s`}
+            </p>
+            <button
+              type="button"
+              onClick={onContinue}
+              disabled={!ready}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-2 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500 disabled:shadow-none"
+            >
+              <ScanSearch className="size-4" />
+              {ready ? "Scan the thread" : `Please wait ${seconds}s`}
+            </button>
+          </div>
+          <p className="mt-3 text-[11px] leading-4 text-zinc-600">Prefer not to wait? The <span className="text-zinc-400">Paste Comments</span> tab runs entirely in your browser — free, instant, and unlimited.</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
