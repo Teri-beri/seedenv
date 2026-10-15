@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import { Clipboard, ClipboardPaste, Copy, Download, Grid2x2, Megaphone, Play, Radar, ScanSearch, ShieldCheck, Siren, Sparkles, Upload } from "lucide-react";
+import { Clipboard, ClipboardPaste, Copy, Download, Grid2x2, Link2, Loader2, Megaphone, Play, Radar, ScanSearch, ShieldCheck, Siren, Sparkles, Upload } from "lucide-react";
 import {
   analyzeCoordination,
   classifyForensics,
@@ -19,6 +19,11 @@ type ReceiptTheme = "cyber" | "hazard" | "dossier";
 type PlatformPreset = "developer" | "tiktok" | "x" | "reddit" | "youtube" | "instagram";
 type CopyState = "idle" | "copied" | "error";
 type AnalysisTab = "radar" | "matrix";
+type IngestMode = "paste" | "link";
+type LinkFetchPayload =
+  | { status: "ok"; platform: string; source: string; comments: Array<{ author: string; text: string; timeOffsetSec: number | null }> }
+  | { status: "guidance"; platform: string; message: string }
+  | { error: string };
 
 const howToSteps = [
   {
@@ -172,6 +177,11 @@ export default function SwarmDetectorPage() {
   const [receiptTheme, setReceiptTheme] = useState<ReceiptTheme>("cyber");
   const [commentFilter, setCommentFilter] = useState<CommentFilter>("all");
   const [analysisTab, setAnalysisTab] = useState<AnalysisTab>("radar");
+  const [ingestMode, setIngestMode] = useState<IngestMode>("paste");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linkNotice, setLinkNotice] = useState<string | null>(null);
   const [auditPhase, setAuditPhase] = useState<number | null>(null);
   const [hasResults, setHasResults] = useState(true);
   const [inputDirty, setInputDirty] = useState(false);
@@ -205,6 +215,9 @@ export default function SwarmDetectorPage() {
 
   const loadInput = (value: string, preset: PlatformPreset) => {
     auditTimers.current.forEach((timer) => window.clearTimeout(timer));
+    setIngestMode("paste");
+    setLinkError(null);
+    setLinkNotice(null);
     setRawInput(value);
     setPlatformPreset(preset);
     setInputDirty(true);
@@ -212,8 +225,9 @@ export default function SwarmDetectorPage() {
     setAuditPhase(null);
   };
 
-  const runAudit = () => {
-    const pendingEntries = parseSwarmInput(rawInput);
+  const runAudit = (overrideInput?: string) => {
+    const value = overrideInput ?? rawInput;
+    const pendingEntries = parseSwarmInput(value);
     if (!pendingEntries.length) {
       setInputError("No comment records were detected. Paste comment text or upload a JSON array and try again.");
       return;
@@ -226,12 +240,50 @@ export default function SwarmDetectorPage() {
       window.setTimeout(() => setAuditPhase(1), 400),
       window.setTimeout(() => setAuditPhase(2), 800),
       window.setTimeout(() => {
-        setAuditedInput(rawInput);
+        setAuditedInput(value);
         setHasResults(true);
         setInputDirty(false);
         setAuditPhase(null);
       }, 1_200),
     ];
+  };
+
+  const fetchFromLink = async () => {
+    const url = linkUrl.trim();
+    if (!url) {
+      setLinkError("Paste a public post link first.");
+      return;
+    }
+    setLinkLoading(true);
+    setLinkError(null);
+    setLinkNotice(null);
+    try {
+      const response = await fetch("/api/fetch-comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, platform: platformPreset }),
+      });
+      const payload = (await response.json()) as LinkFetchPayload;
+      if ("error" in payload) {
+        setLinkError(payload.error);
+        return;
+      }
+      if (payload.status === "guidance") {
+        setLinkError(payload.message);
+        return;
+      }
+      const serialized = JSON.stringify(payload.comments, null, 2);
+      const matchedPreset = platformPresets.find((preset) => preset.id === payload.platform)?.id ?? "developer";
+      setRawInput(serialized);
+      setPlatformPreset(matchedPreset);
+      setLinkNotice(`Imported ${payload.comments.length} comments via ${payload.source}. Running the audit now.`);
+      runAudit(serialized);
+    } catch (error) {
+      console.error("Swarm link fetch failed:", error);
+      setLinkError("That link couldn't be reached. Switch to the “Paste Comments” tab for instant offline processing.");
+    } finally {
+      setLinkLoading(false);
+    }
   };
 
   const uploadJson = async (file: File | null) => {
@@ -323,7 +375,12 @@ export default function SwarmDetectorPage() {
             </div>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/5 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-300"><Sparkles className="size-3" />Smart cleaner on</span>
           </div>
-          <p className="mt-2 text-sm leading-6 text-zinc-400">Paste the comments exactly as you copied them. We strip handles, timestamps, like counts, and &ldquo;Reply&rdquo; clutter automatically.</p>
+          <p className="mt-2 text-sm leading-6 text-zinc-400">{ingestMode === "paste" ? "Paste the comments exactly as you copied them. We strip handles, timestamps, like counts, and “Reply” clutter automatically." : "Drop in a public post link and we’ll pull the readable comments for you. Nothing is stored, and no account is ever connected."}</p>
+
+          <div className="mt-5 inline-flex w-full flex-col gap-2 rounded-2xl border border-zinc-800 bg-black/30 p-1.5 sm:w-auto sm:flex-row" role="tablist" aria-label="How to add the thread">
+            <button type="button" role="tab" aria-selected={ingestMode === "paste"} onClick={() => setIngestMode("paste")} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm transition ${ingestMode === "paste" ? "bg-emerald-400 font-semibold text-zinc-950" : "text-zinc-400 hover:text-white"}`}>📋 Paste Comments <span className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-70">Free &amp; Instant</span></button>
+            <button type="button" role="tab" aria-selected={ingestMode === "link"} onClick={() => setIngestMode("link")} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm transition ${ingestMode === "link" ? "bg-emerald-400 font-semibold text-zinc-950" : "text-zinc-400 hover:text-white"}`}>🔗 Direct Post Link <span className="font-mono text-[10px] uppercase tracking-[0.14em] opacity-70">Beta</span></button>
+          </div>
 
           <div className="mt-5">
             <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">No thread handy? Fill it with one click</p>
@@ -333,16 +390,36 @@ export default function SwarmDetectorPage() {
             </div>
           </div>
 
-          <div className="relative mt-4">
-            <textarea value={rawInput} onChange={(event) => { setRawInput(event.target.value); setInputDirty(true); setInputError(null); }} spellCheck={false} aria-label="Paste comment thread" className="min-h-72 w-full resize-none rounded-2xl border border-zinc-800 bg-[#080a0f] p-4 pb-24 font-mono text-sm leading-6 text-zinc-200 outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/10 sm:pb-16" placeholder="Paste the comments here..." />
-            <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap sm:justify-between">
-              <label className="pointer-events-auto inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/95 px-4 py-2 text-sm text-zinc-300 backdrop-blur hover:border-zinc-500 hover:text-white">
-                <Upload className="size-4" /> Upload JSON
-                <input type="file" accept="application/json,.json" className="sr-only" onChange={(event) => { void uploadJson(event.target.files?.[0] ?? null); event.target.value = ""; }} />
-              </label>
-              <button type="button" onClick={runAudit} disabled={auditPhase !== null} className="pointer-events-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-2 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60"><Play className="size-4" />{auditPhase === null ? "Run Forensic Audit" : "Audit in progress..."}</button>
+          {ingestMode === "paste" ? (
+            <div className="relative mt-4">
+              <textarea value={rawInput} onChange={(event) => { setRawInput(event.target.value); setInputDirty(true); setInputError(null); }} spellCheck={false} aria-label="Paste comment thread" className="min-h-72 w-full resize-none rounded-2xl border border-zinc-800 bg-[#080a0f] p-4 pb-24 font-mono text-sm leading-6 text-zinc-200 outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/10 sm:pb-16" placeholder="Paste the comments here..." />
+              <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-wrap items-center justify-end gap-2 sm:flex-nowrap sm:justify-between">
+                <label className="pointer-events-auto inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/95 px-4 py-2 text-sm text-zinc-300 backdrop-blur hover:border-zinc-500 hover:text-white">
+                  <Upload className="size-4" /> Upload JSON
+                  <input type="file" accept="application/json,.json" className="sr-only" onChange={(event) => { void uploadJson(event.target.files?.[0] ?? null); event.target.value = ""; }} />
+                </label>
+                <button type="button" onClick={() => runAudit()} disabled={auditPhase !== null} className="pointer-events-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-2 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60"><Play className="size-4" />{auditPhase === null ? "Run Forensic Audit" : "Audit in progress..."}</button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-zinc-800 bg-[#080a0f] p-4">
+              <label htmlFor="swarm-link-input" className="font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500">Public post link</label>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <div className="relative flex-1">
+                  <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-600" />
+                  <input id="swarm-link-input" type="url" inputMode="url" spellCheck={false} value={linkUrl} onChange={(event) => { setLinkUrl(event.target.value); setLinkError(null); setLinkNotice(null); }} onKeyDown={(event) => { if (event.key === "Enter" && !linkLoading) void fetchFromLink(); }} placeholder="https://www.tiktok.com/@creator/video/... or https://x.com/..." className="min-h-12 w-full rounded-xl border border-zinc-800 bg-black/40 py-2 pl-9 pr-3 font-mono text-sm text-zinc-200 outline-none focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/10" />
+                </div>
+                <button type="button" onClick={() => void fetchFromLink()} disabled={linkLoading || auditPhase !== null} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-2 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-60">
+                  {linkLoading ? <Loader2 className="size-4 animate-spin" /> : <ScanSearch className="size-4" />}
+                  {linkLoading ? "Fetching thread..." : "Fetch & Scan Thread"}
+                </button>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-zinc-500"><span className="text-zinc-400">Note:</span> Public platform bot protections limit direct server requests. If a link times out or requires login verification, switch to the &ldquo;Paste Comments&rdquo; tab for instant offline processing.</p>
+              <p className="mt-2 font-mono text-[10px] uppercase leading-4 tracking-[0.14em] text-zinc-600">Reddit links read the platform&rsquo;s own public JSON feed · supported: reddit, tiktok, x, instagram, youtube</p>
+              {linkNotice ? <p className="mt-3 text-sm text-emerald-300">{linkNotice}</p> : null}
+              {linkError ? <p role="alert" className="mt-3 text-sm leading-6 text-amber-300">{linkError}</p> : null}
+            </div>
+          )}
 
           <details className="mt-4 rounded-2xl border border-zinc-800/80 bg-black/20 p-3">
             <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500 hover:text-zinc-300">Advanced: source format</summary>
