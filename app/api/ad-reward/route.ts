@@ -15,7 +15,12 @@ function secretMatches(given: string | null, expected: string) {
 /**
  * Server-to-server reward postback for an ad network. Networks differ on verb and parameter
  * names, so both GET and POST are accepted and the nonce is read from whichever macro is sent.
- * Until a network is wired up this stays dormant: without AD_POSTBACK_SECRET nothing is accepted.
+ *
+ * Point the network's postback URL here and have it echo the scan nonce:
+ *   https://seedenv.com/api/ad-reward?secret=<AD_POSTBACK_SECRET>&nonce=${SUBID}
+ *
+ * Without AD_POSTBACK_SECRET nothing is accepted — and because verification fails closed, setting
+ * that secret is also what makes confirmed views mandatory before any provider credit is spent.
  */
 async function handle(request: Request) {
   const expected = process.env.AD_POSTBACK_SECRET?.trim();

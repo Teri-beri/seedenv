@@ -6,7 +6,7 @@ import {
   detectLinkPlatform,
   fetchCommentsForLink,
 } from "@/lib/comment-link-fetch";
-import { consumeScanTicket, verifyScanTicket } from "@/lib/scan-ticket";
+import { consumeScanTicket, refundScanTicket, verifyScanTicket } from "@/lib/scan-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,8 +55,13 @@ export async function POST(request: Request) {
 
   try {
     const result = await fetchCommentsForLink(target.platform, target.url);
+    // The guidance path never reaches the provider, so the visitor's ad paid for nothing —
+    // give the pass back rather than making them watch another to retry the same post.
+    if (result.status === "guidance") refundScanTicket(ticket.nonce);
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    // Deliberately not refunded: a thrown provider call may still have been billed, and a pass
+    // that survives failures could be looped to burn credit for free.
     console.error("SeedEnv link comment fetch failed:", error instanceof Error ? error.message : "unknown error");
     return NextResponse.json(
       { error: "The link couldn't be read just now. Switch to the Paste Comments tab for instant offline processing." },

@@ -12,6 +12,15 @@ import {
   type SanityVerdict,
   type SwarmEntry,
 } from "@/lib/swarm-detector";
+import { AdPlaybackError, isAdNetworkConfigured, playRewardedAd, resolveAdNetwork } from "@/lib/ad-network";
+
+// Read as full literal member expressions so Next.js can inline them into the browser bundle.
+const adNetwork = resolveAdNetwork({
+  NEXT_PUBLIC_AD_PROVIDER: process.env.NEXT_PUBLIC_AD_PROVIDER,
+  NEXT_PUBLIC_AD_ZONE_ID: process.env.NEXT_PUBLIC_AD_ZONE_ID,
+  NEXT_PUBLIC_AD_SDK_URL: process.env.NEXT_PUBLIC_AD_SDK_URL,
+  NEXT_PUBLIC_AD_GLOBAL: process.env.NEXT_PUBLIC_AD_GLOBAL,
+});
 
 type AspectMode = "story" | "card";
 type CommentFilter = "all" | "organic";
@@ -20,9 +29,16 @@ type PlatformPreset = "developer" | "tiktok" | "x" | "reddit" | "youtube" | "ins
 type CopyState = "idle" | "copied" | "error";
 type AnalysisTab = "radar" | "matrix";
 type IngestMode = "paste" | "link";
-type AdGate = { challenge: string; nonce: string; url: string; watchMs: number; startedAt: number };
+type AdGate = {
+  challenge: string;
+  nonce: string;
+  url: string;
+  watchMs: number;
+  startedAt: number;
+  requiresPostback: boolean;
+};
 type ScanTicketPayload =
-  | { challenge: string; nonce: string; watchMs: number; platform: string }
+  | { challenge: string; nonce: string; watchMs: number; platform: string; requiresPostback?: boolean }
   | { error: string };
 type LinkFetchPayload =
   | { status: "ok"; platform: string; source: string; comments: Array<{ author: string; text: string; timeOffsetSec: number | null }> }
@@ -282,7 +298,14 @@ export default function SwarmDetectorPage() {
         setLinkError("error" in payload ? payload.error : "That link couldn't be prepared. Try the Paste Comments tab.");
         return;
       }
-      setAdGate({ challenge: payload.challenge, nonce: payload.nonce, url, watchMs: payload.watchMs, startedAt: Date.now() });
+      setAdGate({
+        challenge: payload.challenge,
+        nonce: payload.nonce,
+        url,
+        watchMs: payload.watchMs,
+        startedAt: Date.now(),
+        requiresPostback: payload.requiresPostback === true,
+      });
       setAdRemainingMs(payload.watchMs);
     } catch (error) {
       console.error("Swarm scan ticket failed:", error);
@@ -565,6 +588,7 @@ export default function SwarmDetectorPage() {
           remainingMs={adRemainingMs}
           watchMs={adGate.watchMs}
           nonce={adGate.nonce}
+          requiresPostback={adGate.requiresPostback}
           onCancel={() => setAdGate(null)}
           onContinue={() => void completeLinkScan()}
         />
@@ -574,26 +598,111 @@ export default function SwarmDetectorPage() {
 }
 
 /**
- * Funds the scan before any provider credit is spent. The countdown here is only the visitor's
- * cue — the server independently refuses a pass that comes back early, so closing this dialog or
- * calling the API directly does not skip the ad.
+ * Funds the scan before any provider credit is spent.
+ *
+ * When an ad network is configured this plays its rewarded unit and unlocks only once the network
+ * reports a completed view — and, when reward postbacks are on, only once that network has
+ * confirmed the view server-to-server. The countdown is the visitor's cue, never the authority:
+ * the server independently re-checks every one of these conditions, so closing this dialog or
+ * calling the API directly cannot skip the ad.
  */
 function AdGateDialog({
   remainingMs,
   watchMs,
   nonce,
+  requiresPostback,
   onCancel,
   onContinue,
 }: {
   remainingMs: number;
   watchMs: number;
   nonce: string;
+  requiresPostback: boolean;
   onCancel: () => void;
   onContinue: () => void;
 }) {
+  const hasNetwork = isAdNetworkConfigured(adNetwork);
+  const [attempt, setAttempt] = useState(0);
+  const [adWatched, setAdWatched] = useState(false);
+  const [confirmed, setConfirmed] = useState(!requiresPostback);
+  const [adError, setAdError] = useState<string | null>(null);
+  const [confirmTimedOut, setConfirmTimedOut] = useState(false);
+
   const seconds = Math.ceil(remainingMs / 1000);
-  const ready = remainingMs <= 0;
+  const timerDone = remainingMs <= 0;
+  // Without a network the countdown itself is the only signal available; with one, the network's
+  // completion callback is what counts.
+  const watched = hasNetwork ? adWatched : timerDone;
+
+  useEffect(() => {
+    if (!hasNetwork) return;
+    let active = true;
+    playRewardedAd(adNetwork, nonce)
+      .then(() => {
+        if (active) setAdWatched(true);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        const reason = error instanceof AdPlaybackError ? error.reason : "unavailable";
+        setAdError(
+          reason === "blocked"
+            ? "The ad couldn't load — an ad blocker or network filter is blocking it. Live scans are paid for by that ad, so they stay locked while it's blocked."
+            : reason === "abandoned"
+              ? "That ad was closed before it finished. Live scans are funded by a completed view."
+              : "No ad was available just now. Try again in a moment.",
+        );
+      });
+    return () => {
+      active = false;
+    };
+  }, [attempt, hasNetwork, nonce]);
+
+  useEffect(() => {
+    if (!watched || !requiresPostback || confirmed) return;
+    let active = true;
+    const deadline = Date.now() + 25_000;
+    const poll = async () => {
+      while (active && Date.now() < deadline) {
+        try {
+          const response = await fetch(`/api/scan-ticket?nonce=${encodeURIComponent(nonce)}`, { cache: "no-store" });
+          const payload = (await response.json()) as { verified?: boolean };
+          if (!active) return;
+          if (payload.verified) {
+            setConfirmed(true);
+            return;
+          }
+        } catch {
+          // Transient; the deadline below is what gives up.
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 1_500));
+      }
+      if (active) setConfirmTimedOut(true);
+    };
+    void poll();
+    return () => {
+      active = false;
+    };
+  }, [confirmed, nonce, requiresPostback, watched]);
+
+  const ready = watched && confirmed && timerDone;
+  const confirming = watched && !confirmed && !confirmTimedOut;
   const progress = watchMs > 0 ? Math.min(100, ((watchMs - remainingMs) / watchMs) * 100) : 100;
+
+  const status = adError
+    ? adError
+    : confirmTimedOut
+      ? "The ad network hasn't confirmed that view. Nothing was charged — try again, or use the Paste Comments tab."
+      : confirming
+        ? "Confirming your ad view with the network…"
+        : ready
+          ? "Ready — your scan is unlocked."
+          : !timerDone
+            ? `Unlocks in ${seconds}s`
+            : hasNetwork
+              ? "Finish the ad to unlock this scan."
+              : "Ready — your scan is unlocked.";
+
+  const retryable = Boolean(adError || confirmTimedOut);
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Unlock this scan" className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-4 backdrop-blur-sm sm:items-center">
@@ -604,14 +713,30 @@ function AdGateDialog({
         </div>
 
         {/*
-          Ad slot. Drop a network's embed (Monetag, Adsterra, Ad Manager rewarded, ...) in here and
-          pass `nonce` through as the network's reward/sub-id macro so its server-to-server
-          postback can hit /api/ad-reward. Until then this house placeholder holds the space.
+          The network's rewarded unit renders itself over the page, so this panel only explains why
+          the break exists. With no network configured it degrades to a house message rather than
+          pretending an ad ran.
         */}
         <div data-ad-slot="swarm-scan-unlock" data-reward-id={nonce} className="flex min-h-48 flex-col items-center justify-center gap-3 border-b border-zinc-800 bg-gradient-to-b from-zinc-900/60 to-black px-5 py-8 text-center">
-          <Megaphone className="size-7 text-emerald-400" />
-          <p className="text-sm font-semibold text-zinc-200">Your scan is being funded</p>
-          <p className="max-w-sm text-xs leading-5 text-zinc-500">Live comment scans are billed per comment by a licensed data provider. This short break covers that cost so the tool can stay free to use.</p>
+          {confirming ? <Loader2 className="size-7 animate-spin text-emerald-400" /> : <Megaphone className="size-7 text-emerald-400" />}
+          <p className="text-sm font-semibold text-zinc-200">{ready ? "Thanks — your scan is funded" : "Your scan is being funded"}</p>
+          <p className="max-w-sm text-xs leading-5 text-zinc-500">Live comment scans are billed per comment by a licensed data provider. This short ad covers that cost so the tool can stay free to use.</p>
+          {retryable ? (
+            <button
+              type="button"
+              onClick={() => {
+                setAdError(null);
+                setConfirmTimedOut(false);
+                setAdWatched(false);
+                setConfirmed(!requiresPostback);
+                setAttempt((value) => value + 1);
+              }}
+              className="mt-1 inline-flex min-h-9 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-xs font-medium text-zinc-300 transition hover:border-zinc-500 hover:text-white"
+            >
+              <Play className="size-3.5" />
+              Try the ad again
+            </button>
+          ) : null}
         </div>
 
         <div className="px-5 py-4">
@@ -619,17 +744,15 @@ function AdGateDialog({
             <div className="h-full rounded-full bg-emerald-400 transition-[width] duration-200 ease-linear" style={{ width: `${progress}%` }} />
           </div>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p aria-live="polite" className="font-mono text-xs text-zinc-500">
-              {ready ? "Ready — your scan is unlocked." : `Unlocks in ${seconds}s`}
-            </p>
+            <p aria-live="polite" className={`font-mono text-xs ${adError || confirmTimedOut ? "text-amber-300" : "text-zinc-500"}`}>{status}</p>
             <button
               type="button"
               onClick={onContinue}
               disabled={!ready}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-2 text-sm font-semibold text-zinc-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500 disabled:shadow-none"
             >
-              <ScanSearch className="size-4" />
-              {ready ? "Scan the thread" : `Please wait ${seconds}s`}
+              {confirming ? <Loader2 className="size-4 animate-spin" /> : <ScanSearch className="size-4" />}
+              {ready ? "Scan the thread" : confirming ? "Confirming…" : !timerDone ? `Please wait ${seconds}s` : "Finish the ad"}
             </button>
           </div>
           <p className="mt-3 text-[11px] leading-4 text-zinc-600">Prefer not to wait? The <span className="text-zinc-400">Paste Comments</span> tab runs entirely in your browser — free, instant, and unlimited.</p>

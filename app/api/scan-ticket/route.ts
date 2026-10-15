@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { SUPPORTED_LINK_DOMAINS, allowLinkFetch, detectLinkPlatform } from "@/lib/comment-link-fetch";
-import { issueScanChallenge } from "@/lib/scan-ticket";
+import { requiresAdPostback } from "@/lib/ad-network";
+import { isAdVerified, issueScanChallenge } from "@/lib/scan-ticket";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,24 @@ export async function POST(request: Request) {
   // The nonce is safe to expose: it is the id an ad network echoes back on its reward postback,
   // and on its own it cannot forge a pass without the signing secret.
   return NextResponse.json(
-    { challenge, watchMs, nonce, platform: target.platform },
+    { challenge, watchMs, nonce, platform: target.platform, requiresPostback: requiresAdPostback() },
+    { headers: { "Cache-Control": "no-store" } },
+  );
+}
+
+/**
+ * Lets the browser poll for the network's reward postback. The postback is server-to-server, so
+ * it can land a beat after the visitor finishes the ad; without this the scan would fail a race
+ * it is going to win a second later. Returning only a boolean keeps this useless to an attacker —
+ * it never flips to true on its own, and the pass still has to clear every other check.
+ */
+export async function GET(request: Request) {
+  const nonce = new URL(request.url).searchParams.get("nonce")?.trim();
+  if (!nonce || nonce.length > 64) {
+    return NextResponse.json({ error: "Missing reward id." }, { status: 400 });
+  }
+  return NextResponse.json(
+    { verified: isAdVerified(nonce) },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

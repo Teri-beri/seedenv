@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { requiresAdPostback } from "@/lib/ad-network";
 
 /**
  * Link scans cost real money (each one bills a licensed data provider per comment), so every scan
@@ -150,8 +151,12 @@ export function verifyScanTicket(
       message: "That scan pass was already used. Watch a new ad to scan another post.",
     };
   }
-  if (env.AD_POSTBACK_REQUIRED === "1" && !adVerified.has(payload.n)) {
-    return { ok: false, reason: "unverified", message: "The ad view wasn't confirmed yet. Try the scan again." };
+  if (requiresAdPostback(env) && !adVerified.has(payload.n)) {
+    return {
+      ok: false,
+      reason: "unverified",
+      message: "The ad network hasn't confirmed that view yet. Give it a moment, or use the Paste Comments tab.",
+    };
   }
 
   return { ok: true, nonce: payload.n };
@@ -159,6 +164,7 @@ export function verifyScanTicket(
 
 const consumed = new Map<string, number>();
 const adVerified = new Map<string, number>();
+const verifiedBeforeConsume = new Map<string, boolean>();
 
 function sweep(store: Map<string, number>, now: number) {
   if (store.size <= 5_000) return;
@@ -168,17 +174,35 @@ function sweep(store: Map<string, number>, now: number) {
 /** Single-use: burning the nonce is what forces a fresh ad for the next post. */
 export function consumeScanTicket(nonce: string, now = Date.now()) {
   consumed.set(nonce, now + TICKET_TTL_MS);
+  verifiedBeforeConsume.set(nonce, adVerified.has(nonce));
   adVerified.delete(nonce);
   sweep(consumed, now);
 }
 
-/** Called by an ad network's server-to-server reward postback once one is wired up. */
+/**
+ * Hands a pass back when the scan turned out to cost nothing — the guidance path returns before
+ * any provider call, so burning the visitor's ad there would charge them for nothing. Safe to
+ * replay: it only ever restores a pass whose fetch was never billable.
+ */
+export function refundScanTicket(nonce: string) {
+  consumed.delete(nonce);
+  if (verifiedBeforeConsume.get(nonce)) adVerified.set(nonce, Date.now() + TICKET_TTL_MS);
+  verifiedBeforeConsume.delete(nonce);
+}
+
+/** Called by an ad network's server-to-server reward postback once the view is confirmed. */
 export function markAdVerified(nonce: string, now = Date.now()) {
   adVerified.set(nonce, now + TICKET_TTL_MS);
   sweep(adVerified, now);
 }
 
+/** Lets the browser wait for the network's postback instead of failing the scan on a race. */
+export function isAdVerified(nonce: string): boolean {
+  return adVerified.has(nonce);
+}
+
 export function resetScanTickets() {
   consumed.clear();
   adVerified.clear();
+  verifiedBeforeConsume.clear();
 }
