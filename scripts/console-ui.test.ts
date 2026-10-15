@@ -45,6 +45,10 @@ test("admin cohort tools collapse into one menu and stay hidden from non-admins"
     assert.ok(admin.includes("flex shrink-0 items-center gap-2.5 whitespace-nowrap"));
     assert.ok(admin.includes("hidden min-w-0 flex-1 md:block"));
     assert.ok(admin.includes("max-w-full"));
+    assert.ok(admin.includes('href="/tools/swarm-detector"'));
+    assert.ok(admin.includes("Swarm Detector"));
+    assert.ok(admin.includes("NEW"));
+    assert.ok(admin.indexOf("Swarm Detector") < admin.indexOf("Tester requests"));
     // Collapsed into the menu: the links are no longer loose text under the header.
     assert.ok(!admin.includes("Manage cohort promo codes"));
 

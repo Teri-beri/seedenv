@@ -12,6 +12,7 @@ export type CohortRuleLink = { label: string; href: string; tone?: "default" | "
 
 const tabs = [
   { label: "Console", href: "/console", view: "overview" },
+  { label: "Swarm Detector", href: "/tools/swarm-detector", view: null, badge: "NEW" },
   { label: "Tester requests", href: "/applications", view: null },
   { label: "Submissions", href: "/console?view=review-deck", view: "review-deck" },
   { label: "Artifacts", href: "/console?view=asset-vault", view: "asset-vault" },
@@ -74,7 +75,12 @@ export function ConsoleHeader({ activeView, paymentsMode, account, cohortRules =
             groupId="developer-console-sections"
             label="Developer console sections"
             activeId={tabs.find((tab) => tab.view === activeView)?.label ?? ""}
-            tabs={tabs.map((tab) => ({ id: tab.label, label: tab.label, href: tab.href }))}
+            tabs={tabs.map((tab) => ({
+              id: tab.label,
+              label: tab.label,
+              href: tab.href,
+              badge: "badge" in tab ? tab.badge : undefined,
+            }))}
             className="max-w-full"
             itemClassName="lg:px-3"
           />
