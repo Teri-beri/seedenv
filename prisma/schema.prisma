@@ -1264,3 +1264,22 @@ model CampaignSynthesis {
   createdAt            DateTime    @default(now())
   updatedAt            DateTime    @updatedAt
 }
+
+// One automated Friday payout of matured platform income to the owner's bank, keyed by its Friday date.
+model OwnerPayout {
+  id               String    @id @default(cuid())
+  weekKey          String    @unique
+  amountCents      Int
+  taxSetAsideCents Int       @default(0)
+  // RESERVED -> SUBMITTED -> PAID | FAILED; SKIPPED when nothing safe was available.
+  status           String    @default("RESERVED")
+  stripePayoutId   String?   @unique
+  breakdown        Json
+  error            String?
+  notifiedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@map("owner_payouts")
+}

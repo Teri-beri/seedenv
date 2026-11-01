@@ -126,6 +126,28 @@ to the available platform balance. A linked transfer succeeds even if the platfo
 can still sweep the funds. Keep the Stripe payout schedule on **Manual** (Settings → Payouts) and pay
 out only earned platform fees so settled tester escrow stays in Stripe.
 
+#### Automatic owner earnings payouts
+
+Every Friday at or after `OWNER_PAYOUT_HOUR` (default 10) New York time, an hourly background sweep
+(`lib/owner-earnings.ts`, or `POST /api/cron/owner-payout` with the `CRON_SECRET` bearer) pays matured
+platform income to the owner's bank with one `stripe.payouts.create` per Friday (`owner_payouts.weekKey`,
+idempotency key `seedenv-owner-payout-<date>`). The amount is the smaller of:
+
+- platform fees from cohorts that ended at least `OWNER_PAYOUT_HOLD_DAYS` (14) ago plus Clippers fees
+  paid that long ago, minus earlier owner payouts, minus the reserve; and
+- the Stripe available USD balance minus tester escrow (including pending tester payouts), developer
+  prepaid balances, funded Clippers escrow, refunds in progress, recent sales tax collected, and the reserve.
+
+The reserve is `OWNER_PAYOUT_RESERVE_PERCENT` (10) of fees earned in the last
+`OWNER_PAYOUT_RESERVE_WINDOW_DAYS` (120). Amounts under `OWNER_PAYOUT_MIN_CENTS` (2500) are skipped and roll
+over. Any read error stops the run without paying. A new Friday never starts while an earlier payout is
+still unsent; one not sent within 20 hours is marked failed and recalculated the next Friday. The owner is emailed (`OWNER_EARNINGS_EMAIL`, else
+admin accounts) with the breakdown and a tax set-aside of `OWNER_TAX_SET_ASIDE_PERCENT` (30); this is an
+estimate, not tax advice. Payouts Stripe later marks failed or canceled stop counting as paid. Preview the
+calculation at `/admin/earnings` or with `?dryRun=1`. Set `SEEDENV_DISABLE_OWNER_PAYOUTS=1` to turn it off.
+Owner payouts made by hand in the Stripe Dashboard are not tracked, so fees they covered are not
+subtracted; the balance-side limit still protects every liability.
+
 When Stripe definitively rejects a transfer request (a 4xx such as `balance_insufficient`, never an
 idempotency conflict, 409, 429, 5xx or network error), no transfer exists, so the operation returns to
 `RESERVED` with `attempt + 1`; the next attempt uses the idempotency key `<operation>-retry-<attempt>`

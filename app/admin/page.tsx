@@ -41,6 +41,7 @@ export default async function AdminPage() {
             </span>
           </header>
           <nav aria-label="Administrator queues" className="mt-6">
+            <Link href="/admin/earnings" className="inline-flex min-h-11 items-center rounded-xl border border-emerald-500/30 px-4 py-3 text-sm text-emerald-200">Owner earnings & payouts</Link>
             <Link href="/admin/proof-reviews" className="inline-flex min-h-11 items-center rounded-xl border border-amber-500/30 px-4 py-3 text-sm text-amber-200">Denied tester work</Link>
             <Link href="/admin/promos" className="inline-flex min-h-11 items-center rounded-xl border border-emerald-500/30 px-4 py-3 text-sm text-emerald-200">Cohort promo codes</Link>
             <Link href="/admin/referrals" className="inline-flex min-h-11 items-center rounded-xl border border-amber-500/30 px-4 py-3 text-sm text-amber-200">Referral clawback audit</Link>

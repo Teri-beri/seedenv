@@ -3,6 +3,7 @@ import { sweepCampaignFunding } from "@/lib/slot-funding";
 import { retryPendingAudits } from "@/lib/ai/qa-audit";
 import { sweepCampaignSyntheses } from "@/lib/ai/campaign-synthesis";
 import { autoApprovalEnabled, autoApproveOverdueSubmissions } from "@/lib/submission-approval";
+import { ownerPayoutsEnabled, runOwnerPayout } from "@/lib/owner-earnings";
 
 const warn = (label: string) => (error: unknown) => console.warn(`SeedEnv ${label} sweep failed:`, error instanceof Error ? error.message : error);
 
@@ -30,4 +31,13 @@ if (process.env.NODE_ENV === "production" && process.env.GEMINI_API_KEY && proce
   };
   setTimeout(sweep, 120_000).unref?.();
   setInterval(sweep, 10 * 60_000).unref?.();
+}
+
+// Fridays (New York time): pays matured platform income to the owner's bank, never escrow or refundable money.
+if (ownerPayoutsEnabled()) {
+  const sweep = () => {
+    runOwnerPayout().catch(warn("owner payout"));
+  };
+  setTimeout(sweep, 180_000).unref?.();
+  setInterval(sweep, 60 * 60_000).unref?.();
 }
