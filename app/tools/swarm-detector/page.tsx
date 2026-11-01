@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { toPng } from "html-to-image";
-import { Clipboard, ClipboardPaste, Copy, Download, Grid2x2, Link2, Loader2, Megaphone, Play, Radar, ScanSearch, ShieldCheck, Siren, Sparkles, Upload } from "lucide-react";
+import { ArrowLeft, Clipboard, ClipboardPaste, Copy, Download, Grid2x2, Link2, Loader2, Megaphone, Play, Radar, ScanSearch, ShieldCheck, Siren, Sparkles, Upload } from "lucide-react";
 import {
   analyzeCoordination,
   classifyForensics,
@@ -190,6 +191,7 @@ function themeClasses(theme: ReceiptTheme) {
 }
 
 export default function SwarmDetectorPage() {
+  const router = useRouter();
   const [rawInput, setRawInput] = useState(initialInput);
   const [auditedInput, setAuditedInput] = useState(initialInput);
   const [platformPreset, setPlatformPreset] = useState<PlatformPreset>("tiktok");
@@ -403,6 +405,17 @@ export default function SwarmDetectorPage() {
   return (
     <main className="min-h-screen bg-[#09090b] text-zinc-100">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) router.back();
+            else router.push("/");
+          }}
+          className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-800 px-4 text-sm font-medium text-zinc-300 transition hover:border-emerald-500/40 hover:text-emerald-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Back
+        </button>
         <header className="rounded-3xl border border-zinc-800 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.12),transparent_34%),#0b0d12] p-6 sm:p-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
