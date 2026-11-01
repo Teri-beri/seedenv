@@ -14,7 +14,7 @@ export default async function ClippersPage({ searchParams }: { searchParams: Pro
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/auth/signin?callbackUrl=/clippers");
   const home = session.user.role === "DEVELOPER" ? "/console" : session.user.role === "ADMIN" ? "/admin" : "/dashboard";
-  if (!clippersEnabled()) return <MemberShell title="Clippers" home={home}><section className="rounded-3xl border border-violet-400/25 p-6"><h2 className="text-2xl font-bold">Creator collaborations are being prepared.</h2><p className="mt-4 text-sm leading-7 text-neutral-400">This workspace stays disabled until its database migration, private video storage, Stripe payment webhooks, and administrator dispute coverage are ready. No creator payments or social accounts are simulated.</p></section></MemberShell>;
+  if (!clippersEnabled()) return <MemberShell title="Clippers" home={home}><section className="rounded-3xl border border-violet-400/25 p-6"><h2 className="text-2xl font-bold">Clippers is coming soon.</h2><p className="mt-4 text-sm leading-7 text-neutral-400">App teams will be able to hire creators for short videos about their apps, and creators get paid once the video is live. We&apos;re finishing setup now.</p></section></MemberShell>;
   const member = await clipMember();
   const developer = member.role === "DEVELOPER";
   const { social } = await searchParams;

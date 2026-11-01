@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import { assertClipTransition, clipCampaignSchema, clipChargeCents, publicationIdentity, clipTermsVersion } from "../lib/clipper-rules";
 
 test("creator fee uses integer cents, includes the platform share, and has exact limits", () => {
-  assert.equal(clipChargeCents(1000), 1050);
-  assert.equal(clipChargeCents(5000), 5250);
-  assert.equal(clipChargeCents(100000), 105000);
-  assert.equal(clipChargeCents(1001), 1051);
+  assert.equal(clipChargeCents(1000), 1370);
+  assert.equal(clipChargeCents(5000), 5953);
+  assert.equal(clipChargeCents(100000), 118466);
+  assert.equal(clipChargeCents(1001), 1371);
   for (const value of [999, 100001, 1000.5, NaN, Infinity]) assert.throws(() => clipChargeCents(value));
 });
 
@@ -31,4 +31,25 @@ test("campaign terms are bounded and versioned", () => {
   assert.equal(clipCampaignSchema.parse(input).feeCents, 5000);
   assert.equal(clipTermsVersion, "clippers-v1-organic-90");
   for (const invalid of [{ revisionLimit: 6 }, { deliveryDays: 0 }, { liveDays: 0 }, { feeCents: 100 }, { minimumRep: -1 }]) assert.equal(clipCampaignSchema.safeParse({ ...input, ...invalid }).success, false);
+});
+
+test("clipper pricing keeps the full platform fee after Stripe's cut", async () => {
+  const { quoteClipperCharge, stripeProcessingCostCents } = await import("../lib/pricing");
+  for (const creator of [1000, 1999, 5000, 33333, 100000]) {
+    const quote = quoteClipperCharge(creator);
+    assert.ok(quote.platformFeeCents >= 300);
+    assert.equal(quote.totalCents, creator + quote.platformFeeCents + quote.transactionFeeCents);
+    assert.ok(quote.totalCents - creator - stripeProcessingCostCents(quote.totalCents) >= quote.platformFeeCents);
+  }
+  assert.equal(quoteClipperCharge(5000, true).platformFeeCents, 0);
+  assert.ok(quoteClipperCharge(5000, true).transactionFeeCents > 0);
+});
+
+test("every agreement status has a readable label and active ones tell each party what to do", async () => {
+  const { clipStatus, clipStatusLabel, clipNextStep } = await import("../lib/clipper-rules");
+  for (const status of clipStatus) assert.doesNotMatch(clipStatusLabel(status), /_/);
+  for (const status of ["APPLIED", "ACCEPTED", "FUNDED", "DRAFT_SUBMITTED", "DRAFT_APPROVED", "PROOF_SUBMITTED", "VERIFIED"]) {
+    assert.ok(clipNextStep(status, "DEVELOPER"));
+    assert.ok(clipNextStep(status, "CREATOR"));
+  }
 });

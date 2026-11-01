@@ -4,6 +4,7 @@ import { isDefinitiveStripeRejection } from "@/lib/billing-operations";
 import { sendNotificationEmail } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
+import { stripeProcessingCostCents } from "@/lib/pricing";
 
 const DAY_MS = 86_400_000;
 const REFUND_KINDS = ["SLOT_REFUND", "PREPAID_REFUND", "PREPAID_BALANCE_REFUND", "WITHDRAWAL", "WITHDRAWAL_REFUND"];
@@ -147,7 +148,8 @@ export async function gatherEarningsInputs(now: Date, policy: OwnerPayoutPolicy,
   }
   let recentFeesCents = recentCohortFees._sum.platformFeeCents ?? 0;
   for (const engagement of clipperPaid) {
-    const fee = Math.max(0, engagement.chargeCents - engagement.feeCents);
+    // Stripe already deducted its processing cost, so only the remainder is income.
+    const fee = Math.max(0, engagement.chargeCents - engagement.feeCents - stripeProcessingCostCents(engagement.chargeCents));
     if (engagement.paidAt && engagement.paidAt <= matureBefore) maturedFeesCents += fee;
     else immatureFeesCents += fee;
     if (engagement.paidAt && engagement.paidAt >= recentSince) recentFeesCents += fee;

@@ -22,7 +22,7 @@ test("promo pricing discounts only platform fees, including the cumulative minim
   assert.equal(quoteCampaignFunding(0, "LIVE_STRESS_DROP", false, 100).escrowTotalCents, 17500);
   assert.equal(quoteCampaignFunding(100, "STANDARD_QA", true, 50).platformFeeUsd, 0);
   assert.equal(quoteCampaignFunding(0, "GOOGLE_PLAY_14_DAY").escrowTotalCents, 9600);
-  assert.equal(quoteClipperFunding(50), 5250);
+  assert.equal(quoteClipperFunding(50), 5953);
   assert.equal(quoteTopUp(5000).totalCents, 5000);
   for (const value of [-1, 101, 0.5, NaN]) assert.throws(() => discountedPlatformFeeCents(1500, value));
 });

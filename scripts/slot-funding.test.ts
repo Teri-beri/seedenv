@@ -50,7 +50,7 @@ test("account fee waiver removes the floor and percentage without reducing rewar
     assert.equal(quote.escrowTotalCents, bundle.slots * bundle.bountyCents);
     assert.equal(quote.payoutPoolUsd, bundle.slots * bundle.bountyCents / 100);
   }
-  assert.equal(quoteClipperFunding(50, true), 5000);
+  assert.equal(quoteClipperFunding(50, true), 5181);
   assert.throws(() => quoteSlotCharge(-1, 0, 0, true));
   assert.throws(() => quoteCampaignFunding(NaN, "STANDARD_QA", true));
 });

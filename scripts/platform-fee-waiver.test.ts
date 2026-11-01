@@ -6,8 +6,8 @@ import { clipChargeCents } from "../lib/clipper-rules";
 import { applyClip } from "../lib/clipper-lifecycle";
 
 test("creator pricing preserves the full reward and normal accounts keep the fee", () => {
-  assert.equal(clipChargeCents(5000, true), 5000);
-  assert.equal(clipChargeCents(5000, false), 5250);
+  assert.equal(clipChargeCents(5000, true), 5181);
+  assert.equal(clipChargeCents(5000, false), 5953);
   assert.throws(() => clipChargeCents(999, true));
 });
 

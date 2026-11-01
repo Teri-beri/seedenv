@@ -56,3 +56,36 @@ export function publicationIdentity(value: string, platform: string) {
 export function assertClipTransition(status: string, allowed: readonly string[]) {
   if (!allowed.includes(status)) throw new Error(`This action is unavailable while the agreement is ${status.toLowerCase().replaceAll("_", " ")}.`);
 }
+
+export type ClipViewer = "DEVELOPER" | "CREATOR" | "ADMIN";
+
+const clipStatusLabels: Record<string, string> = {
+  APPLIED: "Applied", ACCEPTED: "Accepted — awaiting payment", FUNDING: "Payment processing", FUNDED: "Paid — ready for draft",
+  DRAFT_SUBMITTED: "Draft in review", CHANGES_REQUESTED: "Changes requested", DRAFT_APPROVED: "Approved — ready to post",
+  PROOF_SUBMITTED: "Posted — awaiting verification", VERIFIED: "Verified — ready to release", PAYMENT_PENDING: "Releasing payment",
+  PAID: "Paid", DECLINED: "Declined", CANCEL_PENDING: "Refund processing", CANCELLED: "Cancelled & refunded", DISPUTED: "Under review by SeedEnv",
+};
+
+export function clipStatusLabel(status: string) {
+  return clipStatusLabels[status] ?? status.toLowerCase().replaceAll("_", " ");
+}
+
+const clipNextSteps: Record<string, Partial<Record<ClipViewer, string>>> = {
+  APPLIED: { DEVELOPER: "Review this creator's background and samples, then accept or decline.", CREATOR: "Waiting for the developer to review your application." },
+  ACCEPTED: { DEVELOPER: "Pay for this agreement so the creator can start. The creator is paid only after you release it.", CREATOR: "Accepted! Wait until the status says Paid before you start filming." },
+  FUNDING: { DEVELOPER: "Your payment is processing. This usually takes a moment.", CREATOR: "Payment is processing. Don't start work until it says Paid." },
+  FUNDED: { DEVELOPER: "Payment received. The creator is working on their first draft.", CREATOR: "You're funded. Film your video and upload the clean draft below." },
+  DRAFT_SUBMITTED: { DEVELOPER: "Watch the draft, then approve it or request specific changes.", CREATOR: "Your draft is with the developer for review." },
+  CHANGES_REQUESTED: { DEVELOPER: "The creator is working on your requested changes.", CREATOR: "Read the developer's notes and upload a new version." },
+  DRAFT_APPROVED: { DEVELOPER: "Approved. The creator will post it and submit the link.", CREATOR: "Post the approved video with the campaign code in the caption, then submit the link and a screenshot below." },
+  PROOF_SUBMITTED: { DEVELOPER: "Open the live post, check it matches the approved draft, then record your verification.", CREATOR: "The developer is checking your post." },
+  VERIFIED: { DEVELOPER: "Everything checks out. Release the creator's payment.", CREATOR: "Verified. Waiting for the developer to release your payment." },
+  PAYMENT_PENDING: { DEVELOPER: "Payment release is in progress. Retry if it stays here.", CREATOR: "Your payment is being sent to your Stripe account." },
+  PAID: { DEVELOPER: "Done. Keep the post public for the agreed time.", CREATOR: "Paid! Keep the post public for the agreed number of days." },
+  DISPUTED: { DEVELOPER: "SeedEnv is reviewing this agreement. Funds are frozen until it's resolved.", CREATOR: "SeedEnv is reviewing this agreement. Funds are frozen until it's resolved.", ADMIN: "Review both sides' evidence, then resume or refund." },
+  CANCEL_PENDING: { DEVELOPER: "Your refund is processing.", CREATOR: "This agreement was cancelled before work started." },
+};
+
+export function clipNextStep(status: string, viewer: ClipViewer) {
+  return clipNextSteps[status]?.[viewer] ?? null;
+}

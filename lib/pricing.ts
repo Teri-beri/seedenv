@@ -2,7 +2,8 @@ export type CohortTypeKey = "STANDARD_QA" | "GOOGLE_PLAY_14_DAY" | "LIVE_STRESS_
 
 export const COHORT_PLATFORM_FEE_RATE = 0.2;
 export const COHORT_MIN_PLATFORM_FEE_CENTS = 1500;
-export const CLIPPER_PLATFORM_FEE_PERCENT = 0.05;
+export const CLIPPER_PLATFORM_FEE_PERCENT = 0.15;
+export const CLIPPER_MIN_PLATFORM_FEE_CENTS = 300;
 
 // Estimate only; Stripe's actual fee depends on card type and country and is charged to SeedEnv.
 export const STRIPE_CARD_RATE = 0.029;
@@ -95,10 +96,24 @@ export function quoteCampaignFunding(payoutPoolUsd: number, cohortType: CohortTy
   };
 }
 
+export type ClipperChargeQuote = { creatorFeeCents: number; platformFeeCents: number; transactionFeeCents: number; totalCents: number };
+
+// 15% platform fee ($3 minimum) plus a flat transaction fee covering Stripe's processing cost.
+// The transaction fee is the same for every payment method, so it is not a card surcharge.
+export function quoteClipperCharge(creatorFeeCents: number, platformFeeWaived = false): ClipperChargeQuote {
+  if (!Number.isSafeInteger(creatorFeeCents) || creatorFeeCents < 0) throw new Error("The creator fee must be a finite, non-negative USD amount.");
+  const platformFeeCents = platformFeeWaived || creatorFeeCents === 0 ? 0 : Math.max(CLIPPER_MIN_PLATFORM_FEE_CENTS, Math.round(creatorFeeCents * CLIPPER_PLATFORM_FEE_PERCENT));
+  const transactionFeeCents = cardProcessingFeeCents(creatorFeeCents + platformFeeCents);
+  return { creatorFeeCents, platformFeeCents, transactionFeeCents, totalCents: creatorFeeCents + platformFeeCents + transactionFeeCents };
+}
+
 export function quoteClipperFunding(feeUsd: number, platformFeeWaived = false) {
-  const feeCents = Math.round(feeUsd * 100);
-  if (!Number.isSafeInteger(feeCents) || feeCents < 0) throw new Error("The creator fee must be a finite, non-negative USD amount.");
-  return feeCents + (platformFeeWaived ? 0 : Math.round(feeCents * CLIPPER_PLATFORM_FEE_PERCENT));
+  return quoteClipperCharge(Math.round(feeUsd * 100), platformFeeWaived).totalCents;
+}
+
+// Stripe's estimated card cost on an amount already charged.
+export function stripeProcessingCostCents(chargedCents: number) {
+  return chargedCents > 0 ? Math.round(chargedCents * STRIPE_CARD_RATE) + STRIPE_CARD_FIXED_CENTS : 0;
 }
 
 export type EscrowBreakdown = {
@@ -122,7 +137,7 @@ export function calculateCohortEscrow(validatorCount: number, stipendPerValidato
   };
 }
 
-// Stripe's card cost grossed up to a base amount. Used for estimates; SeedEnv absorbs processing rather than surcharging it.
+// Stripe's card cost grossed up to a base amount. Cohorts absorb it; Clippers recovers it as a flat transaction fee.
 export function cardProcessingFeeCents(baseCents: number) {
   if (!Number.isSafeInteger(baseCents) || baseCents <= 0) return 0;
   const totalCents = Math.ceil((baseCents + STRIPE_CARD_FIXED_CENTS) / (1 - STRIPE_CARD_RATE));
