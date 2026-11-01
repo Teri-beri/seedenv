@@ -104,6 +104,37 @@ On Android:
 
 #### Billing support repair runbook
 
+Tester payout setup creates new Express accounts as `individual` with the transfers capability.
+Existing connected accounts keep their identity and destination. Individuals still complete
+Stripe's identity, bank and applicable tax checks; a registered company is not required.
+Completing onboarding does not itself transfer an existing pending ledger balance. The account's
+Receive pending payouts action reports per-payout blockers and support references, continues
+independent payouts after a failure, and refreshes the ledger after settlement. A transfer reaches
+the connected Stripe balance, not necessarily the tester's bank on that day. A failed transfer
+does not undo an already committed proof approval. Expected transfer errors are returned as
+sanitized results rather than thrown through the production Server Action error boundary.
+Test with `node --experimental-test-module-mocks --import tsx --test scripts/billing-security.test.ts scripts/tester-stripe-onboarding.test.ts`.
+
+Tester transfers are linked to the developer charge that funded the tester's place (Stripe
+`source_transaction`): the tester's application → its paid slot → the funding allocation's top-up
+payment, then the cohort's prepaid deposit or other allocated top-ups. Only succeeded, captured,
+undisputed, unrefunded USD charges qualify, and `billing_operations.sourceChargeId` tracks how much of
+each charge is committed so payouts never exceed what it collected. The source is pinned before the
+first attempt so retries reuse identical parameters; when no charge qualifies the transfer falls back
+to the available platform balance. A linked transfer succeeds even if the platform balance is empty
+**while the developer charge is still pending**; once that charge has settled, an automatic bank payout
+can still sweep the funds. Keep the Stripe payout schedule on **Manual** (Settings → Payouts) and pay
+out only earned platform fees so settled tester escrow stays in Stripe.
+
+When Stripe definitively rejects a transfer request (a 4xx such as `balance_insufficient`, never an
+idempotency conflict, 409, 429, 5xx or network error), no transfer exists, so the operation returns to
+`RESERVED` with `attempt + 1`; the next attempt uses the idempotency key `<operation>-retry-<attempt>`
+instead of replaying the stored rejection. Payouts rejected before this behavior existed stay held
+past 23 hours. After confirming the original request's 4xx response in Stripe Workbench → Logs, an
+operator may reopen one with `npx tsx scripts/reopen-rejected-payout.ts --operation <id>
+--rejected-request req_...` (dry run), then add `--apply`. It refuses if any matching transfer exists
+and moves no money; the tester then presses Receive pending payouts.
+
 There is no automatic “assume not sent” admin/CLI command. A successful empty Stripe list alone does not authorize recreating an expired/legacy operation. Only trained billing operators should perform the following repair using the correct Stripe account and live/test mode; record the operation ID, Stripe request/response IDs, support case, operator, evidence, and decision in the incident ticket.
 
 1. Read the immutable `billing_operations` row and its wallet ledger. Never delete it, change its amount/destination, reset `firstAttemptAt`, or mark the ledger completed manually. Check funding holds/debt and that a refund's balance/card reservation remains intact.

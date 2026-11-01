@@ -34,7 +34,6 @@ export async function POST() {
     return NextResponse.json({ url: loginLink.url });
   } catch (error: unknown) {
     console.error("SeedEnv Stripe Express login link error:", error);
-    const message = error instanceof Error ? error.message : "Unable to generate Stripe Express login link";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "Could not open Stripe Express. Sign in again and retry, or contact SeedEnv support to check your linked payout account." }, { status: 500 });
   }
 }

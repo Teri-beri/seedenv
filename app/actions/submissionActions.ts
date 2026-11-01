@@ -1,6 +1,6 @@
 "use server";
 
-import { CampaignStatus, Prisma, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
+import { CampaignStatus, Prisma, SubmissionStatus } from "@prisma/client";
 import { z } from "zod";
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -14,7 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { uploadProofImage } from "@/lib/storage";
 import { usdToCents } from "@/lib/utils";
 import { isStoredRecording } from "@/lib/recording";
-import { approvePendingSubmission, settleApprovedPayout, transferTesterPayout } from "@/lib/submission-approval";
+import { approvePendingSubmission, releaseTesterPayouts, settleApprovedPayout } from "@/lib/submission-approval";
 import { requireMember } from "@/lib/member";
 import { serializable } from "@/lib/quest-ledger";
 import { startAcceptedApplication } from "@/lib/mission-applications";
@@ -294,26 +294,20 @@ export async function approveSubmission(submissionId: string) {
 }
 
 export async function releasePendingTesterPayouts() {
-  const tester = await getCurrentUser("TESTER");
-  if (tester.role !== "TESTER") throw new Error("Switch to your Tester workspace to release payouts.");
-  if (!tester.stripeConnectAccountId || !process.env.STRIPE_SECRET_KEY) {
-    return { releasedCount: 0, pendingCount: await prisma.walletTransaction.count({ where: { userId: tester.id, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING } }) };
+  try {
+    const tester = await getCurrentUser("TESTER");
+    if (tester.role !== "TESTER") return { ok: false as const, message: "Switch to your Tester workspace to release payouts." };
+    if (!process.env.STRIPE_SECRET_KEY) return { ok: false as const, message: "Stripe payouts are unavailable. Contact SeedEnv support." };
+    if (!tester.stripeConnectAccountId) return { ok: false as const, message: "Connect your Stripe payout account first." };
+    const result = await releaseTesterPayouts(tester.id);
+    revalidatePath("/account");
+    revalidatePath("/dashboard");
+    revalidatePath("/dashboard/validator/payouts");
+    return { ok: true as const, ...result };
+  } catch (error) {
+    console.error("SeedEnv pending payout request failed:", error);
+    return { ok: false as const, message: "Could not load or confirm your payouts. Sign in again and check your ledger before retrying. Contact SeedEnv support if this continues." };
   }
-
-  const pending = await prisma.walletTransaction.findMany({
-    where: { userId: tester.id, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING },
-    orderBy: { createdAt: "asc" },
-    select: { id: true },
-  });
-  let releasedCount = 0;
-  for (const payout of pending) {
-    if (await transferTesterPayout(tester.id, payout.id)) releasedCount += 1;
-  }
-
-  return {
-    releasedCount,
-    pendingCount: await prisma.walletTransaction.count({ where: { userId: tester.id, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING } }),
-  };
 }
 
 export async function rejectSubmission(submissionId: string, reason: string) {

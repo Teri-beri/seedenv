@@ -873,6 +873,10 @@ model BillingOperation {
   feeCents       Int       @default(0)
   state          String    @default("RESERVED")
   firstAttemptAt DateTime?
+  // Bumped only after Stripe definitively rejects a create; each attempt uses its own idempotency key.
+  attempt        Int       @default(0)
+  // Developer charge a tester transfer draws from (Stripe source_transaction), pinned before the first attempt.
+  sourceChargeId String?
   remoteId       String?   @unique
   error          String?
   createdAt      DateTime  @default(now())
@@ -880,6 +884,7 @@ model BillingOperation {
 
   @@index([resourceId, state])
   @@index([state, updatedAt])
+  @@index([sourceChargeId])
   @@map("billing_operations")
 }
 

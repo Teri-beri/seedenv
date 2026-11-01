@@ -64,9 +64,11 @@ export async function createStripeConnectOnboardingLink(country: string): Promis
     } else {
       const account = await stripe.accounts.create({
         type: "express",
+        business_type: "individual",
         country: parsedCountry.data,
         email: user.email,
         capabilities: { transfers: { requested: true } },
+        business_profile: { product_description: "Independent software testing and usability feedback through SeedEnv." },
         metadata: { seedenvUserId: user.id },
       }, { idempotencyKey: `seedenv-connect-${user.id}` });
       connectedAccountId = account.id;

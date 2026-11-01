@@ -9,7 +9,7 @@ function harness() {
   let tables: Record<string, Row[]> = {
     user: [{ id: "dev", fundingBalanceCents: 5000 }, { id: "tester", walletBalanceCents: 0, stripeConnectAccountId: "acct_test" }],
     appCampaign: [{ id: "campaign", developerId: "dev", title: "Security fixture", fundingModel: "PREPAID", status: "PAUSED", cancelledAt: new Date(), expiresAt: new Date(0), totalSlots: 3, claimedSlots: 1, bountyPerTaskUsd: 10, platformFeeUsd: 0, refundedCents: 0, billingHoldCents: 0 }],
-    balanceTopUp: [], slotCharge: [], walletTransaction: [], billingOperation: [], fundingReversal: [], fundingAllocation: [], submission: [],
+    balanceTopUp: [], slotCharge: [], walletTransaction: [], billingOperation: [], fundingReversal: [], fundingAllocation: [], submission: [], missionApplication: [],
     feeCredit: [], firstCohortBenefit: [], referralAudit: [], cohortPromoRedemption: [],
   };
   const remote = {
@@ -17,14 +17,17 @@ function harness() {
     intents: new Map<string, Row>(), charges: new Map<string, Row>(),
     refundCreates: 0, transferCreates: 0, loseRefundResponse: false, loseTransferResponse: false,
     failRemoteIdWrite: false, failLedgerWrite: false,
+    rejectTransfer: null as null | string, rejectedTransferKeys: new Map<string, string>(),
     refundStatus: "succeeded",
   };
   const matches = (row: Row, where: Row = {}): boolean => Object.entries(where).every(([key, value]) => {
     if (key === "OR") return value.some((item: Row) => matches(row, item));
+    if (key.includes("_") && !(key in row) && value && typeof value === "object") return matches(row, value);
     if (value && typeof value === "object" && !(value instanceof Date)) {
       return Object.entries(value).every(([operator, operand]) => {
         if (operator === "not") return row[key] !== operand;
         if (operator === "in") return (operand as unknown[]).includes(row[key]);
+        if (operator === "notIn") return !(operand as unknown[]).includes(row[key]);
         if (operator === "gte") return Number(row[key]) >= Number(operand);
         if (operator === "gt") return Number(row[key]) > Number(operand);
         if (operator === "lte") return Number(row[key]) <= Number(operand);
@@ -61,7 +64,7 @@ function harness() {
       count: async (args: Row) => read(args).length,
       create: async ({ data }: Row) => {
         if (name === "walletTransaction" && data.status === "COMPLETED" && data.type === "ESCROW_REFUND" && remote.failLedgerWrite) { remote.failLedgerWrite = false; throw new Error("Database interrupted during settlement"); }
-        const row = { id: `${name}-${tables[name].length}`, createdAt: new Date(), firstAttemptAt: null, remoteId: null, stripePaymentId: null, state: "RESERVED", reversedCents: 0, appliedCents: 0, disputedCents: 0, refundedCents: 0, releasedCents: 0, ...structuredClone(data) };
+        const row = { id: `${name}-${tables[name].length}`, createdAt: new Date(), firstAttemptAt: null, remoteId: null, attempt: 0, sourceChargeId: null, stripePaymentId: null, state: "RESERVED", reversedCents: 0, appliedCents: 0, disputedCents: 0, refundedCents: 0, releasedCents: 0, ...structuredClone(data) };
         tables[name].push(row);
         return structuredClone(row);
       },
@@ -123,8 +126,17 @@ function harness() {
       create: async (data: Row, { idempotencyKey }: Row) => {
         const existing = remote.transfers.find((row) => row.key === idempotencyKey);
         if (existing) return structuredClone(existing);
+        const rejection = remote.rejectedTransferKeys.get(idempotencyKey) ?? remote.rejectTransfer;
+        if (rejection) {
+          // Stripe replays a stored 4xx for the same idempotency key.
+          remote.rejectTransfer = null;
+          remote.rejectedTransferKeys.set(idempotencyKey, rejection);
+          throw Object.assign(new Error(`Stripe rejected transfer: ${rejection}`), { type: "StripeInvalidRequestError", statusCode: 400, code: rejection });
+        }
         remote.transferCreates++;
-        const row = { id: `tr_${remote.transferCreates}`, key: idempotencyKey, amount_reversed: 0, reversed: false, ...structuredClone(data) };
+        const row: Row = { id: `tr_${remote.transferCreates}`, key: idempotencyKey, amount_reversed: 0, reversed: false, ...structuredClone(data) };
+        // Stripe assigns its own group to charge-linked transfers.
+        if (data.source_transaction) row.transfer_group = `group_${String(data.source_transaction).replace(/^ch_/, "")}`;
         remote.transfers.push(row);
         if (remote.loseTransferResponse) { remote.loseTransferResponse = false; throw new Error("Lost Stripe transfer response"); }
         return structuredClone(row);
@@ -133,7 +145,7 @@ function harness() {
   };
   function funding(paymentId: string, metadata: Row = {}) {
     remote.intents.set(paymentId, { id: paymentId, status: "succeeded", currency: "usd", latest_charge: `ch_${paymentId}`, metadata });
-    remote.charges.set(`ch_${paymentId}`, { id: `ch_${paymentId}`, payment_intent: paymentId });
+    remote.charges.set(`ch_${paymentId}`, { id: `ch_${paymentId}`, payment_intent: paymentId, status: "succeeded", paid: true, captured: true, disputed: false, refunded: false, currency: "usd", amount: 5000, amount_refunded: 0 });
   }
   function topUp(status = "SUCCEEDED") {
     tables.balanceTopUp.push({ id: "topup", userId: "dev", status, creditCents: 5000, totalCents: 5000, processingFeeCents: 0, refundedCents: 0, stripePaymentIntentId: status === "PENDING" ? null : "pi_topup", createdAt: new Date(0) });
@@ -145,7 +157,7 @@ function harness() {
   }
   function payout(legacy = false) {
     tables.walletTransaction.push({ id: "payout", userId: "tester", campaignId: "campaign", type: "BOUNTY_PAYOUT", status: "PENDING", amountCents: 1000 });
-    if (!legacy) tables.billingOperation.push({ id: "seedenv-payout-payout", kind: "PAYOUT", resourceId: "payout", ledgerId: "payout", userId: "tester", campaignId: "campaign", destinationId: "acct_test", amountCents: 1000, state: "RESERVED", firstAttemptAt: null, remoteId: null });
+    if (!legacy) tables.billingOperation.push({ id: "seedenv-payout-payout", kind: "PAYOUT", resourceId: "payout", ledgerId: "payout", userId: "tester", campaignId: "campaign", destinationId: "acct_test", amountCents: 1000, state: "RESERVED", firstAttemptAt: null, remoteId: null, attempt: 0, sourceChargeId: null });
   }
   return { db, serializable, stripe, remote, funding, topUp, prepaid, payout, rows: (name: string) => tables[name] };
 }
@@ -166,6 +178,8 @@ async function withHarness(work: (h: ReturnType<typeof harness>, modules: Row) =
     const suffix = randomUUID();
     const operations = await import(`../lib/billing-operations.ts?test=${suffix}`);
     mocks.push(mock.module("../lib/billing-operations.ts", { namedExports: operations }));
+    const fundingSource = await import(`../lib/payout-funding-source.ts?test=${suffix}`);
+    mocks.push(mock.module("../lib/payout-funding-source.ts", { namedExports: fundingSource }));
     const reversals = await import(`../lib/funding-reversals.ts?test=${suffix}`);
     mocks.push(mock.module("../lib/funding-reversals.ts", { namedExports: reversals }));
     const balance = await import(`../lib/funding-balance.ts?test=${suffix}`);
@@ -398,5 +412,193 @@ test("expired unknown payouts and legacy pending payouts with no remote evidence
     h.rows("billingOperation").splice(0);
     await assert.rejects(payouts.transferTesterPayout("tester", "payout"), /Legacy payout/);
     assert.equal(h.remote.transferCreates, 0);
+  });
+});
+
+test("releasing pending payouts reports an expired transfer without hiding it or blocking a separate payout", async () => {
+  await withHarness(async (h, { payouts }) => {
+    h.payout();
+    h.rows("billingOperation")[0].firstAttemptAt = new Date(Date.now() - 48 * 3600000);
+    h.rows("walletTransaction").push({ ...h.rows("walletTransaction")[0], id: "payout-2" });
+    h.rows("billingOperation").push({
+      ...h.rows("billingOperation")[0], id: "seedenv-payout-payout-2", ledgerId: "payout-2",
+      resourceId: "payout-2", firstAttemptAt: null,
+    });
+
+    const result = await payouts.releaseTesterPayouts("tester");
+    assert.equal(result.releasedCount, 1);
+    assert.equal(result.pendingCount, 1);
+    assert.equal(result.failures.length, 1);
+    assert.equal(result.failures[0].payoutId, "payout");
+    assert.match(result.failures[0].message, /support to reconcile/);
+    assert.equal(h.rows("walletTransaction")[0].status, "PENDING");
+    assert.equal(h.rows("walletTransaction")[1].status, "COMPLETED");
+    assert.equal(h.remote.transferCreates, 1);
+    assert.equal(h.rows("user")[1].walletBalanceCents, 1000);
+
+    const retry = await payouts.releaseTesterPayouts("tester");
+    assert.equal(retry.releasedCount, 0);
+    assert.equal(retry.pendingCount, 1);
+    assert.equal(h.remote.transferCreates, 1);
+    assert.equal(h.rows("user")[1].walletBalanceCents, 1000);
+    assert.equal(h.rows("billingOperation")[0].firstAttemptAt.getTime() < Date.now() - 23 * 3600000, true);
+  });
+});
+
+test("payout batch with no linked Stripe account keeps the ledger pending and explains setup", async () => {
+  await withHarness(async (h, { payouts }) => {
+    h.payout();
+    h.rows("user")[1].stripeConnectAccountId = null;
+    h.rows("billingOperation")[0].destinationId = null;
+    const result = await payouts.releaseTesterPayouts("tester");
+    assert.equal(result.releasedCount, 0);
+    assert.equal(result.pendingCount, 1);
+    assert.match(result.failures[0].message, /Finish Stripe payout setup/);
+    assert.equal(h.remote.transferCreates, 0);
+  });
+});
+
+test("a transfer failure does not undo an already committed approval or claim payment succeeded", async () => {
+  await withHarness(async (h, { payouts }) => {
+    h.payout();
+    h.rows("billingOperation")[0].firstAttemptAt = new Date(Date.now() - 48 * 3600000);
+    const sent = await payouts.settleApprovedPayout({
+      payoutCents: 1000, xpGain: 10, testerId: "tester", payoutTransactionId: "payout", campaignTitle: "Fixture",
+    }, false);
+    assert.equal(sent, false);
+    assert.equal(h.rows("walletTransaction")[0].status, "PENDING");
+    assert.equal(h.rows("user")[1].walletBalanceCents, 0);
+    assert.equal(h.remote.transferCreates, 0);
+  });
+});
+
+test("tester-facing payout failures explain known blockers without exposing private Stripe diagnostics", async () => {
+  await withHarness(async (_h, { payouts }) => {
+    assert.match(payouts.testerPayoutErrorMessage(Object.assign(new Error("private Stripe details"), { code: "balance_insufficient" })), /SeedEnv.*available Stripe balance/);
+    assert.match(payouts.testerPayoutErrorMessage(Object.assign(new Error("private Stripe details"), { code: "transfers_not_allowed" })), /not enabled transfers/);
+    assert.match(payouts.testerPayoutErrorMessage(Object.assign(new Error("private Stripe details"), { code: "resource_missing" })), /linked account and payment mode/);
+    assert.match(payouts.testerPayoutErrorMessage(new Error("Stripe payout account is not ready. Finish Stripe onboarding before releasing this payout.")), /identity or bank/);
+    assert.doesNotMatch(payouts.testerPayoutErrorMessage(new Error("private Stripe details")), /private Stripe details/);
+    assert.doesNotMatch(payouts.testerPayoutErrorMessage("private Stripe details"), /private Stripe details/);
+  });
+});
+
+function fundTesterPlace(h: ReturnType<typeof harness>, testerId = "tester", allocationCents = 1000) {
+  h.rows("missionApplication").push({ id: `app-${testerId}`, campaignId: "campaign", testerId });
+  h.rows("slotCharge").push({ id: `slot-${testerId}`, campaignId: "campaign", applicationId: `app-${testerId}`, status: "SUCCEEDED", stripePaymentIntentId: null, createdAt: new Date(0) });
+  h.rows("fundingAllocation").push({ id: `alloc-${testerId}`, topUpId: "topup", slotChargeId: `slot-${testerId}`, campaignId: "campaign", amountCents: allocationCents, releasedCents: 0 });
+}
+
+test("tester payouts are linked to the developer charge that funded their place, so a swept platform balance cannot block them", async () => {
+  await withHarness(async (h, { payouts }) => {
+    h.topUp();
+    fundTesterPlace(h);
+    h.payout();
+    assert.equal(await payouts.transferTesterPayout("tester", "payout"), true);
+    const [transfer] = h.remote.transfers;
+    assert.equal(transfer.source_transaction, "ch_pi_topup");
+    assert.equal(transfer.metadata.seedenvOperationId, "seedenv-payout-payout");
+    assert.equal(h.rows("billingOperation")[0].sourceChargeId, "ch_pi_topup");
+    assert.equal(h.rows("billingOperation")[0].state, "SETTLED");
+    assert.equal(h.rows("user")[1].walletBalanceCents, 1000);
+  });
+});
+
+test("a lost charge-linked transfer response is rediscovered by operation metadata even though Stripe changed its transfer group", async () => {
+  await withHarness(async (h, { payouts }) => {
+    h.topUp();
+    fundTesterPlace(h);
+    h.payout();
+    h.remote.loseTransferResponse = true;
+    await assert.rejects(payouts.transferTesterPayout("tester", "payout"), /Lost Stripe transfer response/);
+    assert.notEqual(h.remote.transfers[0].transfer_group, "seedenv-payout-payout");
+    h.rows("billingOperation")[0].firstAttemptAt = new Date(Date.now() - 48 * 3600000);
+    assert.equal(await payouts.transferTesterPayout("tester", "payout"), true);
+    assert.equal(h.remote.transferCreates, 1);
+    assert.equal(h.rows("user")[1].walletBalanceCents, 1000);
+  });
+});
+
+test("payouts never commit more to one developer charge than it collected", async () => {
+  await withHarness(async (h, { payouts }) => {
+    h.topUp();
+    h.remote.charges.get("ch_pi_topup")!.amount = 1500;
+    fundTesterPlace(h);
+    h.payout();
+    h.rows("walletTransaction").push({ ...h.rows("walletTransaction")[0], id: "payout-2" });
+    h.rows("billingOperation").push({ ...h.rows("billingOperation")[0], id: "seedenv-payout-payout-2", ledgerId: "payout-2", resourceId: "payout-2" });
+    const result = await payouts.releaseTesterPayouts("tester");
+    assert.equal(result.releasedCount, 2);
+    const linked = h.remote.transfers.filter((row) => row.source_transaction === "ch_pi_topup");
+    assert.equal(linked.length, 1);
+    const unlinked = h.remote.transfers.find((row) => !row.source_transaction);
+    assert.equal(unlinked?.transfer_group, "seedenv-payout-payout-2");
+  });
+});
+
+test("unsettled, refunded, or disputed funding charges are not used as a payout source", async () => {
+  await withHarness(async (h, { payouts }) => {
+    h.topUp();
+    h.remote.charges.get("ch_pi_topup")!.disputed = true;
+    fundTesterPlace(h);
+    h.payout();
+    assert.equal(await payouts.transferTesterPayout("tester", "payout"), true);
+    assert.equal(h.remote.transfers[0].source_transaction, undefined);
+    assert.equal(h.rows("billingOperation")[0].sourceChargeId ?? null, null);
+  });
+});
+
+test("a definitive Stripe rejection reopens the payout with a fresh idempotency key instead of locking it forever", async () => {
+  await withHarness(async (h, { payouts }) => {
+    h.payout();
+    h.remote.rejectTransfer = "balance_insufficient";
+    await assert.rejects(payouts.transferTesterPayout("tester", "payout"), /balance_insufficient/);
+    let operation = h.rows("billingOperation")[0];
+    assert.equal(operation.state, "RESERVED");
+    assert.equal(operation.attempt, 1);
+    assert.equal(operation.firstAttemptAt, null);
+    assert.match(operation.error, /balance_insufficient|Stripe rejected/);
+    assert.equal(h.remote.transferCreates, 0);
+    assert.equal(h.rows("walletTransaction")[0].status, "PENDING");
+
+    assert.equal(await payouts.transferTesterPayout("tester", "payout"), true);
+    assert.equal(h.remote.transferCreates, 1);
+    assert.equal(h.remote.transfers[0].key, "seedenv-payout-payout-retry-1");
+    operation = h.rows("billingOperation")[0];
+    assert.equal(operation.state, "SETTLED");
+    assert.equal(await payouts.transferTesterPayout("tester", "payout"), true);
+    assert.equal(h.remote.transferCreates, 1);
+    assert.equal(h.rows("user")[1].walletBalanceCents, 1000);
+  });
+});
+
+test("only definitive Stripe request errors are treated as proof that no transfer was created", async () => {
+  await withHarness(async (_h, { operations }) => {
+    assert.equal(operations.isDefinitiveStripeRejection({ type: "StripeInvalidRequestError", statusCode: 400, code: "balance_insufficient" }), true);
+    assert.equal(operations.isDefinitiveStripeRejection({ type: "StripeIdempotencyError", statusCode: 400 }), false);
+    assert.equal(operations.isDefinitiveStripeRejection({ type: "StripeInvalidRequestError", statusCode: 409 }), false);
+    assert.equal(operations.isDefinitiveStripeRejection({ type: "StripeRateLimitError", statusCode: 429 }), false);
+    assert.equal(operations.isDefinitiveStripeRejection({ type: "StripeAPIError", statusCode: 500 }), false);
+    assert.equal(operations.isDefinitiveStripeRejection({ type: "StripeConnectionError" }), false);
+    assert.equal(operations.isDefinitiveStripeRejection(new Error("socket hang up")), false);
+  });
+});
+
+test("a late rejection replayed for an older attempt cannot reopen a newer in-flight attempt", async () => {
+  await withHarness(async (h, { operations }) => {
+    h.payout();
+    const inFlight = new Date();
+    Object.assign(h.rows("billingOperation")[0], { state: "SUBMITTED", attempt: 1, firstAttemptAt: inFlight, sourceChargeId: "ch_pinned" });
+    await operations.reopenRejectedAttempt({ id: "seedenv-payout-payout", attempt: 0 }, new Error("stale"));
+    let row = h.rows("billingOperation")[0];
+    assert.equal(row.attempt, 1);
+    assert.equal(row.state, "SUBMITTED");
+    assert.equal(row.firstAttemptAt, inFlight);
+    assert.equal(row.sourceChargeId, "ch_pinned");
+    await operations.reopenRejectedAttempt({ id: "seedenv-payout-payout", attempt: 1 }, new Error("current"));
+    row = h.rows("billingOperation")[0];
+    assert.equal(row.attempt, 2);
+    assert.equal(row.state, "RESERVED");
+    assert.equal(row.firstAttemptAt, null);
   });
 });

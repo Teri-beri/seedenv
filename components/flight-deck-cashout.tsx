@@ -22,10 +22,18 @@ export function FlightDeckCashout({ readyCents, stripeConnected }: { readyCents:
         startTransition(async () => {
           try {
             const result = await releasePendingTesterPayouts();
-            setMessage(result.releasedCount ? `Sent ${result.releasedCount} payout${result.releasedCount === 1 ? "" : "s"} to Stripe.` : "Stripe hasn't enabled payouts yet. Finish setup in Account.");
+            if (!result.ok) {
+              setMessage(result.message);
+              return;
+            }
+            const summary = result.releasedCount
+              ? `Sent ${result.releasedCount} payout${result.releasedCount === 1 ? "" : "s"} to your Stripe balance. Bank arrival follows your Stripe schedule.`
+              : `${result.pendingCount} payout${result.pendingCount === 1 ? "" : "s"} still pending.`;
+            setMessage([summary, ...result.failures.map((failure) => `${failure.message} Payout reference: ${failure.payoutId}`)].join(" "));
             router.refresh();
           } catch (error) {
-            setMessage(error instanceof Error ? error.message : "Cash out failed. Try again.");
+            console.error("SeedEnv cash out request failed:", error);
+            setMessage("The payout response could not be confirmed. Refresh your ledger before retrying, or contact SeedEnv support.");
           }
         });
       }}>{isPending ? "Sending…" : "Cash Out via Stripe Express"}</button>

@@ -7,6 +7,7 @@ import { getStripe } from "@/lib/stripe";
 import { formatCents } from "@/lib/utils";
 import { AUTO_APPROVE_AFTER_MS, isAutoApprovalDue } from "@/lib/auto-approval-window";
 import { operationTransfer, reserveBillingOperation } from "@/lib/billing-operations";
+import { payoutSourceCandidates } from "@/lib/payout-funding-source";
 import { assertCampaignFunding } from "@/lib/funding-reversals";
 import { releaseBountyAndDeductFee } from "@/lib/billing/ledger";
 
@@ -15,6 +16,51 @@ export { AUTO_APPROVE_AFTER_MS, isAutoApprovalDue, isFraudHeld, autoApproveDeadl
 export type ApprovalActor = { kind: "reviewer"; id: string; admin: boolean } | { kind: "auto"; now: Date };
 
 export type ApprovalResult = { payoutCents: number; xpGain: number; testerId: string; payoutTransactionId: string; campaignTitle: string };
+
+export function testerPayoutErrorMessage(error: unknown): string {
+  const code = error instanceof Error && "code" in error ? error.code : undefined;
+  if (code === "balance_insufficient") {
+    return "SeedEnv's available Stripe balance cannot cover this transfer yet. Your payout remains pending; SeedEnv support must check platform funding.";
+  }
+  if (code === "account_invalid" || code === "resource_missing") {
+    return "Stripe could not access the payout account or its funding record. Contact SeedEnv support to check the linked account and payment mode.";
+  }
+  if (code === "transfers_not_allowed") {
+    return "Stripe has not enabled transfers for this account. Continue Stripe setup or contact SeedEnv support.";
+  }
+  if (error instanceof Error) {
+    if (error.message === "Stripe payout account is not ready. Finish Stripe onboarding before releasing this payout.") {
+      return "Stripe has not finished enabling your payout account. Continue Stripe setup and complete any identity or bank requirements.";
+    }
+    if (/reconcil|unknown.*outcome|unknown beyond|does not match|Multiple transfers/i.test(error.message)) {
+      return "This payout needs SeedEnv support to reconcile its Stripe transfer before it can be retried safely. Do not create another Stripe account.";
+    }
+  }
+  return "The transfer could not be confirmed. Your payout remains recorded; contact SeedEnv support with the payout reference below before retrying.";
+}
+
+export async function releaseTesterPayouts(testerId: string) {
+  const pending = await prisma.walletTransaction.findMany({
+    where: { userId: testerId, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  let releasedCount = 0;
+  const failures: { payoutId: string; message: string }[] = [];
+  for (const payout of pending) {
+    try {
+      if (await transferTesterPayout(testerId, payout.id)) releasedCount += 1;
+      else failures.push({ payoutId: payout.id, message: "Finish Stripe payout setup before receiving this payment. If setup is complete, contact SeedEnv support." });
+    } catch (error) {
+      console.error("SeedEnv tester payout release failed:", { testerId, payoutId: payout.id, error });
+      failures.push({ payoutId: payout.id, message: testerPayoutErrorMessage(error) });
+    }
+  }
+  const pendingCount = await prisma.walletTransaction.count({
+    where: { userId: testerId, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING },
+  });
+  return { releasedCount, pendingCount, failures };
+}
 
 export async function approvePendingSubmission(tx: Prisma.TransactionClient, submissionId: string, actor: ApprovalActor): Promise<ApprovalResult> {
   const submission = await tx.submission.findUnique({ where: { id: submissionId }, include: { campaign: true, tester: true, audit: { select: { status: true, humanClearedAt: true } } } });
@@ -84,7 +130,7 @@ export async function transferTesterPayout(testerId: string, transactionId: stri
       await serializable((tx) => assertCampaignFunding(tx, operation.campaignId!));
       const account = await stripe.accounts.retrieve(operation.destinationId!);
       if (!account.payouts_enabled) throw new Error("Stripe payout account is not ready. Finish Stripe onboarding before releasing this payout.");
-    });
+    }, { sourceCandidates: () => payoutSourceCandidates(operation) });
 
     const settled = await prisma.$transaction(async (database) => {
       const updated = await database.walletTransaction.updateMany({
@@ -107,7 +153,13 @@ export async function transferTesterPayout(testerId: string, transactionId: stri
 }
 
 export async function settleApprovedPayout(result: ApprovalResult, automatic: boolean) {
-  const payoutSent = await transferTesterPayout(result.testerId, result.payoutTransactionId);
+  let payoutSent = false;
+  try {
+    payoutSent = await transferTesterPayout(result.testerId, result.payoutTransactionId);
+  } catch (error) {
+    // Approval and its pending ledger entry are already committed, even if Stripe is not ready.
+    console.error("SeedEnv approved payout remains pending:", { payoutId: result.payoutTransactionId, error });
+  }
   const tester = await prisma.user.findUnique({ where: { id: result.testerId }, select: { email: true, notificationPreferences: true } });
   if (tester && notificationEnabled(tester.notificationPreferences, "email_ledger_updates", true)) {
     const amount = formatCents(result.payoutCents);

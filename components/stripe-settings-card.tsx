@@ -3,6 +3,7 @@
 import { UserRole } from "@prisma/client";
 import { ArrowRight, Banknote, CreditCard, ExternalLink, LoaderCircle, ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createStripeConnectOnboardingLink, createStripePaymentMethodSetupLink } from "@/app/actions/accountActions";
 import { releasePendingTesterPayouts } from "@/app/actions/submissionActions";
@@ -44,9 +45,11 @@ export function StripeSettingsCard({
   connectSetupResult?: string;
   draftId?: string;
 }) {
+  const router = useRouter();
   const [country, setCountry] = useState(connectCountry || "US");
   const [message, setMessage] = useState("");
   const [payoutMessage, setPayoutMessage] = useState("");
+  const [payoutFailures, setPayoutFailures] = useState<{ payoutId: string; message: string }[]>([]);
   const [isPending, startTransition] = useTransition();
   const isDeveloper = role === UserRole.DEVELOPER;
   const isTester = role === UserRole.TESTER;
@@ -66,12 +69,17 @@ export function StripeSettingsCard({
   function setupPayoutAccount() {
     setMessage("");
     startTransition(async () => {
-      const result = await createStripeConnectOnboardingLink(country);
-      if (!result.ok) {
-        setMessage(result.message);
-        return;
+      try {
+        const result = await createStripeConnectOnboardingLink(country);
+        if (!result.ok) {
+          setMessage(result.message);
+          return;
+        }
+        window.location.assign(result.url);
+      } catch (error) {
+        console.error("SeedEnv Stripe payout setup request failed:", error);
+        setMessage("Could not open Stripe setup. Sign in again and retry, or contact SeedEnv support.");
       }
-      window.location.assign(result.url);
     });
   }
 
@@ -90,21 +98,30 @@ export function StripeSettingsCard({
         }
         window.location.assign(data.url);
       } catch (error) {
-        setMessage(error instanceof Error ? error.message : "Unable to open your Stripe Express dashboard.");
+        console.error("SeedEnv Stripe Express request failed:", error);
+        setMessage("Could not open your Stripe Express dashboard. Sign in again and retry, or contact SeedEnv support.");
       }
     });
   }
 
   function releasePayouts() {
     setPayoutMessage("");
+    setPayoutFailures([]);
     startTransition(async () => {
       try {
         const result = await releasePendingTesterPayouts();
+        if (!result.ok) {
+          setPayoutMessage(result.message);
+          return;
+        }
+        setPayoutFailures(result.failures);
         setPayoutMessage(result.releasedCount
-          ? `${result.releasedCount} payout${result.releasedCount === 1 ? "" : "s"} sent to Stripe. ${result.pendingCount} remain pending.`
-          : `${result.pendingCount} payout${result.pendingCount === 1 ? "" : "s"} still pending. Check Stripe account status and available platform balance.`);
+          ? `${result.releasedCount} payout${result.releasedCount === 1 ? "" : "s"} sent to your Stripe balance. ${result.pendingCount} remain pending. Bank arrival follows your Stripe payout schedule.`
+          : `${result.pendingCount} payout${result.pendingCount === 1 ? "" : "s"} still pending.${result.failures.length ? " See the reason below." : " No transfer was needed."}`);
+        router.refresh();
       } catch (error) {
-        setPayoutMessage(error instanceof Error ? error.message : "Could not release pending payouts.");
+        console.error("SeedEnv payout request failed:", error);
+        setPayoutMessage("The payout response could not be confirmed. Refresh your ledger before retrying, or contact SeedEnv support.");
       }
     });
   }
@@ -120,7 +137,7 @@ export function StripeSettingsCard({
             <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-400">
               {isDeveloper
                 ? "Save a card securely with Stripe so campaign escrow checkout can use your funding account. SeedEnv never stores card numbers."
-                : "Set up Stripe Express to receive direct payouts for verified cohort work. Identity, bank, and applicable tax information are entered securely on Stripe."}
+                : "Receive earnings as an individual tester through Stripe Express. You do not need to register a company to test. Stripe still requires identity, bank, and applicable tax information, entered securely on Stripe."}
             </p>
           </div>
         </div>
@@ -139,7 +156,7 @@ export function StripeSettingsCard({
 
       {paymentSetupResult === "success" && isDeveloper ? <p className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-950/30 p-3 text-sm text-emerald-200" role="status">Stripe returned successfully. Your funding method appears here once setup is confirmed.</p> : null}
       {paymentSetupResult === "cancelled" && isDeveloper ? <p className="mt-4 rounded-lg border border-amber-500/20 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">Payment setup was cancelled; no card was saved.</p> : null}
-      {connectSetupResult === "return" && isTester ? <p className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-950/30 p-3 text-sm text-emerald-200" role="status">Stripe onboarding returned. Payout availability will update after Stripe completes its review.</p> : null}
+      {connectSetupResult === "return" && isTester ? <p className="mt-4 rounded-lg border border-emerald-500/20 bg-emerald-950/30 p-3 text-sm text-emerald-200" role="status">{payoutsEnabled ? "Stripe account setup is enabled. Use Receive pending payouts below to request your approved earnings; finishing setup alone does not confirm a transfer." : "Stripe onboarding returned. Payout availability will update after Stripe completes its review."}</p> : null}
       {connectSetupResult === "refresh" && isTester ? <p className="mt-4 rounded-lg border border-amber-500/20 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">Stripe onboarding needs another step. Continue setup to finish providing your details.</p> : null}
 
       {isTester && !payoutsEnabled ? (
@@ -160,7 +177,7 @@ export function StripeSettingsCard({
 
       {isTester && pendingPayoutCount > 0 ? (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.05] p-4">
-          <div><p className="text-sm font-semibold text-white">{pendingPayoutCount} approved payout{pendingPayoutCount === 1 ? "" : "s"} pending</p><p className="mt-1 text-xs text-neutral-400">{formatCents(pendingPayoutAmountCents)} {payoutsEnabled ? "ready to send to your Stripe account" : "waiting for Stripe payout setup"}</p></div>
+          <div><p className="text-sm font-semibold text-white">{pendingPayoutCount} approved payout{pendingPayoutCount === 1 ? "" : "s"} pending</p><p className="mt-1 text-xs text-neutral-400">{formatCents(pendingPayoutAmountCents)} {payoutsEnabled ? "awaiting transfer to your Stripe balance" : "waiting for Stripe payout setup"}</p></div>
           {payoutsEnabled ? <Button disabled={isPending} onClick={releasePayouts} type="button">{isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Banknote className="size-4" />}{isPending ? "Sending…" : "Receive pending payouts"}</Button> : null}
         </div>
       ) : null}
@@ -174,6 +191,7 @@ export function StripeSettingsCard({
         </div>
       ) : null}
       {payoutMessage ? <p className="mt-3 text-sm text-neutral-300" role="status">{payoutMessage}</p> : null}
+      {payoutFailures.length ? <ul role="alert" className="mt-3 space-y-3 rounded-lg border border-amber-500/20 bg-amber-950/20 p-3 text-sm text-amber-200">{payoutFailures.map((failure) => <li key={failure.payoutId}><p>{failure.message}</p><p className="mt-1 break-all font-mono text-xs text-neutral-400">Payout reference: {failure.payoutId}</p></li>)}</ul> : null}
       {isTester && !connectAccountId ? <Link href="/dashboard/validator/payouts" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm text-emerald-300">Bank schedule &amp; earned ledger <ArrowRight className="size-4" /></Link> : null}
 
       {isDeveloper ? (
