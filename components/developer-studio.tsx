@@ -127,6 +127,7 @@ const defaultTask = { instructionTitle: SEED_TASK_PRESETS[0].title, instructionD
 const taskPresetCategories = Array.from(new Set(SEED_TASK_PRESETS.map((preset) => preset.category)));
 const selectClass = "w-full rounded-2xl border border-stroke bg-black/28 px-4 py-3 text-white outline-none focus:border-zinc-500 [color-scheme:dark]";
 const optionStyle = { backgroundColor: "#0E1017", color: "#F8FAFC" };
+const taskStepFieldKeys = ["instruction", "discoveryMinRep", "estimatedMinutes", "testerPerk", "syncGitHubRepo"];
 
 export type DeveloperStudioView = "overview" | "new-drop" | "review-deck" | "asset-vault";
 
@@ -269,11 +270,13 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
         if (task.instructionTitle.trim().length < 3 || task.instructionTitle.length > 90) nextErrors[`instructionTitle-${index}`] = "Task title must be 3 to 90 characters.";
         if (task.instructionDetail.trim().length < 12 || task.instructionDetail.length > 900) nextErrors[`instructionDetail-${index}`] = "Task instructions must be 12 to 900 characters.";
       });
+      if (form.discoveryAllowed && (!Number.isInteger(form.discoveryMinRep) || form.discoveryMinRep < 0 || form.discoveryMinRep > 1000000)) nextErrors.discoveryMinRep = "Use a whole-number Discovery REP floor from 0 to 1,000,000.";
+      if (form.estimatedMinutes !== null && form.estimatedMinutes !== undefined && (!Number.isInteger(form.estimatedMinutes) || form.estimatedMinutes < 1 || form.estimatedMinutes > 240)) nextErrors.estimatedMinutes = "Use a whole number of minutes from 1 to 240.";
       if (form.syncGitHubRepo && !/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/.test(form.syncGitHubRepo)) nextErrors.syncGitHubRepo = "Use the owner/repo format, e.g. acme/mobile-app.";
     }
     if (stepToValidate === 3) {
       if (!Number.isInteger(form.totalSlots) || form.totalSlots < 5 || form.totalSlots > 500) nextErrors.totalSlots = "Choose between 5 and 500 tester slots.";
-      if (form.bountyPerTaskUsd < 1 || form.bountyPerTaskUsd > 100) nextErrors.bountyPerTaskUsd = "Bounty must be between $1 and $100 per tester.";
+      if (!Number.isFinite(form.bountyPerTaskUsd) || form.bountyPerTaskUsd < 1 || form.bountyPerTaskUsd > 100) nextErrors.bountyPerTaskUsd = "Bounty must be between $1 and $100 per tester.";
     }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -401,6 +404,11 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
         const result = await createCampaignWithEscrow(form, draftId, { ...(needsTopUp && chosenTopUp ? { topUpCents: chosenTopUp.creditCents } : {}), expectedPlatformFeeCents: Math.round(platformFee * 100) });
         if ("promoError" in result) {
           setMessage(result.promoError);
+          if ("fieldErrors" in result && result.fieldErrors) {
+            const field = Object.keys(result.fieldErrors)[0] || "";
+            setErrors(result.fieldErrors);
+            setStep(taskStepFieldKeys.some((key) => field.startsWith(key)) ? 2 : ["totalSlots", "bountyPerTaskUsd", "promoCode"].includes(field) ? 3 : 1);
+          }
           return;
         }
         if (result.requiresPaymentSetup) {
@@ -477,7 +485,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
 
   return (
     <section className="space-y-8">
-      {message ? <p className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 text-sm text-zinc-200" role="status">{message}</p> : null}
+      {message && view !== "new-drop" ? <p className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 text-sm text-zinc-200" role="status">{message}</p> : null}
       {createdCampaignUrl ? <p role="status" className="text-sm text-emerald-300">Your campaign has already been created. <a className="underline" href={createdCampaignUrl}>Continue to your campaign or checkout</a>. Do not launch it again.</p> : null}
       {view === "overview" ? <DeveloperInsights submissions={auditReports} /> : null}
       {view === "new-drop" ? (
@@ -490,7 +498,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
             </div>
             <div className="flex self-start rounded-lg border border-zinc-800 bg-[#090A0F]/60 p-1 sm:self-auto" role="tablist" aria-label="Launch wizard steps">
               {([[1, "Details"], [2, "Tasks"], [3, "Budget"]] as const).map(([item, label]) => (
-                <button aria-selected={step === item} disabled={item > highestStep} key={item} className={`rounded-md px-2.5 py-2 text-xs font-bold transition-all disabled:cursor-not-allowed disabled:opacity-35 ${step === item ? "bg-white text-zinc-950" : "text-white/55 enabled:hover:text-white"}`} onClick={() => { setStep(item); setErrors({}); }} role="tab" type="button">
+                <button aria-selected={step === item} disabled={item > highestStep} key={item} className={`min-h-11 rounded-md px-2.5 py-2 text-xs font-bold transition-all disabled:cursor-not-allowed disabled:opacity-35 ${step === item ? "bg-white text-zinc-950" : "text-white/55 enabled:hover:text-white"}`} onClick={() => { setStep(item); setErrors({}); }} role="tab" type="button">
                   <span className="mr-1 font-mono">{item}</span>{label}
                 </button>
               ))}
@@ -500,8 +508,8 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
           <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-zinc-400">
             <p role="status" aria-live="polite">{autosave.status}</p>
             <span>Private draft - resumes on your account across devices.</span>
-            <button type="button" className="underline hover:text-white" onClick={autosave.retry}>Save now</button>
-            <button type="button" disabled={isPending} className="underline hover:text-white" onClick={() => {
+            <button type="button" className="min-h-11 underline hover:text-white" onClick={autosave.retry}>Save now</button>
+            <button type="button" disabled={isPending} className="min-h-11 underline hover:text-white" onClick={() => {
               if (!window.confirm("Discard this saved wizard draft and start over? This does not cancel any launched campaign.")) return;
               startTransition(async () => {
                 try { await autosave.clear(); window.location.reload(); }
@@ -568,9 +576,9 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                   <div className="space-y-2 text-sm font-semibold text-white/72">
                     <span>Tester device constraints</span>
                     <div className="grid gap-2 rounded-2xl border border-zinc-800 bg-[#0C0F15] p-3">
-                      <label className="flex items-center gap-3 text-sm font-medium text-zinc-200"><input type="checkbox" checked={form.robloxMobileOnly ?? true} onChange={(event) => updateFormField("robloxMobileOnly", event.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-400 focus:ring-emerald-500" /> Mobile Only (iOS & Android)</label>
-                      <label className="flex items-center gap-3 text-sm font-medium text-zinc-200"><input type="checkbox" checked={form.robloxAllowIpad ?? false} onChange={(event) => updateFormField("robloxAllowIpad", event.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-400 focus:ring-emerald-500" /> iPad / Tablets</label>
-                      <label className="flex items-center gap-3 text-sm font-medium text-zinc-200"><input type="checkbox" checked={form.robloxAllowDesktop ?? false} onChange={(event) => updateFormField("robloxAllowDesktop", event.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-400 focus:ring-emerald-500" /> Desktop / PC</label>
+                      <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-zinc-200"><input type="checkbox" checked={form.robloxMobileOnly ?? true} onChange={(event) => updateFormField("robloxMobileOnly", event.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-400 focus:ring-emerald-500" /> Mobile Only (iOS & Android)</label>
+                      <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-zinc-200"><input type="checkbox" checked={form.robloxAllowIpad ?? false} onChange={(event) => updateFormField("robloxAllowIpad", event.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-400 focus:ring-emerald-500" /> iPad / Tablets</label>
+                      <label className="flex min-h-11 items-center gap-3 text-sm font-medium text-zinc-200"><input type="checkbox" checked={form.robloxAllowDesktop ?? false} onChange={(event) => updateFormField("robloxAllowDesktop", event.target.checked)} className="h-4 w-4 rounded border-zinc-700 bg-zinc-950 text-emerald-400 focus:ring-emerald-500" /> Desktop / PC</label>
                     </div>
                   </div>
                   <label className="space-y-2 text-sm font-semibold text-white/72">
@@ -590,7 +598,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                   <span className="relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg border border-white/10 bg-[#090A0F]">
                     {form.iconUrl ? <Image alt="Selected app icon preview" className="object-cover" fill sizes="48px" src={form.iconUrl} unoptimized /> : <ImagePlus className="size-5 text-neutral-500" />}
                   </span>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-stroke bg-black/28 px-3 py-2.5 text-xs font-semibold text-neutral-200 transition hover:border-zinc-700 hover:text-white has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
+                  <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-stroke bg-black/28 px-3 py-2.5 text-xs font-semibold text-neutral-200 transition hover:border-zinc-700 hover:text-white has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50">
                     {isUploadingIcon ? <LoaderCircle className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
                     {isUploadingIcon ? "Uploading…" : form.iconUrl ? "Replace icon" : "Choose icon file"}
                     <input accept="image/png,image/jpeg,.png,.jpg,.jpeg" className="sr-only" disabled={isUploadingIcon} onChange={uploadCampaignIcon} type="file" />
@@ -674,7 +682,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
               <div className="rounded-xl border border-stroke p-4">
                 <p className="text-xs leading-6 text-neutral-400">Tester reputation is checked automatically before an application can be submitted. Discovery Pass applicants remain subject to your Discovery REP floor and review.</p>
                 <label className="mt-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={form.discoveryAllowed} onChange={(event) => setForm((current) => ({ ...current, discoveryAllowed: event.target.checked }))} />Allow Discovery Pass applicants</label>
-                {form.discoveryAllowed ? <label className="mt-3 block text-sm">Discovery REP floor<input type="number" min={0} max={1000000} value={form.discoveryMinRep} onChange={(event) => setForm((current) => ({ ...current, discoveryMinRep: Number(event.target.value) }))} className={`mt-2 ${selectClass}`} /></label> : null}
+                {form.discoveryAllowed ? <label className="mt-3 block text-sm">Discovery REP floor<input type="number" min={0} max={1000000} value={form.discoveryMinRep} onChange={(event) => setForm((current) => ({ ...current, discoveryMinRep: Number(event.target.value) }))} aria-invalid={Boolean(errors.discoveryMinRep)} className={`mt-2 ${selectClass}`} />{errors.discoveryMinRep ? <span className="mt-1 block text-xs text-rose-300">{errors.discoveryMinRep}</span> : null}</label> : null}
               </div>
               <div className="grid gap-4 rounded-xl border border-stroke p-4 md:grid-cols-2">
                 <label className="block text-sm">Estimated tester time <span className="text-neutral-500">(minutes, optional)</span>
@@ -729,7 +737,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                   </div>
                   <p className="text-xs leading-5 text-white/50">Bundle pricing is fixed, paid up front, and verified again at checkout. Unused tester stipends are refunded automatically if the cohort ends early.</p>
                   <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending || Boolean(createdCampaignUrl)}>
-                    <BadgeDollarSign className="size-5" /> Pay ${totalEscrow.toFixed(2)} & Launch
+                    {isPending ? <LoaderCircle className="size-5 animate-spin" /> : <BadgeDollarSign className="size-5" />} {isPending ? "Launching…" : `Pay $${totalEscrow.toFixed(2)} & Launch`}
                   </Button>
                 </>
               ) : (
@@ -756,7 +764,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                       <p className="text-xs leading-5 text-zinc-400">Your balance doesn&apos;t cover the first tester yet. Add funds once, then each accepted tester draws from the balance with no further card charges.</p>
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         {topUpOptions.map((option) => (
-                          <label key={option.count} className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs transition-colors ${chosenTopUp?.count === option.count ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200" : "border-zinc-800 text-zinc-300 hover:border-zinc-600"}`}>
+                          <label key={option.count} className={`flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs transition-colors ${chosenTopUp?.count === option.count ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-200" : "border-zinc-800 text-zinc-300 hover:border-zinc-600"}`}>
                             <span className="flex items-center gap-2"><input type="radio" name="top-up" className="accent-emerald-500" checked={chosenTopUp?.count === option.count} onChange={() => setTopUpTesters(option.count)} />{option.count === form.totalSlots ? `Full cohort (${option.count})` : `${option.count} tester${option.count === 1 ? "" : "s"}`}</span>
                             <span className="font-mono">{usd(option.creditCents)}</span>
                           </label>
@@ -767,13 +775,14 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
                   ) : null}
                   <p className="text-xs leading-5 text-white/50">Each accepted tester draws their reward plus the platform fee from your prepaid balance. Withdrawn places, or places released after a manual review confirms denial, are reused first. Pending denial cases keep their unpaid reward held. Ending the cohort, or 30 days passing, returns unused places to your balance; refundable balance can be returned to your card from Billing.</p>
                   <Button variant="light" size="lg" type="button" className="w-full" onClick={launchCampaign} disabled={isPending || Boolean(createdCampaignUrl)}>
-                    <BadgeDollarSign className="size-5" /> {needsTopUp && chosenTopUp ? `Add ${usd(chosenTopUp.creditCents)} & Launch` : "Launch Cohort"}
+                    {isPending ? <LoaderCircle className="size-5 animate-spin" /> : <BadgeDollarSign className="size-5" />} {isPending ? "Launching…" : needsTopUp && chosenTopUp ? `Add ${usd(chosenTopUp.creditCents)} & Launch` : "Launch Cohort"}
                   </Button>
                 </>
               )}
-              {canSaveTestDraft ? <Button className="w-full" disabled={isPending || isUploadingIcon} type="button" variant="outline" onClick={saveNoChargeTestDraft}><CheckCircle2 className="size-4" /> Save test draft</Button> : null}
+              {canSaveTestDraft ? <Button className="w-full" disabled={isPending || isUploadingIcon} type="button" variant="outline" onClick={saveNoChargeTestDraft}><CheckCircle2 className="size-4" /> {isPending ? "Saving…" : "Save test draft"}</Button> : null}
             </div>
           )}
+          {message ? <p className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] p-3 text-sm text-amber-100" role="alert">{message}</p> : null}
           <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4">
             <Button disabled={step === 1 || isPending || isUploadingIcon} type="button" variant="outline" onClick={() => { setStep((current) => Math.max(1, current - 1)); setErrors({}); }}>Back</Button>
             {step < 3 ? <Button variant="light" type="button" onClick={continueWizard} disabled={isPending || isUploadingIcon}>Continue to {step === 1 ? "tasks" : "budget"}</Button> : <Button type="button" variant="outline" onClick={() => setStep(1)}>Review details</Button>}
@@ -866,9 +875,9 @@ function Slider({ label, min, max, step = 1, value, onChange, error }: { label: 
     <div className="block rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 backdrop-blur-md transition-all hover:border-zinc-700">
       <div className="mb-3 flex items-center justify-between text-sm font-bold">
         <label className="text-white/72" htmlFor={inputId}>{label}</label>
-        <input aria-invalid={Boolean(error)} className="w-24 rounded-md border border-stroke bg-black/40 px-2 py-1 text-right font-mono text-emerald-400 outline-none focus:border-zinc-500" id={inputId} max={max} min={min} onChange={(event) => { const nextValue = event.currentTarget.valueAsNumber; if (Number.isFinite(nextValue)) onChange(nextValue); }} step={step} type="number" value={value} />
+        <input aria-invalid={Boolean(error)} className="min-h-11 w-24 rounded-md border border-stroke bg-black/40 px-2 py-1 text-right font-mono text-emerald-400 outline-none focus:border-zinc-500" id={inputId} max={max} min={min} onChange={(event) => { const nextValue = event.currentTarget.valueAsNumber; if (Number.isFinite(nextValue)) onChange(nextValue); }} step={step} type="number" value={value} />
       </div>
-      <input aria-label={`${label} slider`} type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className="w-full accent-emerald-500" />
+      <input aria-label={`${label} slider`} type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className="min-h-11 w-full accent-emerald-500" />
       {error ? <p className="mt-2 text-xs font-normal text-rose-300">{error}</p> : null}
     </div>
   );
@@ -884,7 +893,7 @@ function Metric({ label, value, gold = false }: { label: string; value: string; 
 }
 
 function IconButton({ label, icon, onClick, disabled = false }: { label: string; icon: React.ReactNode; onClick: () => void; disabled?: boolean }) {
-  return <button aria-label={label} disabled={disabled} type="button" onClick={onClick} className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-2 text-white/72 backdrop-blur-md transition-all hover:border-zinc-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-35">{icon}</button>;
+  return <button aria-label={label} disabled={disabled} type="button" onClick={onClick} className="grid min-h-11 min-w-11 place-items-center rounded-xl border border-zinc-800 bg-zinc-900/40 p-2 text-white/72 backdrop-blur-md transition-all hover:border-zinc-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-35">{icon}</button>;
 }
 
 const rejectionReasons = ["Blurry Image", "Irrelevant Content", "Incomplete Steps", "Low Effort", "Generic Feedback", "Did not follow test script", "Incomplete video proof", "Required participation period not completed"] as const;
@@ -936,7 +945,7 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
         </div>
         <div role="group" aria-label="Filter queue by status" className="mt-4 flex flex-wrap gap-2">
           {queueFilters.slice(0, 3).map((filter) => <QueueFilterButton key={filter.value} filter={filter} active={queueFilter === filter.value} onClick={() => { setQueueFilter(filter.value); setSelectedId(""); setDecision(null); setError(""); }} />)}
-          <Link href="/console?view=asset-vault" className="rounded-full border border-zinc-800 bg-zinc-900/50 px-3 py-1 font-mono text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200">Approved ({approvedCount})</Link>
+          <Link href="/console?view=asset-vault" className="inline-flex min-h-11 items-center rounded-full border border-zinc-800 bg-zinc-900/50 px-3 py-1 font-mono text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200">Approved ({approvedCount})</Link>
           {queueFilters.slice(3).map((filter) => <QueueFilterButton key={filter.value} filter={filter} active={queueFilter === filter.value} onClick={() => { setQueueFilter(filter.value); setSelectedId(""); setDecision(null); setError(""); }} />)}
         </div>
       </header>
@@ -1049,7 +1058,7 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
             <>
               <h3 className="mt-3 text-lg font-bold text-white">No reports match this filter</h3>
               <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-neutral-400">This page of the queue has no {queueFilter === "flagged" ? "flagged" : queueFilter === "revision" ? "in-revision" : "awaiting-review"} reports.</p>
-              <button type="button" onClick={() => setQueueFilter("all")} className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-400 hover:text-emerald-300">Show all submissions</button>
+              <button type="button" onClick={() => setQueueFilter("all")} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-emerald-400 hover:text-emerald-300">Show all submissions</button>
             </>
           ) : (
             <>
@@ -1065,10 +1074,10 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                     <span className="text-zinc-600">·</span>
                     <span>{cohort.claimedSlots}/{cohort.totalSlots} slots claimed</span>
                   </div>
-                  <Link className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console#active-cohorts">Inspect Cohort Status <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
+                  <Link className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console#active-cohorts">Inspect Cohort Status <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
                 </>
               ) : (
-                <Link className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console?view=new-drop">Deploy a Cohort <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
+                <Link className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console?view=new-drop">Deploy a Cohort <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
               )}
             </>
           )}
@@ -1078,8 +1087,8 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
         <nav aria-label="Review queue pages" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-[#0E1017]/65 px-4 py-3">
           <p className="text-xs text-neutral-500">Page {page} of {totalPages} · {totalCount} pending reports</p>
           <div className="flex gap-2">
-            {page > 1 ? <Link className="rounded-lg border border-[#2A2F3D] px-3 py-2 text-xs font-semibold text-neutral-300 hover:text-white" href={`/console?view=review-deck&reviewPage=${page - 1}`}>Previous</Link> : <span aria-disabled="true" className="rounded-lg border border-zinc-800 px-3 py-2 text-xs text-neutral-600">Previous</span>}
-            {page < totalPages ? <Link className="rounded-lg border border-[#2A2F3D] px-3 py-2 text-xs font-semibold text-neutral-300 hover:text-white" href={`/console?view=review-deck&reviewPage=${page + 1}`}>Next</Link> : <span aria-disabled="true" className="rounded-lg border border-zinc-800 px-3 py-2 text-xs text-neutral-600">Next</span>}
+            {page > 1 ? <Link className="inline-flex min-h-11 items-center rounded-lg border border-[#2A2F3D] px-3 py-2 text-xs font-semibold text-neutral-300 hover:text-white" href={`/console?view=review-deck&reviewPage=${page - 1}`}>Previous</Link> : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-lg border border-zinc-800 px-3 py-2 text-xs text-neutral-600">Previous</span>}
+            {page < totalPages ? <Link className="inline-flex min-h-11 items-center rounded-lg border border-[#2A2F3D] px-3 py-2 text-xs font-semibold text-neutral-300 hover:text-white" href={`/console?view=review-deck&reviewPage=${page + 1}`}>Next</Link> : <span aria-disabled="true" className="inline-flex min-h-11 items-center rounded-lg border border-zinc-800 px-3 py-2 text-xs text-neutral-600">Next</span>}
           </div>
         </nav>
       ) : null}
@@ -1093,7 +1102,7 @@ function QueueFilterButton({ filter, active, onClick }: { filter: { value: "all"
       type="button"
       aria-pressed={active}
       onClick={onClick}
-      className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${active ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"}`}
+      className={`min-h-11 rounded-full border px-3 py-1 font-mono text-xs transition-colors ${active ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"}`}
     >
       {filter.label} ({filter.count})
     </button>
@@ -1195,7 +1204,7 @@ function AssetVault({ assets, cohort }: { assets: Asset[]; cohort: ReviewCohort 
           <Boxes className="mx-auto size-8 text-zinc-600" />
           <h3 className="mt-3 text-lg font-bold text-white">No evidence matches these filters</h3>
           <p className="mt-2 text-sm text-neutral-400">Reset the app, validator, and evidence-type filters to restore the complete vault.</p>
-          <button className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-emerald-400 hover:text-emerald-300" type="button" onClick={resetFilters}><RotateCcw className="size-4" /> Reset filters</button>
+          <button className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-emerald-400 hover:text-emerald-300" type="button" onClick={resetFilters}><RotateCcw className="size-4" /> Reset filters</button>
         </div>
       ) : (
         <div className="space-y-4">
@@ -1206,10 +1215,10 @@ function AssetVault({ assets, cohort }: { assets: Asset[]; cohort: ReviewCohort 
             {cohort ? (
               <>
                 <p className="mx-auto mt-4 w-fit rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 font-mono text-xs text-zinc-300">{cohort.title} · {platformLabel(cohort.platform)} · {cohort.claimedSlots}/{cohort.totalSlots} slots claimed</p>
-                <Link className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console#active-cohorts">Go to Active Cohort <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
+                <Link className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console#active-cohorts">Go to Active Cohort <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
               </>
             ) : (
-              <Link className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console?view=new-drop">Deploy New Scenario <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
+              <Link className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400" href="/console?view=new-drop">Deploy New Scenario <ArrowDown className="size-4 rotate-[-90deg]" /></Link>
             )}
           </div>
           <div aria-hidden="true" className="overflow-hidden rounded-xl border border-zinc-800/70 opacity-50">

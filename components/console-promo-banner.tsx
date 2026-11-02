@@ -41,7 +41,7 @@ export function ConsolePromoBanner({ children }: { children: React.ReactNode }) 
   return (
     <div role="status" className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-300">
       <p>{children}</p>
-      <button type="button" onClick={dismiss} aria-label="Dismiss platform fee notice" className="-m-1 shrink-0 rounded-md p-1 text-emerald-400/70 transition-colors hover:bg-emerald-500/10 hover:text-emerald-200">
+      <button type="button" onClick={dismiss} aria-label="Dismiss platform fee notice" className="-m-1 grid min-h-11 min-w-11 shrink-0 place-items-center rounded-md p-1 text-emerald-400/70 transition-colors hover:bg-emerald-500/10 hover:text-emerald-200">
         <X aria-hidden="true" className="size-4" />
       </button>
     </div>

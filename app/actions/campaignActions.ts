@@ -24,20 +24,20 @@ import { assertTestFlightOwner, isTestFlightUrl, TestFlightOwnershipError } from
 import { buildRobloxLaunchUrl, extractRobloxPlaceId, isRobloxAccessMethod, isRobloxExperienceUrl, isRobloxPlaceId } from "@/lib/roblox-cohorts";
 
 const taskInstructionSchema = z.object({
-  instructionTitle: z.string().min(3).max(90),
-  instructionDetail: z.string().min(12).max(900),
+  instructionTitle: z.string().trim().min(3, "Task title must be 3 to 90 characters.").max(90, "Task title must be 3 to 90 characters."),
+  instructionDetail: z.string().trim().min(12, "Task instructions must be 12 to 900 characters.").max(900, "Task instructions must be 12 to 900 characters."),
   proofType: z.nativeEnum(TaskProofType),
   minimumRep: z.number().int().min(0).max(1000000).default(0),
   presetId: z.string().max(90).refine((id) => SEED_TASK_PRESETS.some((preset) => preset.id === id), "Unknown testing mission preset.").optional(),
 }).transform((instruction) => ({ ...instruction, minimumRep: resolveTaskMinimumRep(instruction) }));
 
-const httpUrlSchema = z.string().url().refine((value) => {
+const httpUrlSchema = z.string().trim().url("Enter a valid HTTP or HTTPS URL.").refine((value) => {
   const protocol = new URL(value).protocol;
   return protocol === "http:" || protocol === "https:";
 }, "URL must use HTTP or HTTPS.");
 
 const campaignSchema = z.object({
-  title: z.string().min(4).max(90),
+  title: z.string().trim().min(4, "Use 4 to 90 characters for the app title.").max(90, "Use 4 to 90 characters for the app title."),
   platform: z.nativeEnum(PlatformType),
   appUrl: z.string().trim().max(4000),
   robloxExperienceUrl: z.string().trim().max(4000).optional().or(z.literal("")),
@@ -49,17 +49,17 @@ const campaignSchema = z.object({
   robloxAllowIpad: z.boolean().optional().default(false),
   robloxAllowDesktop: z.boolean().optional().default(false),
   iconUrl: httpUrlSchema.optional().or(z.literal("")),
-  targetVibe: z.string().min(3).max(80),
-  description: z.string().min(24).max(1400),
-  totalSlots: z.number().int().min(5).max(500),
-  bountyPerTaskUsd: z.number().min(1).max(100),
-  instructions: z.array(taskInstructionSchema).min(1).max(12),
+  targetVibe: z.string().trim().min(3, "Choose a target audience.").max(80, "Choose a target audience."),
+  description: z.string().trim().min(24, "Add at least 24 characters so testers know what to validate.").max(1400, "Mission brief must be 1,400 characters or fewer."),
+  totalSlots: z.number({ error: "Choose between 5 and 500 tester slots." }).int("Choose between 5 and 500 tester slots.").min(5, "Choose between 5 and 500 tester slots.").max(500, "Choose between 5 and 500 tester slots."),
+  bountyPerTaskUsd: z.number({ error: "Bounty must be between $1 and $100 per tester." }).min(1, "Bounty must be between $1 and $100 per tester.").max(100, "Bounty must be between $1 and $100 per tester.").refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-6, "Bounty must be a whole number of cents."),
+  instructions: z.array(taskInstructionSchema).min(1, "Add at least one tester task.").max(12, "A drop can have up to 12 tester tasks."),
   discoveryAllowed: z.boolean().default(false),
-  discoveryMinRep: z.number().int().min(0).max(1000000).default(0),
+  discoveryMinRep: z.number({ error: "Use a whole-number Discovery REP floor from 0 to 1,000,000." }).int("Use a whole-number Discovery REP floor from 0 to 1,000,000.").min(0, "Use a whole-number Discovery REP floor from 0 to 1,000,000.").max(1000000, "Use a whole-number Discovery REP floor from 0 to 1,000,000.").default(0),
   cohortType: z.nativeEnum(CohortType).default(CohortType.STANDARD_QA),
   syncGitHubRepo: z.string().trim().regex(/^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/, "Use the owner/repo format.").optional().or(z.literal("")),
   hardwareStrict: z.boolean().default(true),
-  estimatedMinutes: z.number().int().min(1, "Estimate at least 1 minute.").max(240, "Keep estimates under 4 hours.").nullable().optional(),
+  estimatedMinutes: z.number({ error: "Use a whole number of minutes from 1 to 240." }).int("Use a whole number of minutes from 1 to 240.").min(1, "Estimate at least 1 minute.").max(240, "Keep estimates under 4 hours.").nullable().optional(),
   testerPerk: z.string().trim().max(80, "Keep the perk under 80 characters.").optional().or(z.literal("")),
   promoCode: promoStackSchema.optional(),
 }).refine((input) => !input.discoveryAllowed || input.discoveryMinRep <= Math.max(...input.instructions.map((item) => item.minimumRep)), {
@@ -315,8 +315,18 @@ export async function createCampaignWithEscrow(data: CampaignInput, draftId?: st
     return await launchCampaignWithEscrow(data, draftId, options);
   } catch (error) {
     if (error instanceof CohortPromoError || error instanceof TestFlightOwnershipError) return { promoError: error.message };
+    // Thrown action errors are redacted in production, so return the first field issue for inline display.
+    if (error instanceof z.ZodError) {
+      const issue = error.issues[0];
+      return { promoError: issue?.message || "Check the highlighted launch details and try again.", fieldErrors: { [validationErrorKey(issue?.path ?? [])]: issue?.message || "Check this field." } };
+    }
     throw error;
   }
+}
+
+function validationErrorKey(path: PropertyKey[]) {
+  if (path[0] === "instructions" && typeof path[1] === "number" && typeof path[2] === "string") return `${path[2]}-${path[1]}`;
+  return String(path[0] ?? "form");
 }
 
 async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, options?: { topUpCents?: number; expectedPlatformFeeCents?: number }) {

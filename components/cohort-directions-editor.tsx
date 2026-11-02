@@ -32,6 +32,6 @@ export function CohortDirectionsEditor({ campaignId, revision, directions }: {
       <label className="block text-sm">Directions<textarea required minLength={12} maxLength={900} rows={5} value={step.instructionDetail} onChange={(event) => setSteps((items) => items.map((item) => item.id === step.id ? { ...item, instructionDetail: event.target.value } : item))} className="mt-2 block w-full rounded-lg border border-zinc-700 bg-zinc-900 p-3" /></label>
     </fieldset>)}
     {message ? <p role={message.ok ? "status" : "alert"} className={message.ok ? "text-emerald-300" : "text-rose-300"}>{message.text}</p> : null}
-    <button disabled={pending} className="rounded-lg bg-emerald-400 px-5 py-3 font-semibold text-black disabled:opacity-50">{pending ? "Saving..." : `Save as version ${revision + 1}`}</button>
+    <button disabled={pending} className="min-h-11 rounded-lg bg-emerald-400 px-5 py-3 font-semibold text-black disabled:opacity-50">{pending ? "Saving..." : `Save as version ${revision + 1}`}</button>
   </form>;
 }

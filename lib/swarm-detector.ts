@@ -167,8 +167,9 @@ function isSocialUiNoise(line: string) {
     || /^\d+(?:[.,]\d+)?[kmb]?\s*(?:likes?|reposts?|replies?|shares?|views?)?$/i.test(line);
 }
 
+// "@"-prefixed handles may use any script; bare lines stay ASCII so plain CJK/Arabic comment text is never read as a username.
 function plainHandle(line: string) {
-  const match = line.match(/^@?([a-z0-9._]{2,30})$/i);
+  const match = line.startsWith("@") ? line.match(/^@([\p{L}\p{M}\p{N}._]{2,30})$/u) : line.match(/^([a-z0-9._]{2,30})$/i);
   return match?.[1] ?? null;
 }
 
@@ -204,7 +205,7 @@ export function sanitizeSocialClipboard(raw: string): SwarmEntry[] {
   for (const line of lines) {
     if (isSocialUiNoise(line)) continue;
 
-    const combinedHeader = line.match(/^@?([a-z0-9._]{2,30})\s*(?:[·•]\s*|\s+)(.+)$/i);
+    const combinedHeader = line.match(/^@([\p{L}\p{M}\p{N}._]{2,30})\s*(?:[·•]\s*|\s+)(.+)$/u) || line.match(/^([a-z0-9._]{2,30})\s*(?:[·•]\s*|\s+)(.+)$/i);
     const combinedOffset = combinedHeader ? parseRelativeTimeOffset(combinedHeader[2]) : null;
     if (combinedHeader && combinedOffset !== null) {
       finishCurrent();

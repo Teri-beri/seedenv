@@ -181,6 +181,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   const [syncedDeviceModel, setSyncedDeviceModel] = useState("");
   const [mobileEvidenceOpen, setMobileEvidenceOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [claimingId, setClaimingId] = useState<string | null>(null);
   const [scope, animate] = useAnimate();
   const autoClaimedMission = useRef<string | null>(null);
   const fileVersion = useRef(0);
@@ -535,6 +536,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
       return;
     }
     setMessage(null);
+    setClaimingId(mission.id);
     startTransition(async () => {
       try {
         const submission = await claimTaskSlot(mission.id);
@@ -546,6 +548,8 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
         router.refresh();
       } catch (error) {
         setMessage(error instanceof Error ? error.message : "Could not claim this mission.");
+      } finally {
+        setClaimingId(null);
       }
     });
   }, [mode, assignments, openAssignment, resetProof, router]);
@@ -733,7 +737,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
           <div className="rounded-full border border-zinc-800 bg-zinc-900 p-3 text-emerald-400"><Compass className="size-5" /></div>
           <h2 className="mt-3 text-sm font-medium text-zinc-200">{missionView === "progress" ? "No active validation runs" : missionView === "review" ? "No proofs under review" : missionView === "revisions" ? "No revisions requested" : "No completed missions yet"}</h2>
           <p className="mt-1 max-w-sm text-xs leading-5 text-zinc-500">{missionView === "progress" ? "Claim an open cohort slot from Discover to begin testing builds and submitting reproduction proof. Accepted invitations and active proof reservations remain available for up to 24 hours." : missionView === "review" ? "Submitted proof and developer review status will appear here." : missionView === "revisions" ? "Developer requests for updated proof will appear here with a fresh 24-hour editing window." : "Approved, declined, and expired validation runs will collect here."}</p>
-          <Link className="mt-4 rounded-lg bg-emerald-500 px-4 py-2 font-mono text-xs font-semibold text-black transition hover:bg-emerald-400" href="/dashboard?view=discover">Browse Open Missions →</Link>
+          <Link className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-emerald-500 px-4 py-2 font-mono text-xs font-semibold text-black transition hover:bg-emerald-400" href="/dashboard?view=discover">Browse Open Missions →</Link>
         </div> : null}
       </div> : null}
       <section id="tester-hub" className="scroll-mt-6" aria-label={mode === "discover" ? "Mission discovery" : "Mission proof workspace"}>
@@ -800,7 +804,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                 {!completed && !assignment && !accepted ? (
                   mission.ownedByTester ? <Link className="mt-4 block min-h-11 rounded-xl border border-zinc-800 bg-zinc-900 text-center text-sm font-medium text-emerald-300 transition hover:border-zinc-700 hover:text-emerald-200" href="/console">Your cohort · View in Console →</Link> : application && !["DECLINED", "WITHDRAWN", "STARTED"].includes(application.status) ? <Link className="mt-4 block min-h-11 rounded-xl border border-stroke p-3 text-center text-sm text-emerald-300" href="/applications">Application: {application.status.toLowerCase()} / View</Link> : <MissionRequest missionId={mission.id} eligibility={eligibility} passes={discoveryPasses} />
                 ) : <Button className="mt-5 w-full" onClick={() => handleClaim(mission)} disabled={isPending || completed || Boolean(assignment && !resumable) || (!resumable && spotsLeft <= 0)}>
-                  {completed ? "Completed" : assignment?.submitted ? "In review" : resumable ? "Resume mission" : assignment ? "Claim expired" : spotsLeft <= 0 ? "Fully claimed" : "Claim Slot (24h Reserve) →"}
+                  {isPending && claimingId === mission.id ? "Claiming…" : completed ? "Completed" : assignment?.submitted ? "In review" : resumable ? "Resume mission" : assignment ? "Claim expired" : spotsLeft <= 0 ? "Fully claimed" : "Claim Slot (24h Reserve) →"}
                 </Button>}
               </motion.article>
             );
@@ -836,7 +840,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                 <p className={`text-xs uppercase tracking-[0.24em] ${isRobloxMission ? "text-sky-400" : "text-emerald-400"}`}>{isRobloxMission ? "[ Mission Accepted · Roblox Private Run ]" : "Active Mission"}</p>
                 <h2 className="mt-1 break-words text-xl font-semibold tracking-tight">{activeMission.title}{isRobloxMission ? " · Roblox Studio Drop" : ""}</h2>
               </div>
-              <button type="button" disabled={isPending} aria-label="Close mission workspace" onClick={() => { setActiveMission(null); setMessage(null); resetProof(); }} className="rounded-lg p-2 text-neutral-500 hover:bg-white/5 hover:text-white disabled:opacity-50"><X className="size-4" /></button>
+              <button type="button" disabled={isPending} aria-label="Close mission workspace" onClick={() => { setActiveMission(null); setMessage(null); resetProof(); }} className="grid min-h-11 min-w-11 place-items-center rounded-lg p-2 text-neutral-500 hover:bg-white/5 hover:text-white disabled:opacity-50"><X className="size-4" /></button>
             </div>
             {!companionMode ? <p className="rounded-lg border border-emerald-500/25 p-3 text-sm text-emerald-200">Accepted directions{activeMission.acceptedInstructionRevision ? `: version ${activeMission.acceptedInstructionRevision}` : ""}. Your work is reviewed against these saved instructions. Later edits do not change reward eligibility.{activeMission.directionsUpdated ? " The developer has published a newer version for new assignments; your steps remain unchanged." : ""}</p> : null}
             {proofSubmitted ? (
@@ -852,7 +856,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
             {!companionMode && !pairSession?.state.connectedAt && (activeMission.platform === "ROBLOX_EXPERIENCE" ? (() => {
               const robloxLaunchHref = buildRobloxLaunchUrl(activeMission.robloxExperienceUrl || activeMission.appUrl, activeMission.robloxPlaceId);
               return robloxLaunchHref ? (
-                <a href={robloxLaunchHref} target="_blank" rel="noopener noreferrer" className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 shadow-lg shadow-sky-500/10 transition-all hover:bg-sky-400">
+                <a href={robloxLaunchHref} target="_blank" rel="noopener noreferrer" className="mb-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-sky-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 shadow-lg shadow-sky-500/10 transition-all hover:bg-sky-400">
                   <span>Launch Roblox Private Server ↗</span>
                 </a>
               ) : null;
@@ -985,10 +989,10 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
                 </label>
                 {recordingUpload.state === "error" ? <p className="mt-1 text-xs text-rose-300" role="alert">{recordingUpload.message}</p> : null}
               </div>
-              <label className="mt-3 block text-xs font-mono uppercase tracking-[0.12em] text-white/48">{storedRecording ? "Or replace with a share link" : "Or paste a recording link"} <input className="mt-1.5 w-full rounded-lg border border-stroke bg-[#0E1017] px-3 py-2 text-sm font-sans normal-case tracking-normal text-white outline-none focus:border-emerald-500/60" onChange={(event) => setTelemetry((current) => ({ ...current, recordingUrl: event.target.value }))} placeholder="https://.../recording.mp4" type="url" value={telemetry.recordingUrl} /></label>
+              <label className="mt-3 block text-xs font-mono uppercase tracking-[0.12em] text-white/48">{storedRecording ? "Or replace with a share link" : "Or paste a recording link"} <input className="mt-1.5 min-h-11 w-full rounded-lg border border-stroke bg-[#0E1017] px-3 py-2 text-sm font-sans normal-case tracking-normal text-white outline-none focus:border-emerald-500/60" onChange={(event) => setTelemetry((current) => ({ ...current, recordingUrl: event.target.value }))} placeholder="https://.../recording.mp4" type="url" value={telemetry.recordingUrl} /></label>
             </div>
                         {isRobloxMission ? <section className="space-y-4 rounded-xl border border-sky-500/20 bg-sky-500/5 p-4">
-              <label className="block text-sm font-semibold text-zinc-200">Roblox Username<input value={robloxUsername} maxLength={20} onChange={(event) => setRobloxUsername(event.target.value.replace(/[^A-Za-z0-9_]/g, ""))} placeholder="BuilderNode_42" className="mt-2 w-full rounded-xl border border-zinc-700 bg-[#0A0D12] px-3 py-2.5 font-mono text-sm font-normal text-white outline-none focus:border-sky-500/60" /><span className="mt-1 block text-xs font-normal text-zinc-500">Shared with the studio for permanent backer items or validator perks.</span></label>
+              <label className="block text-sm font-semibold text-zinc-200">Roblox Username<input value={robloxUsername} maxLength={20} onChange={(event) => setRobloxUsername(event.target.value.replace(/[^A-Za-z0-9_]/g, ""))} placeholder="BuilderNode_42" className="mt-2 min-h-11 w-full rounded-xl border border-zinc-700 bg-[#0A0D12] px-3 py-2.5 font-mono text-sm font-normal text-white outline-none focus:border-sky-500/60" /><span className="mt-1 block text-xs font-normal text-zinc-500">Shared with the studio for permanent backer items or validator perks.</span></label>
               <fieldset className="space-y-2"><legend className="mb-2 text-sm font-semibold text-zinc-200">Roblox validation checks</legend>
                 {([
                   ["interfaceScaled", "Interface scaled cleanly without screen edge or notch clipping"],
@@ -1093,7 +1097,7 @@ function MissionRequest({ missionId, eligibility, passes }: { missionId: string;
   const router = useRouter();
   if (eligibility === "locked") return <p className="mt-4 text-sm text-neutral-500">Build more REP through approved work to qualify.</p>;
   if (eligibility === "pass" && passes < 1) return <Link className="mt-4 block rounded-xl border border-zinc-800 p-3 text-sm text-emerald-300" href="/quests">Earn a Discovery Pass in Quest Center</Link>;
-  return <details className="mt-4 rounded-xl border border-stroke p-3"><summary className="min-h-8 cursor-pointer text-sm font-semibold text-amber-300">{eligibility === "pass" ? "Request with Discovery Pass" : "Request to join"}</summary><label className="mt-3 block text-xs text-neutral-400">Why are you a good fit? Include relevant devices and experience.<textarea disabled={pending || result?.ok} maxLength={600} value={note} onChange={(event) => { setNote(event.target.value); setResult(null); }} className="mt-2 min-h-20 w-full rounded-lg border border-stroke bg-background p-2 text-sm text-white" /></label><p className="my-2 text-xs leading-5 text-neutral-500">{eligibility === "pass" ? "Reserves one pass. Returned if declined, withdrawn, or expired." : "The developer reviews your request. No timer starts yet."}</p><button type="button" disabled={pending || result?.ok || note.trim().length < 12} className="min-h-11 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50" onClick={() => startTransition(async () => {
+  return <details className="mt-4 rounded-xl border border-stroke p-3"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-amber-300">{eligibility === "pass" ? "Request with Discovery Pass" : "Request to join"}</summary><label className="mt-3 block text-xs text-neutral-400">Why are you a good fit? Include relevant devices and experience.<textarea disabled={pending || result?.ok} maxLength={600} value={note} onChange={(event) => { setNote(event.target.value); setResult(null); }} className="mt-2 min-h-20 w-full rounded-lg border border-stroke bg-background p-2 text-sm text-white" /></label><p className="my-2 text-xs leading-5 text-neutral-500">{eligibility === "pass" ? "Reserves one pass. Returned if declined, withdrawn, or expired." : "The developer reviews your request. No timer starts yet."}</p><button type="button" disabled={pending || result?.ok || note.trim().length < 12} className="min-h-11 rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-black disabled:opacity-50" onClick={() => startTransition(async () => {
     setResult(null);
     try {
       const response = await requestMission(missionId, note);

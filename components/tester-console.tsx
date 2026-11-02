@@ -173,7 +173,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
           {activeView === "leaderboard" ? <section id="leaderboard" className="scroll-mt-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
               <div className="flex items-center justify-between"><h2 className="text-lg font-semibold tracking-tight">Community standouts</h2><Trophy className="size-5 text-amber-400" /></div>
               <p className="mt-2 text-sm text-neutral-400">Top-ranked validators by approved evidence, reproducible findings, and verified REP.</p>
-              <LeaderboardTable entries={leaderboard} currentUser={{ id: tester.id, username: tester.username, xpPoints: tester.xpPoints, rankTier: rank, approvedRuns: approvedCount, passRate: quality }} />
+              <LeaderboardTable now={now} entries={leaderboard} currentUser={{ id: tester.id, username: tester.username, xpPoints: tester.xpPoints, rankTier: rank, approvedRuns: approvedCount, passRate: quality }} />
               <Link href="/dashboard?view=discover" className="mt-6 inline-flex items-center gap-2 font-mono text-xs font-semibold text-emerald-400 transition hover:text-emerald-300">Browse Open Cohorts to Earn REP <ArrowRight className="size-3.5" /></Link>
           </section> : null}
         </div>

@@ -9,16 +9,16 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-[#0F1117] text-white">
       <header className="border-b border-white/10">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-3 text-xl font-bold">
+          <Link href="/" className="flex min-h-11 items-center gap-3 text-xl font-bold">
             <Image src="/seedenv-logo-v3.png" alt="" width={36} height={36} className="object-contain" />
             SeedEnv
           </Link>
-          <nav aria-label="Primary" className="flex flex-wrap items-center gap-5 text-sm text-neutral-300">
-            <Link href="/explore" className="hover:text-emerald-300">Explore</Link>
-            <Link href="/pricing" className="hover:text-emerald-300">Pricing</Link>
-            <Link href="/guides" className="hover:text-emerald-300">Guides</Link>
-            <Link href="/about" className="hover:text-emerald-300">About</Link>
-            <Link href="/auth/signin" className="font-semibold text-emerald-300">Sign In</Link>
+          <nav aria-label="Primary" className="-mx-2 flex flex-wrap items-center gap-x-1 gap-y-0 text-sm text-neutral-300 sm:gap-x-3">
+            <Link href="/explore" className="inline-flex min-h-11 items-center px-2 hover:text-emerald-300">Explore</Link>
+            <Link href="/pricing" className="inline-flex min-h-11 items-center px-2 hover:text-emerald-300">Pricing</Link>
+            <Link href="/guides" className="inline-flex min-h-11 items-center px-2 hover:text-emerald-300">Guides</Link>
+            <Link href="/about" className="inline-flex min-h-11 items-center px-2 hover:text-emerald-300">About</Link>
+            <Link href="/auth/signin" className="inline-flex min-h-11 items-center px-2 font-semibold text-emerald-300">Sign In</Link>
           </nav>
         </div>
       </header>

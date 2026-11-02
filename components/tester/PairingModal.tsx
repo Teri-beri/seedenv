@@ -130,7 +130,7 @@ export function PairingModal({ open, submissionId, activeStep, completedSteps, c
       {open ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <motion.div initial={{ scale: 0.96, opacity: 0, y: 18 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0, y: 18 }} className="relative w-full max-w-md rounded-2xl border border-zinc-800 bg-[#0A0D12] p-5 shadow-2xl shadow-sky-500/10">
-            <button type="button" onClick={onClose} className="absolute right-3 top-3 rounded-lg border border-zinc-800 p-2 text-zinc-400 transition hover:text-white" aria-label="Close pairing">
+            <button type="button" onClick={onClose} className="absolute right-3 top-3 grid min-h-11 min-w-11 place-items-center rounded-lg border border-zinc-800 p-2 text-zinc-400 transition hover:text-white" aria-label="Close pairing">
               <X className="size-4" />
             </button>
 
@@ -159,7 +159,7 @@ export function PairingModal({ open, submissionId, activeStep, completedSteps, c
               {qrDataUrl ? <Image src={qrDataUrl} unoptimized width={208} height={208} alt="QR code containing the secure SeedEnv mission pairing link" className="h-52 w-52 rounded-lg" /> : error ? (
                 <div className="text-center">
                   <p className="text-sm text-rose-300">{error}</p>
-                  <button type="button" onClick={createPairing} className="mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-xs text-white hover:border-zinc-600">
+                  <button type="button" onClick={createPairing} className="min-h-11 mt-4 inline-flex items-center gap-2 rounded-lg border border-zinc-700 px-3 py-2 text-xs text-white hover:border-zinc-600">
                     <RefreshCw className="size-3.5" /> Retry pairing
                   </button>
                 </div>
@@ -177,7 +177,7 @@ export function PairingModal({ open, submissionId, activeStep, completedSteps, c
               </div>
             ) : null}
 
-            <button type="button" onClick={onClose} className="mt-5 w-full rounded-xl bg-sky-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 transition hover:bg-sky-400">
+            <button type="button" onClick={onClose} className="min-h-11 mt-5 w-full rounded-xl bg-sky-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 transition hover:bg-sky-400">
               Resume Mission →
             </button>
           </motion.div>

@@ -41,12 +41,11 @@ const boardTabs: Array<{ id: BoardMode; label: string }> = [
   { id: "pass-rate", label: "Highest Pass Rate" },
 ];
 
-function monthStart() {
-  const now = new Date();
+function monthStart(now: Date) {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).getTime();
 }
 
-function toBoardRow(entry: LeaderboardEntry): BoardRow {
+function toBoardRow(entry: LeaderboardEntry, seasonStart: number): BoardRow {
   const reviewed = entry.submissions.length;
   const approved = entry.submissions.filter((submission) => submission.status === "APPROVED");
   return {
@@ -56,7 +55,7 @@ function toBoardRow(entry: LeaderboardEntry): BoardRow {
     xpPoints: entry.xpPoints,
     rankTier: entry.rankTier,
     approvedRuns: approved.length,
-    seasonRuns: approved.filter((submission) => new Date(submission.submittedAt).getTime() >= monthStart()).length,
+    seasonRuns: approved.filter((submission) => new Date(submission.submittedAt).getTime() >= seasonStart).length,
     passRate: reviewed ? Math.round((approved.length / reviewed) * 100) : null,
   };
 }
@@ -69,9 +68,10 @@ function rankRows(rows: BoardRow[], mode: BoardMode) {
   });
 }
 
-export function LeaderboardTable({ entries, currentUser }: { entries: LeaderboardEntry[]; currentUser: CurrentUser }) {
+export function LeaderboardTable({ entries, currentUser, now }: { entries: LeaderboardEntry[]; currentUser: CurrentUser; now: Date }) {
+  const seasonStart = monthStart(now);
   const [mode, setMode] = useState<BoardMode>("all-time");
-  const realRows = useMemo(() => entries.map(toBoardRow), [entries]);
+  const realRows = useMemo(() => entries.map((entry) => toBoardRow(entry, seasonStart)), [entries, seasonStart]);
   const hasCompetitors = realRows.some((entry) => entry.id !== currentUser.id);
   const rows = useMemo(() => rankRows(hasCompetitors ? realRows : benchmarkRows, mode), [hasCompetitors, mode, realRows]);
   const currentRank = hasCompetitors ? rankRows(realRows, mode).findIndex((entry) => entry.id === currentUser.id) + 1 : 0;

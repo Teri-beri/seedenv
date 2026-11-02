@@ -46,9 +46,9 @@ export const editDirectionsSchema = z.object({
   expectedRevision: z.number().int().positive(),
   directions: z.array(z.object({
     id: z.string().min(1),
-    instructionTitle: z.string().trim().min(3).max(90),
-    instructionDetail: z.string().trim().min(12).max(900),
-  }).strict()).min(1).max(12),
+    instructionTitle: z.string().trim().min(3, "Each step title must be 3 to 90 characters.").max(90, "Each step title must be 3 to 90 characters."),
+    instructionDetail: z.string().trim().min(12, "Each step's directions must be 12 to 900 characters.").max(900, "Each step's directions must be 12 to 900 characters."),
+  }).strict()).min(1, "Keep at least one direction step.").max(12, "A cohort can have up to 12 direction steps."),
 }).strict();
 
 export class InstructionEditError extends Error {}

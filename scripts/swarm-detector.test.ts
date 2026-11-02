@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeCoordination, classifyForensics, computeSwarmMetrics, getSanityVerdict, parseRelativeTimeOffset, parseSwarmInput } from "@/lib/swarm-detector";
+import { analyzeCoordination, classifyForensics, computeSwarmMetrics, getSanityVerdict, parseRelativeTimeOffset, parseSwarmInput, sanitizeSocialClipboard } from "@/lib/swarm-detector";
 
 test("organic comments remain below the watchlist threshold", () => {
   const entries = parseSwarmInput(`alice | Search worked well, though filters could be clearer. | 2026-10-14T08:00:00Z
@@ -178,4 +178,22 @@ test("sanity verdict matches the forensic score of a coordinated swarm", () => {
   const verdict = getSanityVerdict(computeSwarmMetrics(entries).inauthenticityIndex);
   assert.equal(verdict.title, "Manufactured Swarm");
   assert.equal(verdict.message, "The hostility on this post is mathematically coordinated. You are not imagining it.");
+});
+
+test("clipboard sanitizer keeps non-Latin @handles separate and survives malformed Unicode", () => {
+  const entries = sanitizeSocialClipboard("@alpha_1 · 2m ago\nsame text 😀\nReply\n@用户_3 · 5m ago\n这是评论\n@مستخدم · 1h\nتعليق رائع\n\uD800 broken \uDFFF");
+  assert.deepEqual(entries.map((entry) => entry.author), ["alpha_1", "用户_3", "مستخدم"]);
+  assert.equal(entries[0].text, "same text 😀");
+  assert.equal(entries[1].text, "这是评论");
+  assert.equal(sanitizeSocialClipboard("这是评论\n第二行").length, 0);
+});
+
+test("metrics stay finite for zero, one, and two comments", () => {
+  const all = sanitizeSocialClipboard("@alpha_1 · 2m ago\nsame text\n@beta_2 · 2m ago\nsame text");
+  for (const count of [0, 1, 2]) {
+    const entries = all.slice(0, count);
+    const metrics = computeSwarmMetrics(entries);
+    const result = JSON.stringify([metrics, classifyForensics(entries, metrics, analyzeCoordination(entries))]);
+    assert.doesNotMatch(result, /NaN|Infinity|null,"label":null/);
+  }
 });

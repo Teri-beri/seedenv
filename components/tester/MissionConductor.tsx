@@ -99,12 +99,12 @@ export function MissionConductor({
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {onPairDevice ? (
-          <button type="button" onClick={onPairDevice} className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-2 text-[11px] font-mono text-zinc-200 transition hover:border-zinc-600">
+          <button type="button" onClick={onPairDevice} className="min-h-11 inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-2 text-[11px] font-mono text-zinc-200 transition hover:border-zinc-600">
             <Smartphone className="size-3.5 text-sky-400" /> Pair mobile session
           </button>
         ) : null}
         {onToggleCompact ? (
-          <button type="button" onClick={onToggleCompact} className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-2 text-[11px] font-mono text-zinc-200 transition hover:border-zinc-600">
+          <button type="button" onClick={onToggleCompact} className="min-h-11 inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-2 text-[11px] font-mono text-zinc-200 transition hover:border-zinc-600">
             <MonitorSmartphone className="size-3.5 text-emerald-400" />
             {compact ? "Switch to Full Deck" : "Switch to Compact All-in-One View"}
           </button>
@@ -129,11 +129,11 @@ export function MissionConductor({
                 Launch build from paired phone <Smartphone className="size-4" />
               </div>
             ) : (
-              <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 transition hover:bg-emerald-400">
+              <a href={link} target="_blank" rel="noopener noreferrer" className="min-h-11 inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 transition hover:bg-emerald-400">
                 {isRobloxMission ? "Launch Roblox Server" : "Open App / TestFlight"} <ArrowUpRight className="size-4" />
               </a>
             )}
-            <button type="button" onClick={() => completeStep(safeStepIndex)} disabled={!currentStep || completed.has(safeStepIndex)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-xs font-bold tracking-tight text-white transition hover:border-zinc-600 disabled:cursor-default disabled:text-emerald-300">
+            <button type="button" onClick={() => completeStep(safeStepIndex)} disabled={!currentStep || completed.has(safeStepIndex)} className="min-h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-xs font-bold tracking-tight text-white transition hover:border-zinc-600 disabled:cursor-default disabled:text-emerald-300">
               {completed.has(safeStepIndex) ? "Step Complete" : safeStepIndex < steps.length - 1 ? "Mark Step Complete" : "Complete Walkthrough"} {completed.has(safeStepIndex) ? <CheckCircle2 className="size-4" /> : <StepForward className="size-4" />}
             </button>
           </div>
@@ -163,7 +163,7 @@ export function MissionConductor({
                     </div>
                     <p className="mt-2 text-xs leading-5 text-zinc-400">{step.instructionDetail}</p>
                     {!isComplete ? (
-                      <button type="button" onClick={() => completeStep(index)} className="mt-3 rounded-lg border border-zinc-700 px-3 py-2 text-[11px] font-semibold text-zinc-200 transition hover:border-zinc-500">
+                      <button type="button" onClick={() => completeStep(index)} className="min-h-11 mt-3 rounded-lg border border-zinc-700 px-3 py-2 text-[11px] font-semibold text-zinc-200 transition hover:border-zinc-500">
                         Mark step complete
                       </button>
                     ) : null}
@@ -172,7 +172,7 @@ export function MissionConductor({
               </div>
             );
           })}
-          <a href={link} target="_blank" rel="noopener noreferrer" className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 transition hover:bg-emerald-400">
+          <a href={link} target="_blank" rel="noopener noreferrer" className="min-h-11 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 transition hover:bg-emerald-400">
             {isRobloxMission ? "Launch Roblox Server" : "Open App / TestFlight"} <ArrowUpRight className="size-4" />
           </a>
         </div>

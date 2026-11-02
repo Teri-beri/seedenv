@@ -292,7 +292,7 @@ export function DeveloperInsights({
           ).map(([value, label]) => (
             <button
               aria-selected={tab === value}
-              className={`shrink-0 text-sm transition-colors ${tab === value ? "font-semibold text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
+              className={`min-h-11 shrink-0 text-sm transition-colors ${tab === value ? "font-semibold text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
               key={value}
               onClick={() => setTab(value)}
               role="tab"
@@ -312,7 +312,7 @@ export function DeveloperInsights({
               (filter) => (
                 <button
                   aria-pressed={reportFilter === filter}
-                  className={`shrink-0 rounded-md px-2.5 py-1 font-mono text-xs transition-colors ${reportFilter === filter ? "bg-zinc-800/80 text-white" : "text-zinc-500 hover:text-zinc-200"}`}
+                  className={`min-h-11 shrink-0 rounded-md px-2.5 py-1 font-mono text-xs transition-colors ${reportFilter === filter ? "bg-zinc-800/80 text-white" : "text-zinc-500 hover:text-zinc-200"}`}
                   key={filter}
                   onClick={() => setReportFilter(filter)}
                   type="button"
@@ -473,7 +473,7 @@ function TelemetryHub({
                   {severity.label}
                 </span>
                 <button
-                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/15"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/15"
                   onClick={copyDiagnosticPayload}
                   type="button"
                 >
@@ -567,7 +567,7 @@ function TelemetryHub({
                 <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
                   <button
                     aria-expanded={logOpen}
-                    className="flex w-full items-center justify-between text-left font-mono text-xs text-zinc-300"
+                    className="flex min-h-11 w-full items-center justify-between text-left font-mono text-xs text-zinc-300"
                     onClick={() => setLogOpen(!logOpen)}
                     type="button"
                   >
@@ -583,7 +583,7 @@ function TelemetryHub({
                     </pre>
                   ) : null}
                   <button
-                    className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-emerald-400"
+                    className="mt-3 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-emerald-400"
                     onClick={() => copyIssue("logs")}
                     type="button"
                   >
@@ -594,21 +594,21 @@ function TelemetryHub({
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
               <button
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white"
                 onClick={() => copyIssue("GitHub")}
                 type="button"
               >
                 <Code2 className="size-3.5" /> Copy GitHub Issue
               </button>
               <button
-                className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white"
                 onClick={() => copyIssue("Linear")}
                 type="button"
               >
                 <Send className="size-3.5" /> Copy for Linear
               </button>
               <button
-                className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15"
                 onClick={exportTelemetry}
                 type="button"
               >
@@ -762,7 +762,7 @@ function PlayTracker() {
         </div>
         <div className="flex flex-wrap gap-2">
           <a
-            className="inline-flex items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:border-zinc-700 hover:text-white"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 transition hover:border-zinc-700 hover:text-white"
             href="https://play.google.com/console"
             rel="noreferrer"
             target="_blank"
@@ -770,7 +770,7 @@ function PlayTracker() {
             <ExternalLink className="size-3.5" /> Open Play Console
           </a>
           <button
-            className="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-zinc-200"
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-zinc-200"
             onClick={exportChecklist}
             type="button"
           >
@@ -885,7 +885,7 @@ function Ecosystem({
           ).map((value) => (
             <button
               aria-pressed={filter === value}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${filter === value ? "border-zinc-600 bg-zinc-800/80 text-white" : "border-zinc-800 text-zinc-500 hover:text-white"}`}
+              className={`min-h-11 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${filter === value ? "border-zinc-600 bg-zinc-800/80 text-white" : "border-zinc-800 text-zinc-500 hover:text-white"}`}
               key={value}
               onClick={() => setFilter(value)}
               type="button"

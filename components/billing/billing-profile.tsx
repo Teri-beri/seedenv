@@ -8,7 +8,7 @@ import type { BillingDetails } from "@/lib/enterprise-rules";
 
 type PaymentMethod = { brand: string; last4: string; expMonth: number; expYear: number } | null;
 
-const inputClass = "mt-1.5 h-9 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-zinc-600";
+const inputClass = "mt-1.5 h-9 min-h-11 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-zinc-600";
 const labelClass = "block font-mono text-[11px] uppercase tracking-wider text-zinc-500";
 
 function brandLabel(brand: string) {
@@ -55,7 +55,7 @@ export function PaymentMethodCard({ method, unavailable, setupResult }: { method
       {setupResult === "cancelled" ? <p className="mt-3 text-xs text-zinc-400" role="status">Card update cancelled. No changes were made.</p> : null}
       {message ? <p className="mt-3 text-xs text-red-300" role="alert">{message}</p> : null}
       <div className="mt-auto pt-5">
-        <button type="button" onClick={update} disabled={pending} className="inline-flex h-8 items-center rounded-lg border border-zinc-700 px-3 text-xs font-medium text-zinc-200 transition-colors hover:border-zinc-600 hover:bg-zinc-800/60 disabled:opacity-50">
+        <button type="button" onClick={update} disabled={pending} className="inline-flex h-8 min-h-11 items-center rounded-lg border border-zinc-700 px-3 text-xs font-medium text-zinc-200 transition-colors hover:border-zinc-600 hover:bg-zinc-800/60 disabled:opacity-50">
           {pending ? "Opening Stripe…" : method ? "Update Payment Method" : "Add Payment Method"}
         </button>
         <p className="mt-3 flex items-center gap-1.5 font-mono text-[11px] text-zinc-500"><Lock className="size-3" />Payments processed securely via Stripe. SeedEnv never stores card numbers.</p>
@@ -103,7 +103,7 @@ export function BillingInfoForm({ initial }: { initial: BillingDetails }) {
           {field("country", "Country Code", { limit: 2, required: true, placeholder: "US" })}
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button type="submit" disabled={pending} className="inline-flex h-8 items-center rounded-lg bg-white px-3.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200 disabled:opacity-50">{pending ? "Saving…" : "Save Billing Info"}</button>
+          <button type="submit" disabled={pending} className="inline-flex h-8 min-h-11 items-center rounded-lg bg-white px-3.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200 disabled:opacity-50">{pending ? "Saving…" : "Save Billing Info"}</button>
           {message ? <p className={`text-xs ${message.ok ? "text-emerald-400" : "text-red-300"}`} role="status">{message.text}</p> : null}
         </div>
       </form>

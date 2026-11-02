@@ -81,11 +81,11 @@ function ReportCard({ row }: { row: ReleaseReportRow }) {
         </div>
         <div className="flex items-center gap-2">
           {report ? (
-            <button aria-expanded={open} className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:border-zinc-500" onClick={() => setOpen((value) => !value)} type="button">
+            <button aria-expanded={open} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-200 hover:border-zinc-500" onClick={() => setOpen((value) => !value)} type="button">
               <FileText className="size-3.5" /> {open ? "Hide" : "View"} <ChevronDown className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
           ) : (
-            <button className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-emerald-400 disabled:opacity-60" disabled={busy || row.approvedCount === 0} onClick={() => generate(false)} type="button">
+            <button className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-black hover:bg-emerald-400 disabled:opacity-60" disabled={busy || row.approvedCount === 0} onClick={() => generate(false)} type="button">
               {busy ? <LoaderCircle className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />} {busy ? "Generating…" : "Generate report"}
             </button>
           )}
@@ -111,11 +111,11 @@ function ReportCard({ row }: { row: ReleaseReportRow }) {
             </ol>
           ) : <p className="text-sm text-zinc-500">No defects were reported in the approved submissions.</p>}
           <div className="flex flex-wrap items-center gap-2">
-            <button className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200" onClick={copy} type="button">
+            <button className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200" onClick={copy} type="button">
               {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? "Copied" : "Copy GitHub markdown"}
             </button>
-            <button className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:border-zinc-500 disabled:opacity-60" disabled={busy} onClick={() => generate(true)} type="button">
-              {busy ? <LoaderCircle className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} Regenerate
+            <button className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:border-zinc-500 disabled:opacity-60" disabled={busy} onClick={() => generate(true)} type="button">
+              {busy ? <LoaderCircle className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} {busy ? "Regenerating…" : "Regenerate"}
             </button>
             <span className="text-[11px] text-zinc-600">AI-generated from approved reports. Verify before scheduling work.</span>
           </div>

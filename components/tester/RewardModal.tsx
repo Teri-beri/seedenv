@@ -63,7 +63,7 @@ export function RewardModal({ open, initialRep, addedRep, onClose, triggerHaptic
       {open ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
           <motion.div initial={{ scale: 0.96, opacity: 0, y: 18 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.96, opacity: 0, y: 18 }} transition={{ duration: 0.22, ease: "easeOut" }} className="relative w-full max-w-md overflow-hidden rounded-2xl border border-emerald-500/25 bg-[#0A0D12] p-5 shadow-2xl shadow-emerald-500/10">
-            <button type="button" onClick={onClose} className="absolute right-3 top-3 rounded-lg border border-zinc-800 p-2 text-zinc-400 transition hover:text-white" aria-label="Close reward summary">
+            <button type="button" onClick={onClose} className="absolute right-3 top-3 grid min-h-11 min-w-11 place-items-center rounded-lg border border-zinc-800 p-2 text-zinc-400 transition hover:text-white" aria-label="Close reward summary">
               <X className="size-4" />
             </button>
 
@@ -95,7 +95,7 @@ export function RewardModal({ open, initialRep, addedRep, onClose, triggerHaptic
               <p className="mt-2 text-sm leading-6 text-zinc-300">The developer will review your evidence. REP and the escrowed bounty settle only after approval.</p>
             </div>
 
-            <button type="button" onClick={onClose} className="mt-5 w-full rounded-xl bg-emerald-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 transition hover:bg-emerald-400">
+            <button type="button" onClick={onClose} className="min-h-11 mt-5 w-full rounded-xl bg-emerald-500 px-4 py-3 text-xs font-bold tracking-tight text-zinc-950 transition hover:bg-emerald-400">
               Continue →
             </button>
           </motion.div>

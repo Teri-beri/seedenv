@@ -116,11 +116,11 @@ export function TelemetryMonitor({
               {cohorts.length ? cohorts.map((cohort) => <option key={cohort.id} value={cohort.id}>{cohort.title} · {cohort.status}</option>) : <option value="">No active cohorts</option>}
             </select>
           </label>
-          <button type="button" disabled={!activeCohort || isPending} onClick={togglePause} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-xs font-semibold transition disabled:opacity-50 ${activeCohort?.status === "PAUSED" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15" : "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/15"}`}>
+          <button type="button" disabled={!activeCohort || isPending} onClick={togglePause} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 py-2 text-xs font-semibold transition disabled:opacity-50 ${activeCohort?.status === "PAUSED" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15" : "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/15"}`}>
             {isPending ? <LoaderCircle className="size-4 animate-spin" /> : activeCohort?.status === "PAUSED" ? <Play className="size-4" /> : <Pause className="size-4" />}
             {activeCohort?.status === "PAUSED" ? "Resume Cohort Drop" : "Pause Cohort Drop"}
           </button>
-          <button type="button" onClick={() => router.refresh()} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-zinc-800 px-4 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white"><RefreshCw className="size-4" /> Refresh</button>
+          <button type="button" onClick={() => router.refresh()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-zinc-800 px-4 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white"><RefreshCw className="size-4" /> Refresh</button>
         </div>
         {message ? <p role="status" className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/60 p-3 text-sm text-zinc-300">{message}</p> : null}
       </section>
@@ -175,7 +175,7 @@ export function TelemetryMonitor({
                 <td className="px-3 py-4"><p className="font-semibold text-zinc-200">{incident.statusCode}</p><p className="mt-1 max-w-40 truncate text-[10px] text-zinc-600">{incident.endpoint || "runtime"}</p></td>
                 <td className="px-3 py-4"><p className="text-zinc-300">{incident.deviceModel}</p><p className="mt-1 text-[10px] text-zinc-600">{incident.osVersion}{incident.validatorHandle ? ` · @${incident.validatorHandle}` : ""}</p></td>
                 <td className="max-w-md px-3 py-4 leading-5 text-zinc-400">{incident.message}</td>
-                <td className="px-4 py-4 text-right">{incident.githubIssueUrl ? <a href={incident.githubIssueUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300">GitHub <ExternalLink className="size-3" /></a> : <button type="button" disabled={exportingId === incident.id} onClick={() => void exportIncident(incident.id)} className="inline-flex items-center gap-1 text-zinc-300 hover:text-white disabled:opacity-50">{exportingId === incident.id ? <LoaderCircle className="size-3 animate-spin" /> : null} Export Issue ↗</button>}</td>
+                <td className="px-4 py-4 text-right">{incident.githubIssueUrl ? <a href={incident.githubIssueUrl} target="_blank" rel="noreferrer" className="min-h-11 inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300">GitHub <ExternalLink className="size-3" /></a> : <button type="button" disabled={exportingId === incident.id} onClick={() => void exportIncident(incident.id)} className="min-h-11 inline-flex items-center gap-1 text-zinc-300 hover:text-white disabled:opacity-50">{exportingId === incident.id ? <LoaderCircle className="size-3 animate-spin" /> : null} Export Issue ↗</button>}</td>
               </tr>)}
             </tbody>
           </table>

@@ -10,7 +10,7 @@ export function EndCohortButton({ campaignId, title, payPerTester }: { campaignI
 
   if (message) return <p role="status" className="ml-auto max-w-[16rem] text-left text-[11px] leading-5 text-zinc-400">{message}</p>;
   if (!confirming) {
-    return <button type="button" onClick={() => setConfirming(true)} className="rounded-md border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-300">End cohort</button>;
+    return <button type="button" onClick={() => setConfirming(true)} className="min-h-11 rounded-md border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-400 transition-colors hover:border-red-500/40 hover:text-red-300">End cohort</button>;
   }
   return (
     <div className="ml-auto max-w-[16rem] space-y-2 text-left">
@@ -21,8 +21,8 @@ export function EndCohortButton({ campaignId, title, payPerTester }: { campaignI
         <button type="button" disabled={pending} onClick={() => startTransition(async () => {
           const result = await endCohort(campaignId);
           setMessage(result.message);
-        })} className="rounded-md bg-red-500/90 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50">{pending ? "Ending…" : payPerTester ? "End cohort" : "End & refund"}</button>
-        <button type="button" disabled={pending} onClick={() => setConfirming(false)} className="rounded-md border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-400">Keep running</button>
+        })} className="min-h-11 rounded-md bg-red-500/90 px-2.5 py-1 text-[11px] font-semibold text-white disabled:opacity-50">{pending ? "Ending…" : payPerTester ? "End cohort" : "End & refund"}</button>
+        <button type="button" disabled={pending} onClick={() => setConfirming(false)} className="min-h-11 rounded-md border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-400">Keep running</button>
       </div>
     </div>
   );

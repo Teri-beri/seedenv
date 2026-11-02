@@ -66,8 +66,8 @@ export function AiAuditCard({ submissionId, audit }: { submissionId: string; aud
     <div className={`rounded-xl border p-4 ${flagged ? "border-rose-500/30 bg-rose-950/20" : "border-zinc-800 bg-[#090A0F]/55"}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-xs uppercase tracking-[0.16em] text-neutral-500"><Sparkles className="size-3.5 text-emerald-400" /> AI review assistant</p>
-        <button className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-400 hover:text-white disabled:opacity-50" disabled={busy} onClick={rerun} type="button">
-          {busy ? <LoaderCircle className="size-3 animate-spin" /> : <RefreshCw className="size-3" />} Re-check
+        <button className="inline-flex min-h-11 items-center gap-1 text-[11px] font-semibold text-zinc-400 hover:text-white disabled:opacity-50" disabled={busy} onClick={rerun} type="button">
+          {busy ? <LoaderCircle className="size-3 animate-spin" /> : <RefreshCw className="size-3" />} {busy ? "Checking…" : "Re-check"}
         </button>
       </div>
       {!audit || audit.status === "PENDING" ? (

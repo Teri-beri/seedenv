@@ -14,7 +14,7 @@ const statusChip: Record<EscrowStatus, { label: string; className: string }> = {
   CREDITED: { label: "Credited", className: "border-sky-500/20 bg-sky-500/10 text-sky-400" },
 };
 
-const dateInputClass = "h-8 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 font-mono text-xs text-zinc-300 outline-none transition-colors focus:border-zinc-600 [color-scheme:dark]";
+const dateInputClass = "h-8 min-h-11 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 font-mono text-xs text-zinc-300 outline-none transition-colors focus:border-zinc-600 [color-scheme:dark]";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
@@ -48,11 +48,11 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
             <label className="relative">
               <span className="sr-only">Search by cohort name or ID</span>
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-zinc-600" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search cohort or ID" className="h-8 w-48 rounded-lg border border-zinc-800 bg-zinc-950 pl-8 pr-2.5 text-xs text-zinc-200 outline-none transition-colors placeholder:text-zinc-600 focus:border-zinc-600" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search cohort or ID" className="h-8 min-h-11 w-48 rounded-lg border border-zinc-800 bg-zinc-950 pl-8 pr-2.5 text-xs text-zinc-200 outline-none transition-colors placeholder:text-zinc-600 focus:border-zinc-600" />
             </label>
             <label className="flex items-center gap-1.5 font-mono text-[11px] text-zinc-500">From<input type="date" value={from} max={to || undefined} onChange={(event) => setFrom(event.target.value)} className={dateInputClass} /></label>
             <label className="flex items-center gap-1.5 font-mono text-[11px] text-zinc-500">To<input type="date" value={to} min={from || undefined} onChange={(event) => setTo(event.target.value)} className={dateInputClass} /></label>
-            {filtering ? <button type="button" onClick={() => { setQuery(""); setFrom(""); setTo(""); }} className="h-8 px-2 text-xs text-zinc-500 transition-colors hover:text-zinc-200">Clear</button> : null}
+            {filtering ? <button type="button" onClick={() => { setQuery(""); setFrom(""); setTo(""); }} className="h-8 min-h-11 px-2 text-xs text-zinc-500 transition-colors hover:text-zinc-200">Clear</button> : null}
           </div>
         ) : null}
       </div>
@@ -62,7 +62,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
           <FileText className="mb-3 size-8 text-zinc-600" />
           <p className="text-sm font-medium text-zinc-200">No billing history found</p>
           <p className="mt-1 max-w-md text-sm text-zinc-500">Funding receipts and escrow invoices will appear here once your first validation cohort is deployed.</p>
-          <Link href="/console?view=new-drop" className="mt-5 inline-flex h-8 items-center rounded-lg bg-white px-3.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200">Deploy First Cohort</Link>
+          <Link href="/console?view=new-drop" className="mt-5 inline-flex h-8 min-h-11 items-center rounded-lg bg-white px-3.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200">Deploy First Cohort</Link>
         </div>
       ) : !filtered.length ? (
         <p className="px-5 py-10 text-center text-sm text-zinc-500">No invoices match these filters.</p>
@@ -101,7 +101,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
                     <td className="whitespace-nowrap px-3 py-3"><span className={`inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${chip.className}`}>{chip.label}</span></td>
                     <td className="whitespace-nowrap px-5 py-3 text-right">
                       {invoice.downloadable ? (
-                        <a href={`/api/billing/invoices/${invoice.id}`} className="inline-flex h-7 items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 font-mono text-[11px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100" aria-label={`Download PDF receipt ${invoice.invoiceNumber}`}>
+                        <a href={`/api/billing/invoices/${invoice.id}`} className="inline-flex h-7 min-h-11 items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 font-mono text-[11px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100" aria-label={`Download PDF receipt ${invoice.invoiceNumber}`}>
                           PDF <Download className="size-3" />
                         </a>
                       ) : <span className="font-mono text-[11px] text-zinc-600" title={invoice.escrowStatus === "AWAITING_PAYMENT" ? "Receipt available after Stripe confirms payment" : "Receipt unavailable for this record"}>—</span>}

@@ -18,8 +18,8 @@ export function CohortContactPicker({ contacts, compact = false }: { contacts: C
       <Link
         href="/applications"
         className={compact
-          ? "inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-500 px-3 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400"
-          : "mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"}
+          ? "inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-500 px-3 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400"
+          : "mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"}
       >
         <MessageCircle className="size-4" /> {compact ? "New Conversation" : "Review Cohort Testers"}
       </Link>
@@ -31,8 +31,8 @@ export function CohortContactPicker({ contacts, compact = false }: { contacts: C
         type="button"
         onClick={() => setOpen(true)}
         className={compact
-          ? "inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-500 px-3 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400"
-          : "mt-4 inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 font-mono text-xs font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/15"}
+          ? "inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-500 px-3 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400"
+          : "mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 font-mono text-xs font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/15"}
       >
         <MessageCircle className="size-4" /> {compact ? "New Conversation" : "Message Cohort Tester"}
       </button>
@@ -45,7 +45,7 @@ export function CohortContactPicker({ contacts, compact = false }: { contacts: C
                 <h2 id="cohort-contact-title" className="text-base font-semibold text-zinc-100">Start a cohort conversation</h2>
                 <p className="mt-1 text-xs leading-5 text-zinc-500">Choose an accepted cohort contact. Message-request and block rules still apply.</p>
               </div>
-              <button type="button" aria-label="Close contact picker" onClick={() => setOpen(false)} className="rounded-lg border border-zinc-800 p-2 text-zinc-400 hover:text-white"><X className="size-4" /></button>
+              <button type="button" aria-label="Close contact picker" onClick={() => setOpen(false)} className="grid min-h-11 min-w-11 place-items-center rounded-lg border border-zinc-800 p-2 text-zinc-400 hover:text-white"><X className="size-4" /></button>
             </div>
             <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
               {contacts.map((contact) => (

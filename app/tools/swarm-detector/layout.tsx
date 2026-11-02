@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/tools/swarm-detector" },
   title: "Swarm Detector // SeedEnv QA & Trust Suite",
   description:
     "Audit comment streams across TikTok, X, Reddit, and custom applications to detect synchronized bot swarms and astroturfing campaigns.",

@@ -2,7 +2,6 @@ import { ImageResponse } from "next/og";
 import { createElement } from "react";
 import { brandLogoDataUrl } from "@/lib/brand-image";
 
-export const runtime = "edge";
 export const alt = "SeedEnv - High-Signal Beta Testing & App Store Readiness";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";

@@ -71,7 +71,7 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
         <h2 id="active-cohorts-heading" className="text-sm font-semibold text-zinc-100">
           Active Cohorts {total ?           <span className="ml-1 font-mono text-xs font-normal text-zinc-400">{total}</span> : null}
         </h2>
-        <Link href="/console?view=new-drop" className="rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white">
+        <Link href="/console?view=new-drop" className="inline-flex min-h-11 items-center rounded-lg border border-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white">
           + New Cohort Drop
         </Link>
       </div>
@@ -133,7 +133,7 @@ export function ActiveCohorts({ cohorts, total }: { cohorts: ConsoleCohort[]; to
           <Boxes aria-hidden className="mb-3 size-8 text-zinc-600" />
           <p className="text-sm font-medium text-zinc-200">No cohorts currently deployed</p>
           <p className="mt-1 max-w-md text-sm leading-6 text-zinc-500">Deploy a TestFlight or Play Console build to start recruiting hardware nodes and collecting crash telemetry.</p>
-          <Link href="/console?view=new-drop" className="mt-5 rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200">Deploy First Cohort</Link>
+          <Link href="/console?view=new-drop" className="mt-5 inline-flex min-h-11 items-center rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200">Deploy First Cohort</Link>
         </div>
       )}
     </section>

@@ -61,7 +61,7 @@ export function AiSpecDrafter({ platform, onApply, inputs, onInputsChange }: { p
             <input className={fieldClass} maxLength={300} onChange={(event) => onInputsChange({ ...inputs, audience: event.target.value })} placeholder="e.g. busy parents on iPhone" value={audience} />
           </label>
           <div className="flex flex-wrap items-center gap-3">
-            <button className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-emerald-400 disabled:opacity-60" disabled={busy} onClick={draft} type="button">
+            <button className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-emerald-400 disabled:opacity-60" disabled={busy} onClick={draft} type="button">
               {busy ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
               {busy ? "Drafting…" : "Draft with AI"}
             </button>

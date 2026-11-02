@@ -10,7 +10,7 @@ export const SupportTrigger = forwardRef<HTMLButtonElement, ComponentPropsWithou
       type="button"
       aria-label="Help & Support (press ? to open)"
       title="Help & Support (?)"
-      className={`support-trigger group fixed bottom-5 right-5 z-40 inline-flex h-9 min-w-9 items-center justify-center rounded-full border border-zinc-800/80 bg-zinc-900/75 p-2 text-zinc-400 shadow-lg shadow-black/30 backdrop-blur-md transition-all duration-250 ease-out hover:border-zinc-700 hover:px-3 hover:text-emerald-400 focus-visible:border-zinc-700 focus-visible:px-3 focus-visible:text-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 data-[state=open]:text-emerald-400 ${className}`}
+      className={`support-trigger group fixed bottom-5 right-5 z-40 inline-flex h-11 min-w-11 items-center justify-center rounded-full border border-zinc-800/80 bg-zinc-900/75 p-2.5 text-zinc-400 shadow-lg shadow-black/30 backdrop-blur-md transition-all duration-250 ease-out hover:border-zinc-700 hover:px-3 hover:text-emerald-400 focus-visible:border-zinc-700 focus-visible:px-3 focus-visible:text-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 data-[state=open]:text-emerald-400 ${className}`}
       {...props}
     >
       <MessageSquarePlus aria-hidden className="size-4 shrink-0" />

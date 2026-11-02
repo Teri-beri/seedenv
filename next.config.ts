@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const securityHeaders = [
@@ -12,6 +13,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  turbopack: { root: path.resolve(process.cwd()) },
   outputFileTracingIncludes: { "/api/billing/invoices/*": ["./assets/fonts/NotoSans.ttf", "./public/seedenv-logo-v3.png"] },
   experimental: {
     serverActions: { bodySizeLimit: "8mb" },

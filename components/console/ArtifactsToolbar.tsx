@@ -14,7 +14,7 @@ const typeOptions: Array<{ value: ArtifactFilter; label: string }> = [
   { value: "crash", label: "Crash traces" },
 ];
 
-const selectClass = "min-h-10 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-xs text-zinc-300 outline-none transition-colors focus:border-emerald-500/50";
+const selectClass = "min-h-11 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 font-mono text-xs text-zinc-300 outline-none transition-colors focus:border-emerald-500/50";
 
 export function ArtifactsToolbar({
   campaigns,
@@ -62,11 +62,11 @@ export function ArtifactsToolbar({
         </label>
       </div>
       {hasArtifacts ? (
-        <a className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 font-mono text-xs font-semibold text-zinc-200 transition-colors hover:border-zinc-600 hover:text-white" href="/api/assets/download">
+        <a className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 font-mono text-xs font-semibold text-zinc-200 transition-colors hover:border-zinc-600 hover:text-white" href="/api/assets/download">
           <Download className="size-4" /> Export Bundle (ZIP + JSON)
         </a>
       ) : (
-        <button disabled type="button" className="inline-flex min-h-10 cursor-not-allowed items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 font-mono text-xs font-semibold text-zinc-600">
+        <button disabled type="button" className="inline-flex min-h-11 cursor-not-allowed items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 font-mono text-xs font-semibold text-zinc-600">
           <Download className="size-4" /> Export Bundle (ZIP + JSON)
         </button>
       )}

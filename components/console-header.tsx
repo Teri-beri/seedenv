@@ -32,19 +32,19 @@ export function CohortRulesMenu({ links }: { links: ReadonlyArray<CohortRuleLink
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
-        className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-1.5 font-mono text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
+        className="min-h-11 rounded-lg border border-zinc-800 bg-zinc-900/50 px-3 py-1.5 font-mono text-xs text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200"
       >
         Cohort Rules <span aria-hidden="true">▾</span>
       </button>
       {open ? (
-        <div role="menu" className="absolute right-0 top-10 z-50 w-60 rounded-xl border border-zinc-800 bg-zinc-900 p-1 font-mono text-xs shadow-2xl shadow-black/50">
+        <div role="menu" className="absolute right-0 top-12 z-50 w-60 rounded-xl border border-zinc-800 bg-zinc-900 p-1 font-mono text-xs shadow-2xl shadow-black/50">
           {links.map((link) => (
             <Link
               key={link.href}
               role="menuitem"
               href={link.href}
               onClick={() => setOpen(false)}
-              className={`flex items-center rounded-lg px-3 py-2 transition-colors ${link.tone === "caution" ? "text-amber-300 hover:bg-amber-500/10" : "text-zinc-300 hover:bg-zinc-800/70 hover:text-white"}`}
+              className={`flex min-h-11 items-center rounded-lg px-3 py-2 transition-colors ${link.tone === "caution" ? "text-amber-300 hover:bg-amber-500/10" : "text-zinc-300 hover:bg-zinc-800/70 hover:text-white"}`}
             >
               {link.label}
             </Link>
@@ -90,7 +90,7 @@ export function ConsoleHeader({ activeView, paymentsMode, account, cohortRules =
           <Link
             href="/console?view=new-drop"
             aria-current={activeView === "new-drop" ? "page" : undefined}
-            className="rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200"
+            className="inline-flex min-h-11 items-center rounded-lg bg-white px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition-all hover:bg-zinc-200"
           >
             + Deploy Cohort
           </Link>

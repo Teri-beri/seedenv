@@ -41,10 +41,10 @@ export function MobileMissionGuide({
 
         {!evidenceReady ? (
           <>
-            <a href={launchUrl} target="_blank" rel="noopener noreferrer" className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-4 text-sm font-bold text-zinc-950 shadow-lg shadow-emerald-500/10 transition hover:bg-emerald-400">
+            <a href={launchUrl} target="_blank" rel="noopener noreferrer" className="min-h-11 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-4 text-sm font-bold text-zinc-950 shadow-lg shadow-emerald-500/10 transition hover:bg-emerald-400">
               Open {platformLabel} <ArrowUpRight className="size-4" />
             </a>
-            <button type="button" onClick={onEvidenceReady} className="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-xs font-semibold text-zinc-200 transition hover:border-zinc-600">
+            <button type="button" onClick={onEvidenceReady} className="min-h-11 flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-xs font-semibold text-zinc-200 transition hover:border-zinc-600">
               <UploadCloud className="size-4 text-sky-300" /> I finished testing · Add evidence
             </button>
           </>

@@ -146,11 +146,11 @@ function ShareCohortButton({ cohort }: { cohort: { id: string; title: string } }
             window.open(href, "_blank", "noopener");
           }
         }}
-        className="rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400"
+        className="min-h-11 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400"
       >
         {copied ? "Link copied" : "Share Cohort Link"}
       </button>
-      <Link href={`/cohorts/${cohort.id}`} className="rounded-lg border border-zinc-800 px-3 py-2 font-mono text-xs text-zinc-400 transition-colors hover:text-white">Open public brief</Link>
+      <Link href={`/cohorts/${cohort.id}`} className="inline-flex min-h-11 items-center rounded-lg border border-zinc-800 px-3 py-2 font-mono text-xs text-zinc-400 transition-colors hover:text-white">Open public brief</Link>
     </div>
   );
 }
@@ -191,7 +191,7 @@ export function TesterRequests({ applications, chargePreviews = {}, balance, ren
               role="tab"
               aria-selected={tab === item.value}
               onClick={() => setTab(item.value)}
-              className={`rounded-lg border px-3 py-1.5 font-mono text-xs transition-colors ${tab === item.value ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"}`}
+              className={`min-h-11 rounded-lg border px-3 py-1.5 font-mono text-xs transition-colors ${tab === item.value ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200"}`}
             >
               {item.label} ({counts[item.value]})
             </button>
@@ -202,7 +202,7 @@ export function TesterRequests({ applications, chargePreviews = {}, balance, ren
             type="button"
             aria-haspopup="dialog"
             onClick={() => setRulesOpen(true)}
-            className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 font-mono text-xs text-zinc-300 transition-colors hover:text-white"
+            className="min-h-11 flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-1.5 font-mono text-xs text-zinc-300 transition-colors hover:text-white"
           >
             <Settings2 aria-hidden="true" className="size-3.5" /> REP &amp; Device Rules
           </button>
@@ -238,7 +238,7 @@ export function TesterRequests({ applications, chargePreviews = {}, balance, ren
               <h3 className="text-sm font-medium text-zinc-200">{emptyCopy[tab].heading}</h3>
               <p className="mt-1 max-w-sm text-xs leading-5 text-zinc-500">{emptyCopy[tab].detail}</p>
               {tab === "pending" && shareCohort ? <ShareCohortButton cohort={shareCohort} /> : null}
-              {tab === "pending" && !shareCohort ? <Link href="/console?view=new-drop" className="mt-4 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400">Deploy a cohort</Link> : null}
+              {tab === "pending" && !shareCohort ? <Link href="/console?view=new-drop" className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400">Deploy a cohort</Link> : null}
             </div>
           )}
         </div>
@@ -279,7 +279,7 @@ export function TesterRequests({ applications, chargePreviews = {}, balance, ren
                 <button
                   type="button"
                   onClick={() => setRulesOpen(true)}
-                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 font-mono text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
+                  className="min-h-11 mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 font-mono text-xs text-zinc-300 transition-colors hover:border-zinc-700 hover:text-white"
                 >
                   <Settings2 aria-hidden="true" className="size-3.5" /> Edit Criteria
                 </button>
@@ -287,7 +287,7 @@ export function TesterRequests({ applications, chargePreviews = {}, balance, ren
             ) : (
               <div className="mt-4">
                 <p className="text-xs leading-5 text-zinc-500">Deploy a cohort to configure REP, Discovery Pass, and hardware validation rules.</p>
-                <Link href="/console?view=new-drop" className="mt-3 inline-flex rounded-lg border border-zinc-800 px-3 py-2 font-mono text-xs text-zinc-300 hover:text-white">Deploy a cohort</Link>
+                <Link href="/console?view=new-drop" className="mt-3 inline-flex min-h-11 items-center rounded-lg border border-zinc-800 px-3 py-2 font-mono text-xs text-zinc-300 hover:text-white">Deploy a cohort</Link>
               </div>
             )}
           </div>
@@ -316,7 +316,7 @@ export function TesterRequests({ applications, chargePreviews = {}, balance, ren
                 <h2 id="criteria-dialog-title" className="text-base font-semibold text-zinc-100">REP &amp; Entry Rules</h2>
                 <p className="mt-1 text-xs leading-5 text-zinc-500">Set task REP floors and Discovery Pass access. Existing accepted testers keep their eligibility.</p>
               </div>
-              <button type="button" aria-label="Close criteria editor" onClick={() => setRulesOpen(false)} className="rounded-lg border border-zinc-800 p-2 text-zinc-400 transition-colors hover:text-white">
+              <button type="button" aria-label="Close criteria editor" onClick={() => setRulesOpen(false)} className="grid min-h-11 min-w-11 place-items-center rounded-lg border border-zinc-800 p-2 text-zinc-400 transition-colors hover:text-white">
                 <X aria-hidden="true" className="size-4" />
               </button>
             </header>
