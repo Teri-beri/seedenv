@@ -21,6 +21,14 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [{ source: "/@:username", destination: "/u/:username" }];
   },
+  async redirects() {
+    // Short command-palette aliases; destinations keep their own role gating in proxy.ts.
+    return [
+      { source: "/campaigns", destination: "/console", permanent: false },
+      { source: "/billing", destination: "/dashboard/developer/billing", permanent: false },
+      { source: "/tester/rewards", destination: "/dashboard", permanent: false },
+    ];
+  },
   async headers() {
     const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
     return [

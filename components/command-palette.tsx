@@ -13,9 +13,9 @@ type PaletteCommand =
 
 const commands: ReadonlyArray<PaletteCommand> = [
   { id: "swarm", kind: "navigate", label: "SwarmForensics Bot Detector", hint: "/tools/swarm-detector", keywords: "swarm bot detector forensics comments audit", icon: Radar, href: "/tools/swarm-detector" },
-  { id: "drops", kind: "navigate", label: "Campaign Drops", hint: "/console", keywords: "campaign drops cohorts console developer launch", icon: FolderKanban, href: "/console" },
-  { id: "vault", kind: "navigate", label: "Developer Vault & Escrow", hint: "/dashboard/developer/billing", keywords: "vault escrow billing balance invoices payments developer", icon: Vault, href: "/dashboard/developer/billing" },
-  { id: "rewards", kind: "navigate", label: "Tester Rewards & Missions", hint: "/dashboard", keywords: "tester rewards missions bounties validator flight deck", icon: Trophy, href: "/dashboard" },
+  { id: "drops", kind: "navigate", label: "Campaign Drops", hint: "/campaigns", keywords: "campaign drops cohorts console developer launch", icon: FolderKanban, href: "/campaigns" },
+  { id: "vault", kind: "navigate", label: "Developer Vault & Escrow", hint: "/billing", keywords: "vault escrow billing balance invoices payments developer", icon: Vault, href: "/billing" },
+  { id: "rewards", kind: "navigate", label: "Tester Rewards & Missions", hint: "/tester/rewards", keywords: "tester rewards missions bounties validator flight deck", icon: Trophy, href: "/tester/rewards" },
   { id: "status", kind: "status", label: "System Operational Status", hint: "Live check", keywords: "system status operational uptime latency health", icon: Activity },
 ];
 
