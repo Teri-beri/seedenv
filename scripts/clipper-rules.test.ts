@@ -53,3 +53,22 @@ test("every agreement status has a readable label and active ones tell each part
     assert.ok(clipNextStep(status, "CREATOR"));
   }
 });
+
+test("creator profiles require curated genres and authentic social profile URL shapes", async () => {
+  const { clipProfileSchema, clipSocialLinks, socialProfileIdentity, clipFeeInputSchema, clipEligibility } = await import("../lib/clipper-rules");
+  const profile = { bio: "I create original mobile gaming tutorials.", portfolioUrl: "https://example.invalid/samples", socialUrl: "https://tiktok.com/@creator?tracking=1", specialties: "Mobile gamers and students", genres: ["Gaming", "Tech & apps"], instagramUrl: "https://www.instagram.com/creator/" };
+  const parsed = clipProfileSchema.parse(profile);
+  assert.equal(parsed.socialUrl, "https://www.tiktok.com/@creator");
+  assert.equal(clipProfileSchema.safeParse({ ...profile, tiktokUrl: "https://www.tiktok.com/@different" }).success, false);
+  assert.equal(clipProfileSchema.safeParse({ ...profile, tiktokUrl: "https://tiktok.com/@creator/" }).success, true);
+  assert.deepEqual(clipSocialLinks(parsed).map((link) => link.platform), ["TIKTOK", "INSTAGRAM"]);
+  for (const invalid of [{ genres: [] }, { genres: ["not-a-genre"] }, { genres: ["Gaming", "Gaming"] }, { genres: ["Gaming", "Tech & apps", "Lifestyle", "Comedy", "Fitness", "Education"] }, { socialUrl: "https://tiktok.com/@creator/video/123" }, { instagramUrl: "https://youtube.com/@creator" }]) assert.equal(clipProfileSchema.safeParse({ ...profile, ...invalid }).success, false);
+  for (const url of ["https://tiktok.com.evil.invalid/@creator", "https://instagram.com/reels", "https://instagram.com/accounts/login", "https://youtu.be/abcdefghijk", "https://youtube.com/watch?v=abcdefghijk", "http://tiktok.com/@creator", "https://tiktok.com:444/@creator"]) assert.throws(() => socialProfileIdentity(url));
+  assert.equal(clipFeeInputSchema.parse("50.01"), 5001);
+  for (const value of ["10.001", "1e2", "0", "-10", "1000.01", "NaN"]) assert.equal(clipFeeInputSchema.safeParse(value).success, false);
+  const creator = { emailVerified: new Date(), xpPoints: 100 };
+  assert.equal(clipEligibility(creator, { ...parsed, status: "APPROVED" }, { platform: "TIKTOK", minimumRep: 100 }), null);
+  assert.match(clipEligibility(creator, { ...parsed, status: "PENDING_REVIEW" }, { platform: "TIKTOK", minimumRep: 0 })!, /approved/);
+  assert.match(clipEligibility(creator, { ...parsed, status: "APPROVED" }, { platform: "YOUTUBE", minimumRep: 0 })!, /youtube/);
+  assert.match(clipEligibility(creator, { ...parsed, status: "APPROVED" }, { platform: "TIKTOK", minimumRep: 101 })!, /101 REP/);
+});

@@ -58,7 +58,8 @@ test("Clippers payment retries reconcile a single transfer/refund without chargi
       transactionMock = mock.module("../lib/quest-ledger.ts", { namedExports: { serializable: async (work: (database: Prisma.TransactionClient) => Promise<unknown>) => work(tx) } });
       const { fundClipAgreement, handleClipPaymentEvent, releaseClipPayment, refundClipPayment } = await import("../lib/clipper-payments");
       const developer = await tx.user.create({ data: { email: `${marker}-dev@example.invalid`, role: "DEVELOPER" } });
-      const creator = await tx.user.create({ data: { email: `${marker}-creator@example.invalid`, role: "TESTER", stripeConnectAccountId: `acct_${marker}` } });
+      const creator = await tx.user.create({ data: { email: `${marker}-creator@example.invalid`, role: "TESTER", emailVerified: new Date(), stripeConnectAccountId: `acct_${marker}` } });
+      await tx.clipProfile.create({ data: { userId: creator.id, bio: "An original creator with approved samples.", portfolioUrl: "https://example.invalid/samples", socialUrl: "https://www.tiktok.com/@fixture", specialties: "Gaming and mobile apps", genres: ["Gaming"], status: "APPROVED" } });
       const campaign = await tx.clipCampaign.create({ data: { developerId: developer.id, title: "Payment rollback fixture", appUrl: "https://example.invalid", brief: "A controlled payment test without any real Stripe network requests.", platform: "TIKTOK", feeCents: 5000 } });
       const item = await tx.clipEngagement.create({ data: { campaignId: campaign.id, creatorId: creator.id, note: "Fixture agreement", status: "ACCEPTED", feeCents: 5000, chargeCents: 5435, termsAcceptedAt: new Date() } });
       await assert.rejects(fundClipAgreement(item.id, creator.id), /not found/);

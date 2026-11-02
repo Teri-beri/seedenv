@@ -1,7 +1,7 @@
 "use client";
 
 import { UserRole } from "@prisma/client";
-import { Activity, Boxes, BriefcaseBusiness, CreditCard, Flame, Gamepad2, LayoutDashboard, LoaderCircle, Medal, MessagesSquare, PlusCircle, Settings, ShieldCheck, Sprout, Trophy, UserRound } from "lucide-react";
+import { Activity, Boxes, BriefcaseBusiness, CreditCard, Flame, Gamepad2, LayoutDashboard, LoaderCircle, Medal, MessagesSquare, PlusCircle, Settings, ShieldCheck, Sprout, Trophy, Video, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -13,6 +13,7 @@ const testerItems = [
   { label: "Discover", shortLabel: "Discover", icon: Gamepad2, href: "/dashboard?view=discover", view: "discover" },
   { label: "My missions", shortLabel: "Missions", icon: Flame, href: "/dashboard?view=missions", view: "missions" },
   { label: "Reputation", shortLabel: "Rep", icon: Medal, href: "/dashboard?view=reputation", view: "reputation" },
+  { label: "Clippers", shortLabel: "Clippers", icon: Video, href: "/dashboard?view=clippers", view: "clippers" },
   { label: "Leaderboard", shortLabel: "Ranks", icon: Trophy, href: "/dashboard?view=leaderboard", view: "leaderboard" },
   { label: "Circle", shortLabel: "Circle", icon: MessagesSquare, href: "/launch-circle", view: null },
   { label: "Settings", shortLabel: "Account", icon: UserRound, href: "/account", view: null },
@@ -83,7 +84,7 @@ export function TesterBottomNav() {
   }, [pathname, searchParams, router]);
   return (
     <nav aria-label="Tester app navigation" className="mobile-app-tabbar fixed inset-x-0 bottom-0 z-40 border-t border-stroke bg-obsidian/94 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl lg:hidden">
-      <div className="mx-auto grid max-w-lg grid-cols-6 gap-0">
+      <div className="mx-auto grid max-w-lg grid-cols-7 gap-0">
         {testerItems.map(({ label, shortLabel, icon: Icon, href, view: itemView }) => {
           const active = pathname === "/account" || pathname === "/launch-circle" ? href === pathname : pathname === "/dashboard" && itemView === view;
           return (

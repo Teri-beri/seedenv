@@ -947,6 +947,14 @@ model SupportTicket {
   @@index([status, createdAt])
 }
 
+enum ClipProfileStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
 model ClipProfile {
   userId       String   @id
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -954,7 +962,20 @@ model ClipProfile {
   portfolioUrl String
   socialUrl    String
   specialties  String   @db.VarChar(200)
+  genres       String[] @default([])
+  tiktokUrl    String?
+  instagramUrl String?
+  youtubeUrl   String?
+  status       ClipProfileStatus @default(DRAFT)
+  available    Boolean  @default(true)
+  revision     Int      @default(1)
+  submittedAt  DateTime?
+  reviewedAt   DateTime?
+  reviewedById String?
+  reviewNote   String?  @db.VarChar(1500)
   updatedAt    DateTime @updatedAt
+
+  @@index([status, submittedAt])
 }
 
 model ClipCampaign {
@@ -991,7 +1012,11 @@ model ClipEngagement {
   feeCents            Int
   chargeCents         Int
   termsVersion        String       @default("clippers-v1-organic-90")
-  termsAcceptedAt     DateTime
+  termsAcceptedAt     DateTime?
+  invitationNote      String?      @db.VarChar(1500)
+  invitedAt           DateTime?
+  invitationExpiresAt DateTime?
+  profileSnapshot     Json?
   revisionCount       Int          @default(0)
   reviewNote          String?
   dueAt               DateTime?
@@ -1022,6 +1047,7 @@ model ClipEngagement {
   statusBeforeDispute String?
   moderationNote      String?
   assets              ClipAsset[]
+  messages            ClipMessage[]
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
@@ -1034,6 +1060,8 @@ model ClipMessage {
   id         String       @id @default(cuid())
   campaignId String
   campaign   ClipCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  engagementId String?
+  engagement ClipEngagement? @relation(fields: [engagementId], references: [id], onDelete: Restrict)
   authorId   String
   author     User         @relation(fields: [authorId], references: [id], onDelete: Restrict)
   body       String       @db.VarChar(2000)
@@ -1041,6 +1069,7 @@ model ClipMessage {
 
   @@index([campaignId, createdAt])
   @@index([authorId, createdAt])
+  @@index([engagementId, createdAt])
 }
 
 model ClipAsset {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
-import { requireClippers } from "@/lib/clippers";
+import { notifyClipAgreement, requireClippers } from "@/lib/clippers";
 import { handleClipPaymentEvent } from "@/lib/clipper-payments";
 
 export async function POST(request: NextRequest) {
@@ -15,7 +15,8 @@ export async function POST(request: NextRequest) {
   }
   try {
     requireClippers();
-    await handleClipPaymentEvent(event);
+    const funded = await handleClipPaymentEvent(event);
+    if (funded) await notifyClipAgreement(funded.agreementId, funded.developerId, "Funding is confirmed. Your creator agreement now says Funded; you may start work. Open it for the draft deadline.");
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("Clippers webhook processing failed:", error instanceof Error ? error.message : "Unknown error");

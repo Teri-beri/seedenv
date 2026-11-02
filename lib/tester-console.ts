@@ -4,6 +4,7 @@ export type MissionSort = "reward" | "slots";
 export const testerViews = [
   { id: "discover", label: "Discover", description: "Find apps and choose your next contribution." },
   { id: "missions", label: "My missions", description: "Resume work, respond to revisions, and track developer reviews." },
+  { id: "clippers", label: "Clippers", description: "Manage your creator application, campaign invitations, and paid video collaborations." },
   { id: "reputation", label: "Reputation", description: "Your trusted REP, milestones, and earned rewards." },
   { id: "leaderboard", label: "Leaderboard", description: "Meet the community's leading contributors." },
 ] as const;

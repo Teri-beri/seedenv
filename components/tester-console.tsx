@@ -14,6 +14,7 @@ import { autoApproveDeadlineFrom as autoApproveDeadline } from "@/lib/auto-appro
 import { formatCents } from "@/lib/utils";
 import { formatRankLevel, validatorNodeId } from "@/lib/validator-identity";
 import { parseRobloxSubmissionChecklist } from "@/lib/roblox-cohorts";
+import { ClipperDashboard, type ClipperDashboardData } from "@/components/clipper-dashboard";
 
 type ConsoleMission = Pick<AppCampaign, "id" | "title" | "appUrl" | "iconUrl" | "targetVibe" | "description" | "bountyPerTaskUsd" | "totalSlots" | "claimedSlots" | "completedSlots" | "platform" | "discoveryAllowed" | "discoveryMinRep" | "estimatedMinutes" | "testerPerk"> & { instructions: TaskInstruction[]; acceptedInstructionRevision?: number; directionsUpdated?: boolean; ownedByTester?: boolean };
 
@@ -31,9 +32,10 @@ export type TesterConsoleData = {
   applications: Array<{ campaignId: string; status: string; startBy: string | null }>;
   questXp: number;
   discoveryPasses: number;
+  clippers?: ClipperDashboardData;
 };
 
-export function TesterConsole({ activeView, tester, missions, leaderboard, summary, recent, pending, approvedCampaigns, pendingPayoutCents, now, applications, questXp, discoveryPasses }: TesterConsoleData) {
+export function TesterConsole({ activeView, tester, missions, leaderboard, summary, recent, pending, approvedCampaigns, pendingPayoutCents, now, applications, questXp, discoveryPasses, clippers }: TesterConsoleData) {
   const approved = summary.find((item) => item.status === SubmissionStatus.APPROVED);
   const approvedCount = approved?._count._all || 0;
   const rejectedCount = summary.find((item) => item.status === SubmissionStatus.REJECTED)?._count._all || 0;
@@ -125,6 +127,8 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
             </div>
           </section> : null}
 
+          {activeView === "clippers" ? <ClipperDashboard data={clippers || { enabled: false, profileStatus: null, reviewNote: null, paidCents: 0, agreements: [] }} now={now} /> : null}
+          {(activeView === "missions" || activeView === "discover") && clippers?.enabled ? <Link href="/dashboard?view=clippers" className="block rounded-xl border border-violet-400/25 bg-violet-500/5 p-4 text-sm text-violet-200">Creator work is separate from testing. View your Clippers application, {clippers.agreements.filter((item) => item.status === "INVITED").length} invitations, and {clippers.agreements.filter((item) => item.status === "APPLIED").length} campaign applications →</Link> : null}
           {activeView === "discover" || activeView === "missions" ? <section id="active-missions" className={activeView === "missions" ? "scroll-mt-20" : "scroll-mt-20 rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5 sm:p-6"}>
             {activeView === "discover" ? <div className="flex flex-wrap items-center justify-between gap-3">
               <div>

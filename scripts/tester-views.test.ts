@@ -134,9 +134,10 @@ test("the mobile app shell never pans sideways and keeps desktop layout intact",
   assert.match(leaderboard, /min-w-\[680px\]/);
 
   const nav = await readFile(new URL("../components/navigation.tsx", import.meta.url), "utf8");
-  // Six tabs only fit a phone with short labels, and the full label must stay in the accessible name.
+  // Keep short labels and full accessible names as creator work joins the existing navigation.
   assert.match(nav, /shortLabel: "Missions"/);
   assert.match(nav, /shortLabel: "Ranks"/);
+  assert.match(nav, /shortLabel: "Clippers"/);
   assert.match(nav, /aria-label=\{label\}/);
   assert.match(nav, /min-h-14/);
 });

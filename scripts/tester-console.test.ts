@@ -4,7 +4,7 @@ import { rankForXp, rankProgress, xpForBounty } from "../lib/rank";
 import { approvalRate, availableSlots, discoverMissions, resolveTesterView, testerMilestones, testerViews } from "../lib/tester-console";
 
 test("tester views are separate, bookmarkable, and accepted mission links open the mission desk", () => {
-  assert.deepEqual(testerViews.map((item) => item.id), ["discover", "missions", "reputation", "leaderboard"]);
+  assert.deepEqual(testerViews.map((item) => item.id), ["discover", "missions", "clippers", "reputation", "leaderboard"]);
   for (const view of testerViews) assert.equal(resolveTesterView(view.id), view.id);
   assert.equal(resolveTesterView(), "discover");
   assert.equal(resolveTesterView("unknown"), "discover");

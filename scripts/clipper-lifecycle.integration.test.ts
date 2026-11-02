@@ -17,11 +17,11 @@ test("Clippers lifecycle preserves contract permissions and evidence (rollback-o
       await assert.rejects(applyClip(tx, creator.id, campaign.id, "Audience and original video experience"), /Verify your email/);
       await tx.user.update({ where: { id: creator.id }, data: { emailVerified: new Date() } });
       await assert.rejects(applyClip(tx, creator.id, campaign.id, "Audience and original video experience"), /profile/);
-      await tx.clipProfile.create({ data: { userId: creator.id, bio: "An experienced mobile app creator.", portfolioUrl: "https://example.invalid/portfolio", socialUrl: "https://www.tiktok.com/@fixture", specialties: "Mobile apps" } });
+      await tx.clipProfile.create({ data: { userId: creator.id, bio: "An experienced mobile app creator.", portfolioUrl: "https://example.invalid/portfolio", socialUrl: "https://www.tiktok.com/@fixture", specialties: "Mobile apps", genres: ["Tech & apps"], status: "APPROVED" } });
       const item = await applyClip(tx, creator.id, campaign.id, "Audience and original video experience");
       assert.equal(item.status, "APPLIED");
       assert.equal(item.feeCents, 5000);
-      assert.equal(item.chargeCents, 5435);
+      assert.equal(item.chargeCents, 5953);
       assert.equal(item.termsVersion, "clippers-v1-organic-90");
       await assert.rejects(applyClip(tx, creator.id, campaign.id, "Duplicate application note"), /already applied/);
       await assert.rejects(reviewClipApplication(tx, stranger.id, item.id, true), /not found/);

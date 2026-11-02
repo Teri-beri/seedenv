@@ -1,4 +1,6 @@
 import { after } from "next/server";
+import Link from "next/link";
+import { z } from "zod";
 import { assignedCampaign } from "@/lib/instruction-versions";
 import { sweepOverdueSubmissionsLazily } from "@/lib/submission-approval";
 import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
@@ -13,15 +15,19 @@ import { prisma } from "@/lib/prisma";
 import { awardDailyCheckIn } from "@/lib/quest-ledger";
 import { resolveTesterView } from "@/lib/tester-console";
 import { ensureValidatorHandle } from "@/lib/validator-handle";
+import { clippersEnabled } from "@/lib/clippers";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string; claim?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string; claim?: string; clipPage?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "TESTER") redirect(session.user.role === "DEVELOPER" ? "/console" : "/admin");
   const params = await searchParams;
   const activeView = resolveTesterView(params.view, params.claim);
+  const requestedClipPage = z.coerce.number().int().min(1).max(10000).safeParse(params.clipPage || "1");
+  if (!requestedClipPage.success) return <AuthCheck role="TESTER"><main id="main-content" className="p-6"><p role="alert">Invalid creator-work page. <Link href="/dashboard?view=clippers" className="underline">Return to your Clippers dashboard.</Link></p></main></AuthCheck>;
+  const clipsEnabled = clippersEnabled();
 
   await ensureValidatorHandle(session.user.id);
 
@@ -29,7 +35,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   after(sweepOverdueSubmissionsLazily);
   await awardDailyCheckIn(session.user.id);
   const now = new Date();
-  const [tester, missions, leaderboard, summary, recent, pending, approvedCampaigns, payouts, applications] = await Promise.all([
+  const [tester, missions, leaderboard, summary, recent, pending, approvedCampaigns, payouts, applications, clipTotal] = await Promise.all([
     getCurrentUser("TESTER"),
     prisma.appCampaign.findMany({
       where: { status: CampaignStatus.ACTIVE, expiresAt: { gt: now } },
@@ -78,6 +84,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       _sum: { amountCents: true },
     }),
     prisma.missionApplication.findMany({ where: { testerId: session.user.id }, select: { campaignId: true, status: true, startBy: true, instructionVersion: true } }),
+    clipsEnabled ? prisma.clipEngagement.count({ where: { creatorId: session.user.id } }) : 0,
   ]);
 
   const pendingWithPreviews = pending.map((item) => ({ ...item, campaign: assignedCampaign(item.campaign, item.instructionVersion), proofPreviewUrl: item.revisionRequestedAt && item.proofImageUrl ? `/api/submissions/${item.id}/proof` : null }));
@@ -85,9 +92,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     const application = applications.find((item) => item.campaignId === mission.id && ["ACCEPTED", "STARTED"].includes(item.status));
     return { ...(application ? assignedCampaign(mission, application.instructionVersion) : mission), ownedByTester: mission.developerId === session.user.id };
   });
+  const clipPage = Math.min(requestedClipPage.data, Math.max(1, Math.ceil(clipTotal / 50)));
+  const [clipProfile, clipAgreements, clipPayments] = clipsEnabled ? await Promise.all([
+    prisma.clipProfile.findUnique({ where: { userId: session.user.id }, select: { status: true, reviewNote: true, available: true } }),
+    prisma.clipEngagement.findMany({ where: { creatorId: session.user.id }, take: 50, skip: (clipPage - 1) * 50, orderBy: [{ updatedAt: "desc" }, { id: "desc" }], select: { id: true, status: true, feeCents: true, invitationExpiresAt: true, dueAt: true, reviewDueAt: true, publishDueAt: true, campaign: { select: { id: true, title: true, platform: true } } } }),
+    prisma.clipEngagement.aggregate({ where: { creatorId: session.user.id, paidAt: { not: null } }, _sum: { feeCents: true } }),
+  ]) : [null, [], null];
   return (
     <AuthCheck role="TESTER">
-      <TesterConsole activeView={activeView} tester={tester} missions={testerMissions} leaderboard={leaderboard.map((entry) => ({ ...entry, submissions: entry.submissions.flatMap((submission) => submission.submittedAt ? [{ ...submission, submittedAt: submission.submittedAt.toISOString() }] : []) }))} summary={summary} recent={recent} pending={pendingWithPreviews} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ campaignId: item.campaignId, status: item.status, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} />
+      <TesterConsole activeView={activeView} tester={tester} missions={testerMissions} leaderboard={leaderboard.map((entry) => ({ ...entry, submissions: entry.submissions.flatMap((submission) => submission.submittedAt ? [{ ...submission, submittedAt: submission.submittedAt.toISOString() }] : []) }))} summary={summary} recent={recent} pending={pendingWithPreviews} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ campaignId: item.campaignId, status: item.status, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} clippers={{ enabled: clipsEnabled, profileStatus: clipProfile?.status || null, profileAvailable: clipProfile?.available ?? false, reviewNote: clipProfile?.reviewNote || null, paidCents: clipPayments?._sum.feeCents || 0, page: clipPage, total: clipTotal, agreements: clipAgreements.map((item) => ({ ...item, invitationExpiresAt: item.invitationExpiresAt?.toISOString() || null, dueAt: item.dueAt?.toISOString() || null, reviewDueAt: item.reviewDueAt?.toISOString() || null, publishDueAt: item.publishDueAt?.toISOString() || null })) }} />
     </AuthCheck>
   );
 }

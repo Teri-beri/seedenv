@@ -32,7 +32,7 @@
     "test:telemetry-monitor": "node --experimental-test-module-mocks --import tsx --test --test-concurrency=1 scripts/telemetry-monitor.test.ts",
     "test:mission-hud": "node --conditions=react-server --experimental-test-module-mocks --import tsx --test --test-concurrency=1 scripts/mission-hud.test.ts",
     "test:quests": "node --import tsx --test scripts/quest-rules.test.ts scripts/quest-ledger.integration.test.ts",
-    "test:clippers": "node --conditions=react-server --experimental-test-module-mocks --import tsx --test scripts/clipper-rules.test.ts scripts/clipper-lifecycle.integration.test.ts scripts/clipper-payments.integration.test.ts scripts/clipper-tiktok.integration.test.ts scripts/clipper-storage.integration.test.ts",
+    "test:clippers": "node --conditions=react-server --experimental-test-module-mocks --import tsx --test scripts/clipper-rules.test.ts scripts/clipper-lifecycle.integration.test.ts scripts/clipper-payments.integration.test.ts scripts/clipper-tiktok.integration.test.ts scripts/clipper-storage.integration.test.ts && node --experimental-test-module-mocks --import tsx --test scripts/clipper-marketplace.test.ts scripts/clipper-marketplace-payments.test.ts",
     "setup:clippers-storage": "tsx scripts/setup-clippers-storage.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

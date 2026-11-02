@@ -6,22 +6,24 @@ import { createClipUpload, completeClipUpload } from "@/app/actions/clipperActio
 
 export const clipInputClass = "mt-2 block w-full min-w-0 rounded-xl border border-stroke bg-background p-3 text-base";
 
-export function ClipperForm({ action, children, label, disabled = false }: { action: (data: FormData) => Promise<string>; children: React.ReactNode; label: string; disabled?: boolean }) {
+export function ClipperForm({ action, children, label, disabled = false, onChange }: { action: (data: FormData) => Promise<string>; children: React.ReactNode; label: string; disabled?: boolean; onChange?: () => void }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
+  const [failed, setFailed] = useState(false);
   const router = useRouter();
-  return <form className="space-y-4" onSubmit={(event) => {
+  return <form className="space-y-4" onChange={onChange} onSubmit={(event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     setMessage("");
+    setFailed(false);
     startTransition(async () => {
       try { setMessage(await action(data)); router.refresh(); }
-      catch (error) { setMessage(error instanceof Error ? error.message : "The action failed. Please retry."); }
+      catch (error) { setFailed(true); setMessage(error instanceof Error ? error.message : "The action failed. Please retry."); }
     });
   }}>
-    {children}
+    <fieldset disabled={pending || disabled} className="min-w-0 space-y-4">{children}</fieldset>
     <button type="submit" disabled={pending || disabled} className="min-h-11 rounded-xl bg-amber-400 px-4 py-3 text-sm font-semibold text-black disabled:opacity-50">{pending ? "Working..." : label}</button>
-    {message ? <p role="status" className="break-words text-sm leading-6 text-neutral-300">{message}</p> : null}
+    {message ? <p role={failed ? "alert" : "status"} className={`break-words text-sm leading-6 ${failed ? "text-amber-200" : "text-neutral-300"}`}>{message}</p> : null}
   </form>;
 }
 

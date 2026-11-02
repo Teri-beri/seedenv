@@ -4,15 +4,17 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { serializable } from "@/lib/quest-ledger";
 import { getStripe } from "@/lib/stripe";
-import { assertClipTransition } from "@/lib/clipper-rules";
+import { assertClipTransition, clipEligibility } from "@/lib/clipper-rules";
 
 export async function fundClipAgreement(id: string, developerId: string) {
   const stripe = getStripe();
   const origin = process.env.NEXT_PUBLIC_APP_URL;
   if (!origin || !origin.startsWith("https://")) throw new Error("A public HTTPS NEXT_PUBLIC_APP_URL is required for Clippers checkout.");
-  const item = await prisma.clipEngagement.findUnique({ where: { id }, include: { campaign: true, creator: { select: { stripeConnectAccountId: true } } } });
+  const item = await prisma.clipEngagement.findUnique({ where: { id }, include: { campaign: true, creator: { select: { stripeConnectAccountId: true, clipProfile: { select: { status: true } } } } } });
   if (!item || item.campaign.developerId !== developerId) throw new Error("Agreement not found for your campaign.");
   assertClipTransition(item.status, ["ACCEPTED", "FUNDING"]);
+  if (!item.termsAcceptedAt) throw new Error("The creator must accept the campaign terms before funding.");
+  if (item.status === "ACCEPTED" && item.creator.clipProfile?.status !== "APPROVED") throw new Error("The creator's marketplace profile needs SeedEnv approval before new funding.");
   if (!item.creator.stripeConnectAccountId) throw new Error("The creator must finish Stripe payout setup before you fund this agreement.");
   const account = await stripe.accounts.retrieve(item.creator.stripeConnectAccountId);
   if (!account.payouts_enabled || account.capabilities?.transfers !== "active") throw new Error("The creator's Stripe account is not ready to receive payments.");
@@ -22,9 +24,12 @@ export async function fundClipAgreement(id: string, developerId: string) {
     throw new Error("This checkout is processing or expired. Wait for the signed payment webhook to update the agreement.");
   }
   const fundingAttempt = await serializable(async (tx) => {
-    const current = await tx.clipEngagement.findUniqueOrThrow({ where: { id } });
+    const current = await tx.clipEngagement.findUniqueOrThrow({ where: { id }, include: { campaign: true, creator: { include: { clipProfile: true } } } });
     assertClipTransition(current.status, ["ACCEPTED", "FUNDING"]);
     if (current.status === "FUNDING") return current.fundingAttempt;
+    if (!current.termsAcceptedAt) throw new Error("The creator must accept the terms before funding.");
+    const reason = clipEligibility(current.creator, current.creator.clipProfile, current.campaign);
+    if (reason) throw new Error(reason);
     const updated = await tx.clipEngagement.update({ where: { id }, data: { status: "FUNDING", fundingAttempt: { increment: 1 } } });
     return updated.fundingAttempt;
   });
@@ -37,9 +42,28 @@ export async function fundClipAgreement(id: string, developerId: string) {
     success_url: `${origin}/clippers/${item.campaignId}?funding=processing`,
     cancel_url: `${origin}/clippers/${item.campaignId}?funding=cancelled`,
   }, { idempotencyKey: `clip-checkout-${id}-${fundingAttempt}` });
-  await prisma.clipEngagement.updateMany({ where: { id, fundingAttempt }, data: { checkoutId: session.id } });
+  await prisma.clipEngagement.updateMany({ where: { id, fundingAttempt, status: "FUNDING" }, data: { checkoutId: session.id } });
   if (!session.url) throw new Error("Stripe did not return a checkout URL. Contact support before trying again.");
   return session.url;
+}
+
+export async function cancelUnpaidClipCheckout(id: string, developerId: string) {
+  const stripe = getStripe();
+  const item = await prisma.clipEngagement.findUnique({ where: { id }, include: { campaign: true } });
+  if (!item || item.campaign.developerId !== developerId) throw new Error("Agreement not found for your campaign.");
+  assertClipTransition(item.status, ["FUNDING"]);
+  if (!item.checkoutId) throw new Error("Retry funding to recover the existing checkout before cancelling it. No new funding attempt will be created.");
+  let session = await stripe.checkout.sessions.retrieve(item.checkoutId);
+  if (session.status === "complete" || session.payment_status === "paid") throw new Error("This checkout has been paid or is processing. Wait for funding confirmation; do not cancel or pay again.");
+  if (session.status === "open") session = await stripe.checkout.sessions.expire(item.checkoutId, {}, { idempotencyKey: `clip-expire-${id}-${item.fundingAttempt}` });
+  if (session.status !== "expired" || session.payment_status !== "unpaid") throw new Error("Stripe has not confirmed this checkout is expired and unpaid. Wait for reconciliation before trying again.");
+  await serializable(async (tx) => {
+    const current = await tx.clipEngagement.findUniqueOrThrow({ where: { id } });
+    if (current.status === "ACCEPTED" && current.fundingAttempt === item.fundingAttempt && !current.checkoutId && !current.fundedAt) return;
+    if (current.status !== "FUNDING" || current.fundingAttempt !== item.fundingAttempt || current.checkoutId !== item.checkoutId || current.fundedAt) throw new Error("The funding state changed. Refresh the agreement before taking further action.");
+    await tx.clipEngagement.update({ where: { id }, data: { status: "ACCEPTED", checkoutId: null } });
+  });
+  return "Unpaid checkout cancelled. You can fund later or withdraw the unfunded agreement; no creator work should begin.";
 }
 
 export async function handleClipPaymentEvent(event: { type: Stripe.Event["type"]; data: { object: unknown } }) {
@@ -50,7 +74,7 @@ export async function handleClipPaymentEvent(event: { type: Stripe.Event["type"]
     const id = object.metadata.engagementId;
     if (!id) throw new Error("Clippers payment is missing its agreement.");
     const session = await stripe.checkout.sessions.retrieve(object.id);
-    await serializable(async (tx) => {
+    const funded = await serializable(async (tx) => {
       const item = await tx.clipEngagement.findUniqueOrThrow({ where: { id }, include: { campaign: true } });
       if (session.metadata?.fundingAttempt !== String(item.fundingAttempt)) {
         if (session.payment_status === "paid") throw new Error("A stale checkout attempt was paid. Administrator reconciliation is required.");
@@ -65,10 +89,12 @@ export async function handleClipPaymentEvent(event: { type: Stripe.Event["type"]
         if (!intentId) throw new Error("A confirmed payment intent is required.");
         await tx.clipEngagement.update({ where: { id }, data: { status: "FUNDED", fundedAt: new Date(), dueAt: new Date(Date.now() + item.campaign.deliveryDays * 86400000), checkoutId: session.id, paymentIntentId: intentId } });
         await tx.walletTransaction.create({ data: { userId: item.campaign.developerId, amountCents: item.chargeCents, type: "CLIPPER_DEPOSIT", status: "COMPLETED", stripePaymentId: intentId, description: `Pre-funded Clippers agreement ${id}` } });
+        return { agreementId: item.id, developerId: item.campaign.developerId };
       } else if (event.type === "checkout.session.expired" || event.type === "checkout.session.async_payment_failed") {
         await tx.clipEngagement.updateMany({ where: { id, status: "FUNDING", fundedAt: null }, data: { status: "ACCEPTED", checkoutId: null } });
       }
     });
+    return funded;
   }
   if (event.type === "charge.dispute.created" || event.type === "charge.refunded") {
     const chargeId = event.type === "charge.dispute.created" ? z.object({ charge: z.union([z.string(), z.object({ id: z.string() })]) }).parse(event.data.object).charge : z.object({ id: z.string() }).parse(event.data.object).id;
