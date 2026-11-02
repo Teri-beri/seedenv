@@ -12,12 +12,29 @@ function toneFor(status: LiveSystemStatus): Tone {
   return { dot: "bg-emerald-500", text: "text-emerald-300", border: "border-emerald-500/20", label: "SYSTEMS OPERATIONAL", pulse: true };
 }
 
-export function StatusPill({ className = "" }: { className?: string }) {
+export function StatusPill({ className = "", compact = false }: { className?: string; compact?: boolean }) {
   const status = useLiveSystemStatus();
   const [showLatency, setShowLatency] = useState(false);
   const tone = toneFor(status);
   const latency = status.phase === "ready" ? `${status.latencyMs}ms` : null;
   const label = showLatency && latency ? `LATENCY ${latency}` : tone.label;
+
+  if (compact) {
+    return (
+      <span
+        role="status"
+        aria-live="polite"
+        aria-label={`${tone.label.toLowerCase()}${latency ? `, ${latency} round trip` : ""}`}
+        title={`${tone.label}${latency ? ` · ${latency}` : ""}`}
+        className={`inline-flex size-3 shrink-0 items-center justify-center ${className}`}
+      >
+        <span aria-hidden="true" className="relative flex size-2">
+          {tone.pulse ? <span className={`absolute inline-flex size-full rounded-full opacity-60 motion-safe:animate-ping ${tone.dot}`} /> : null}
+          <span className={`relative inline-flex size-2 rounded-full ${tone.dot} ${tone.pulse ? "motion-safe:animate-pulse" : ""}`} />
+        </span>
+      </span>
+    );
+  }
 
   // `className` controls the wrapper's display so responsive `hidden lg:inline-flex` utilities aren't overridden.
   return (

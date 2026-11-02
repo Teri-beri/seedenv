@@ -6,6 +6,7 @@ import Link from "next/link";
 import { UserDropdown, type DropdownAccount } from "@/components/user-dropdown";
 import { SegmentedTabLinks } from "@/components/ui/SegmentedTabs";
 import { useDismissableMenu } from "@/components/use-dismissable-menu";
+import { CommandPaletteTrigger } from "@/components/command-palette";
 
 export type ConsoleView = "overview" | "new-drop" | "review-deck" | "asset-vault" | "monitor" | "billing" | "messages";
 
@@ -87,7 +88,8 @@ export function ConsoleHeader({ activeView, paymentsMode, account, cohortRules =
           />
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <StatusPill className="hidden 2xl:inline-flex" />
+          <CommandPaletteTrigger />
+          <StatusPill compact />
           <CohortRulesMenu links={cohortRules} />
           <Link
             href="/console?view=new-drop"

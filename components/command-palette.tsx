@@ -21,6 +21,21 @@ const commands: ReadonlyArray<PaletteCommand> = [
 
 export const OPEN_COMMAND_PALETTE_EVENT = "seedenv:open-command-palette";
 
+export function CommandPaletteTrigger({ className = "" }: { className?: string }) {
+  return (
+    <button
+      type="button"
+      aria-label="Open command palette"
+      title="Search SeedEnv"
+      onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT))}
+      className={`inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/50 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 ${className}`}
+    >
+      <Search aria-hidden="true" className="size-4" />
+      <span className="sr-only">Search SeedEnv</span>
+    </button>
+  );
+}
+
 function matches(command: PaletteCommand, query: string) {
   const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
   const haystack = `${command.label} ${command.hint} ${command.keywords}`.toLowerCase();
