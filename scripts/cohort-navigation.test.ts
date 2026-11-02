@@ -22,10 +22,14 @@ test("cohort creation survives sign-in redirects without weakening admin route p
     token = { role: "ADMIN" };
     const adminLaunch = await proxy(new NextRequest("https://seedenv.com/console?view=new-drop"));
     assert.equal(adminLaunch.headers.get("x-middleware-next"), "1");
+    const adminControl = await proxy(new NextRequest("https://seedenv.com/admin"));
+    assert.equal(adminControl.headers.get("x-middleware-next"), "1");
 
     token = { role: "DEVELOPER" };
     const developerLaunch = await proxy(new NextRequest("https://seedenv.com/console?view=new-drop"));
     assert.equal(developerLaunch.headers.get("x-middleware-next"), "1");
+    const developerDenied = await proxy(new NextRequest("https://seedenv.com/admin"));
+    assert.equal(new URL(developerDenied.headers.get("location")!).pathname, "/console");
 
     token = { role: "TESTER" };
     const adminDenied = await proxy(new NextRequest("https://seedenv.com/admin"));

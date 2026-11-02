@@ -28,6 +28,7 @@ import { isPublicHandle, publicProfilePath } from "@/lib/public-profile";
 import { rankProgress } from "@/lib/rank";
 import { getStripe } from "@/lib/stripe";
 import { formatCents } from "@/lib/utils";
+import { workspaceHome } from "@/lib/workspace-navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -157,7 +158,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         <div className="mx-auto max-w-7xl">
           <header className="mobile-settings-header flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-4">
-              <Link className="inline-flex items-center gap-2 rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-3 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-amber-500/40 hover:text-white" href={user.role === UserRole.DEVELOPER ? "/console" : user.role === UserRole.ADMIN ? "/admin" : "/dashboard"}>
+              <Link className="inline-flex items-center gap-2 rounded-xl border border-[#1F2430] bg-[#0E1017]/80 px-3 py-2 text-sm font-semibold text-neutral-300 transition-all hover:border-amber-500/40 hover:text-white" href={workspaceHome(user.role)}>
                 <ArrowLeft className="size-4" /> Back
               </Link>
               <Link className="mobile-settings-brand flex items-center gap-3" href="/">
@@ -196,6 +197,16 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
             {activeTab === "profile" ? (
               <div className="max-w-3xl space-y-4">
+                {user.role === UserRole.ADMIN ? (
+                  <Link href="/admin" className="group flex min-h-11 items-center gap-4 rounded-xl border border-violet-500/25 bg-violet-500/[0.07] p-4 transition hover:border-violet-400/40 hover:bg-violet-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/60">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-violet-400/20 bg-violet-400/10 text-violet-300"><ShieldCheck aria-hidden="true" className="size-5" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-zinc-100">Private Admin Control</span>
+                      <span className="mt-1 block text-sm text-zinc-400">Manage SeedEnv operations, reviews, and payouts.</span>
+                    </span>
+                    <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-zinc-500 transition group-hover:text-violet-200" />
+                  </Link>
+                ) : null}
                 {isPublicHandle(user.username) ? (
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs">
@@ -308,7 +319,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           </section>
         </div>
         <div className="sm:hidden">
-          {user.role === UserRole.TESTER ? <TesterBottomNav /> : user.role === UserRole.DEVELOPER ? <DeveloperBottomNav /> : null}
+          {user.role === UserRole.TESTER ? <TesterBottomNav /> : <DeveloperBottomNav />}
         </div>
       </main>
     </AuthCheck>

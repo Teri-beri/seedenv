@@ -2,7 +2,10 @@ import test, { mock } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { createElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { landingViews, landingViewHref, resolveLandingView } from "../lib/landing-views";
+import { workspaceHome } from "../lib/workspace-navigation";
 
 test("production npm startup applies pending database migrations before serving traffic", async () => {
   const pkg = JSON.parse(await readFile("package.json", "utf8"));
@@ -27,28 +30,75 @@ test("landing destinations map to continuous-page anchors and keep safe legacy r
   }
 });
 
+test("workspace navigation sends administrators and developers to the console", () => {
+  assert.equal(workspaceHome("ADMIN"), "/console");
+  assert.equal(workspaceHome("DEVELOPER"), "/console");
+  assert.equal(workspaceHome("TESTER"), "/dashboard");
+  assert.equal(workspaceHome(undefined), "/dashboard");
+});
+
+test("the landing Console link points to the correct workspace for each role", async () => {
+  const Empty = () => null;
+  const modules = [
+    mock.module("next-auth/react", { namedExports: { useSession: () => ({ data: null, status: "unauthenticated" }) } }),
+    mock.module("next/navigation", { namedExports: { useRouter: () => ({ push: () => {} }) } }),
+    mock.module("next/image", { defaultExport: Empty }),
+    mock.module("next/link", { defaultExport: ({ href, children, ...props }: { href: string; children: ReactNode }) => createElement("a", { href, ...props }, children) }),
+    mock.module("../components/analytics-tracker.tsx", { namedExports: { AnalyticsTracker: Empty, trackAnalytics: () => {} } }),
+    mock.module("../components/status-pill.tsx", { namedExports: { StatusPill: Empty } }),
+    mock.module("../components/public-footer.tsx", { namedExports: { PublicFooter: Empty } }),
+    mock.module("../components/PricingCalculator.tsx", { namedExports: { PricingCalculator: Empty } }),
+    mock.module("../components/TelemetryGridCanvas.tsx", { defaultExport: Empty }),
+    mock.module("../components/landing-platform-fee-offer.tsx", { namedExports: { LandingPlatformFeeOfferCard: Empty } }),
+    mock.module("../components/ui/SegmentedTabs.tsx", { namedExports: { SegmentedTabs: Empty } }),
+    mock.module("../components/telemetry-sandbox.tsx", { namedExports: {
+      SandboxBadge: Empty,
+      ScenarioCard: Empty,
+      ScenarioDrawer: Empty,
+      sandboxScenarios: [],
+      useScenarioInspector: () => ({ active: null, inspect: () => {}, onOpenChange: () => {} }),
+    } }),
+  ];
+  try {
+    const { PublicLanding } = await import(`../components/public-landing.tsx?workspace=${randomUUID()}`);
+    for (const [role, destination] of [["ADMIN", "/console"], ["DEVELOPER", "/console"], ["TESTER", "/dashboard"]] as const) {
+      const html = renderToStaticMarkup(createElement(PublicLanding, { missions: [], viewer: { id: "member", role } }));
+      const actions = html.match(/<nav[^>]*aria-label="Landing actions"[^>]*>.*?<\/nav>/)?.[0] ?? "";
+      assert.match(actions, new RegExp(`href="${destination}"[^>]*>Console<\\/a>`));
+      assert.doesNotMatch(actions, /href="\/admin"/);
+    }
+    const visitor = renderToStaticMarkup(createElement(PublicLanding, { missions: [], viewer: null }));
+    assert.match(visitor, />Sign In<\/button>/);
+  } finally {
+    for (const moduleMock of modules.reverse()) moduleMock.restore();
+  }
+});
+
 test("Account profile avoids unmigrated invoice columns and unrelated analytics", async () => {
   const previousOwner = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL;
   process.env.SEEDENV_ANALYTICS_OWNER_EMAIL = "owner@example.invalid";
   let query: { include?: { transactions?: { select?: Record<string, boolean> } } } = {};
   let analyticsCalls = 0;
+  let role: "ADMIN" | "DEVELOPER" | "TESTER" = "DEVELOPER";
   const Empty = () => null;
+  const PassThrough = ({ children }: { children: ReactNode }) => createElement("div", null, children);
   const modules = [
     mock.module("next-auth", { namedExports: { getServerSession: async () => ({ user: { id: "owner" } }) } }),
     mock.module("../lib/auth-options.ts", { namedExports: { authOptions: {} } }),
     mock.module("next/navigation", { namedExports: { redirect: (path: string) => { throw new Error(`Unexpected redirect: ${path}`); } } }),
     mock.module("next/image", { defaultExport: Empty }),
-    mock.module("next/link", { defaultExport: Empty }),
+    mock.module("next/link", { defaultExport: ({ href, children, ...props }: { href: string; children: ReactNode }) => createElement("a", { href, ...props }, children) }),
     mock.module("lucide-react", { namedExports: Object.fromEntries(["ArrowLeft", "ArrowRight", "BadgeCheck", "BriefcaseBusiness", "CheckCircle2", "ShieldCheck", "Sprout", "Trophy", "WalletCards"].map((name) => [name, Empty])) }),
     mock.module("../lib/prisma.ts", { namedExports: { prisma: { user: { findUnique: async (input: typeof query) => {
       query = input;
       if (!input.include?.transactions?.select || "invoiceSnapshot" in input.include.transactions.select) throw new Error("New invoice columns are unavailable in this simulated database.");
-      return { id: "owner", email: "owner@example.invalid", username: "teriberi", role: "DEVELOPER", rankTier: "ALPHA_SEEDER", xpPoints: 0, walletBalanceCents: 0, submissions: [], campaigns: [], transactions: [], accounts: [], developerReferralReceived: null, developerReferralsSent: [], ownedPromoCodes: [], feeCredits: [], createdAt: new Date("2026-01-01"), notificationPreferences: {}, emailVerified: null };
+      return { id: "owner", email: "owner@example.invalid", username: "teriberi", role, rankTier: "ALPHA_SEEDER", xpPoints: 0, walletBalanceCents: 0, submissions: [], campaigns: [], transactions: [], accounts: [], developerReferralReceived: null, developerReferralsSent: [], ownedPromoCodes: [], feeCredits: [], createdAt: new Date("2026-01-01"), notificationPreferences: {}, emailVerified: null };
     } } } } }),
     mock.module("../lib/analytics.ts", { namedExports: { getAnalyticsSummary: async () => { analyticsCalls++; throw new Error("Optional analytics unavailable."); } } }),
-    mock.module("../components/AuthCheck.tsx", { defaultExport: Empty }),
+    mock.module("../components/AuthCheck.tsx", { defaultExport: PassThrough }),
     mock.module("../components/analytics-summary.tsx", { namedExports: { AnalyticsSummary: Empty } }),
     mock.module("../components/account-settings-form.tsx", { namedExports: { AccountSettingsForm: Empty } }),
+    mock.module("../components/developer-referral-settings.tsx", { namedExports: { DeveloperReferralSettings: Empty } }),
     mock.module("../components/account-signout-button.tsx", { namedExports: { AccountSignOutButton: Empty } }),
     mock.module("../components/notification-settings-form.tsx", { namedExports: { NotificationSettingsForm: Empty } }),
     mock.module("../components/github-token-form.tsx", { namedExports: { GitHubTokenForm: Empty } }),
@@ -60,12 +110,24 @@ test("Account profile avoids unmigrated invoice columns and unrelated analytics"
   try {
     const { default: AccountPage } = await import(`../app/account/page.tsx?account-compat=${randomUUID()}`);
     const result = await AccountPage({ searchParams: Promise.resolve({ tab: "profile" }) });
-    assert.ok(result);
+    const developerPage = renderToStaticMarkup(result);
+    assert.match(developerPage, /<a href="\/console"[^>]*>.*?Back<\/a>/);
+    assert.doesNotMatch(developerPage, /Private Admin Control/);
     assert.equal(analyticsCalls, 0);
     assert.deepEqual(Object.keys(query.include?.transactions?.select || {}).sort(), ["amountCents", "createdAt", "description", "id", "status", "type"]);
     await AccountPage({ searchParams: Promise.resolve({ tab: "security" }) });
     await AccountPage({ searchParams: Promise.resolve({ tab: "notifications" }) });
     assert.equal(analyticsCalls, 0);
+
+    role = "ADMIN";
+    const adminPage = renderToStaticMarkup(await AccountPage({ searchParams: Promise.resolve({}) }));
+    assert.match(adminPage, /<a href="\/console"[^>]*>.*?Back<\/a>/);
+    assert.match(adminPage, /<a href="\/admin"[^>]*>.*?Private Admin Control/);
+
+    role = "TESTER";
+    const testerPage = renderToStaticMarkup(await AccountPage({ searchParams: Promise.resolve({}) }));
+    assert.match(testerPage, /<a href="\/dashboard"[^>]*>.*?Back<\/a>/);
+    assert.doesNotMatch(testerPage, /Private Admin Control/);
   } finally {
     for (const item of modules.reverse()) item.restore();
     if (previousOwner === undefined) delete process.env.SEEDENV_ANALYTICS_OWNER_EMAIL;

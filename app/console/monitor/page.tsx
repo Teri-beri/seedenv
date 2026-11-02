@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function TelemetryMonitorPage({ searchParams }: { searchParams: Promise<{ cohort?: string; incident?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/auth/signin?callbackUrl=/console/monitor");
-  if (session.user.role !== "DEVELOPER") redirect("/");
+  if (session.user.role !== "DEVELOPER" && session.user.role !== "ADMIN") redirect("/");
   const params = await searchParams;
   const developer = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -88,7 +88,7 @@ export default async function TelemetryMonitorPage({ searchParams }: { searchPar
   };
 
   return (
-    <AuthCheck role="DEVELOPER">
+    <AuthCheck role={session.user.role}>
       <main className="mobile-app-shell min-h-screen bg-[#0A0D12] pb-20 text-white">
         <ConsoleHeader activeView="monitor" paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={account} />
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">

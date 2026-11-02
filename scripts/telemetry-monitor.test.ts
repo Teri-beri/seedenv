@@ -1,7 +1,66 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test, { mock } from "node:test";
+import { createElement, isValidElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { resolveIncidentSeverity } from "../lib/telemetry/thresholds";
+
+test("the console monitor accepts administrators without exposing another member's cohorts", async () => {
+  let role: "ADMIN" | "DEVELOPER" | "TESTER" = "ADMIN";
+  let cohortQuery: { where?: { developerId?: string } } = {};
+  class Redirect extends Error {}
+  const Empty = () => null;
+  const modules = [
+    mock.module("next-auth", { namedExports: { getServerSession: async () => ({ user: { id: "member-1", role } }) } }),
+    mock.module("next/navigation", { namedExports: { redirect: (path: string) => { throw new Redirect(path); } } }),
+    mock.module("../lib/auth-options.ts", { namedExports: { authOptions: {} } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: {
+      user: { findUnique: async () => ({ username: "member", avatarUrl: null, role, companyName: null, billingProfile: null, passwordHash: "fixture", _count: { accounts: 0 } }) },
+      appCampaign: { findMany: async (query: typeof cohortQuery) => { cohortQuery = query; return []; } },
+    } } }),
+    mock.module("../components/AuthCheck.tsx", { defaultExport: Empty }),
+    mock.module("../components/console-header.tsx", { namedExports: { ConsoleHeader: Empty } }),
+    mock.module("../components/console/TelemetryMonitor.tsx", { namedExports: { TelemetryMonitor: Empty } }),
+    mock.module("../components/navigation.tsx", { namedExports: { DeveloperBottomNav: Empty } }),
+  ];
+  try {
+    const { default: MonitorPage } = await import("../app/console/monitor/page");
+    for (const allowedRole of ["ADMIN", "DEVELOPER"] as const) {
+      role = allowedRole;
+      const page = await MonitorPage({ searchParams: Promise.resolve({}) });
+      assert.ok(isValidElement<{ role: string }>(page));
+      assert.equal(page.props.role, allowedRole);
+      assert.equal(cohortQuery.where?.developerId, "member-1");
+    }
+    role = "TESTER";
+    await assert.rejects(MonitorPage({ searchParams: Promise.resolve({}) }), (error) => error instanceof Redirect && error.message === "/");
+  } finally {
+    for (const moduleMock of modules.reverse()) moduleMock.restore();
+  }
+});
+
+test("account setup returns to the console monitor after onboarding", async () => {
+  const Empty = () => null;
+  const modules = [
+    mock.module("next-auth", { namedExports: { getServerSession: async () => ({ user: { id: "admin-1", role: "ADMIN" } }) } }),
+    mock.module("next/navigation", { namedExports: { redirect: (path: string) => { throw new Error(`Unexpected redirect: ${path}`); } } }),
+    mock.module("../lib/auth-options.ts", { namedExports: { authOptions: {} } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: {
+      user: { findUnique: async () => ({ email: "admin@example.invalid", name: "Admin", username: "admin", bio: null, portfolioUrl: null, companyName: null, productUrl: null, role: "ADMIN", passwordHash: null }) },
+    } } }),
+    mock.module("../components/grid-background.tsx", { namedExports: { GridBackground: Empty } }),
+    mock.module("../components/onboarding-wizard.tsx", { namedExports: { OnboardingWizard: ({ nextPath }: { nextPath: string }) => createElement("span", { "data-next": nextPath }) } }),
+  ];
+  try {
+    const { default: SetupPage } = await import("../app/onboarding/setup/page");
+    const monitor = renderToStaticMarkup(await SetupPage({ searchParams: Promise.resolve({ next: "/console/monitor?cohort=example" }) }));
+    assert.match(monitor, /data-next="\/console\/monitor\?cohort=example"/);
+    const invalid = renderToStaticMarkup(await SetupPage({ searchParams: Promise.resolve({ next: "//example.invalid" }) }));
+    assert.match(invalid, /data-next="\/admin"/);
+  } finally {
+    for (const moduleMock of modules.reverse()) moduleMock.restore();
+  }
+});
 
 test("telemetry thresholds escalate service degradation server-side", () => {
   assert.equal(resolveIncidentSeverity({ requestedSeverity: "WARN", statusCode: "500" }), "CRITICAL");

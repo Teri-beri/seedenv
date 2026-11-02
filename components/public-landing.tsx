@@ -20,6 +20,7 @@ import { SandboxBadge, ScenarioCard, ScenarioDrawer, sandboxScenarios, useScenar
 import { LandingPlatformFeeOfferCard, type LandingPlatformFeeOffer } from "@/components/landing-platform-fee-offer";
 import { CohortBriefLink } from "@/components/cohort-brief-link";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
+import { workspaceHome } from "@/lib/workspace-navigation";
 
 type Mission = {
   id: string;
@@ -108,7 +109,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
   const visibleMissions = discoverMissions(missions, deferredQuery, filter, "reward");
   const role = viewer?.role ?? session?.user?.role;
   const signedIn = Boolean(viewer) || status === "authenticated";
-  const workspaceHref = role === "DEVELOPER" ? "/console" : role === "ADMIN" ? "/admin" : "/dashboard";
+  const workspaceHref = workspaceHome(role);
   const developerHref = signedIn
     ? role === "DEVELOPER" || role === "ADMIN" ? "/console?view=new-drop" : "/onboarding?role=DEVELOPER&next=%2Fconsole%3Fview%3Dnew-drop"
     : "/auth/signin?role=DEVELOPER&callbackUrl=%2Fconsole%3Fview%3Dnew-drop";
