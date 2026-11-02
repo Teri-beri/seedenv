@@ -1,5 +1,5 @@
 import { UserRole } from "@prisma/client";
-import { ShieldCheck, UsersRound, WalletCards } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, ShieldCheck, UsersRound, WalletCards } from "lucide-react";
 import { getServerSession } from "next-auth";
 import Image from "next/image";
 import Link from "next/link";
@@ -36,28 +36,58 @@ export default async function AdminPage() {
                 <h1 className="text-xl font-semibold text-neutral-100">Private Admin Control</h1>
               </div>
             </div>
-            <span className="rounded-full border border-violet-500/30 bg-violet-950/30 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-violet-100">
-              {UserRole.ADMIN}
-            </span>
+            <div className="flex items-center gap-3">
+              <Link href="/" className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 text-sm font-medium text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-800/80 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60">
+                <ArrowLeft aria-hidden="true" className="size-4" />
+                <span className="hidden sm:inline">Back to SeedEnv</span>
+                <span className="sm:hidden">Back</span>
+              </Link>
+              <span className="rounded-full border border-violet-500/30 bg-violet-950/30 px-4 py-2 font-mono text-xs font-semibold uppercase tracking-[0.18em] text-violet-100">
+                {UserRole.ADMIN}
+              </span>
+            </div>
           </header>
-          <nav aria-label="Administrator queues" className="mt-6">
-            <Link href="/admin/earnings" className="inline-flex min-h-11 items-center rounded-xl border border-emerald-500/30 px-4 py-3 text-sm text-emerald-200">Owner earnings & payouts</Link>
-            <Link href="/admin/proof-reviews" className="inline-flex min-h-11 items-center rounded-xl border border-amber-500/30 px-4 py-3 text-sm text-amber-200">Denied tester work</Link>
-            <Link href="/admin/promos" className="inline-flex min-h-11 items-center rounded-xl border border-emerald-500/30 px-4 py-3 text-sm text-emerald-200">Cohort promo codes</Link>
-            <Link href="/admin/referrals" className="inline-flex min-h-11 items-center rounded-xl border border-amber-500/30 px-4 py-3 text-sm text-amber-200">Referral clawback audit</Link>
-            <Link href="/clippers" className="inline-flex min-h-11 items-center rounded-xl border border-violet-500/30 px-4 py-3 text-sm text-violet-200">Clippers creator applications & disputes</Link>
-            <Link href="/admin/growth" className="ml-3 inline-flex min-h-11 items-center rounded-xl border border-emerald-500/30 px-4 py-3 text-sm text-emerald-200">Growth engine & social posts</Link>
-            <Link href="/admin/qa" className="ml-3 inline-flex min-h-11 items-center rounded-xl border border-amber-500/30 px-4 py-3 text-sm text-amber-200">QA assistant: flagged proofs</Link>
+          <nav aria-label="Administrator queues" className="mt-8 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { href: "/admin/earnings", label: "Owner earnings & payouts", tone: "emerald" },
+              { href: "/admin/proof-reviews", label: "Denied tester work", tone: "amber" },
+              { href: "/admin/promos", label: "Cohort promo codes", tone: "emerald" },
+              { href: "/admin/referrals", label: "Referral clawback audit", tone: "amber" },
+              { href: "/clippers", label: "Clippers creator applications & disputes", tone: "violet" },
+              { href: "/admin/growth", label: "Growth engine & social posts", tone: "emerald" },
+              { href: "/admin/qa", label: "QA assistant: flagged proofs", tone: "amber" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`group flex min-h-12 items-center justify-between gap-3 rounded-xl border bg-zinc-950/50 px-4 py-3 text-sm transition duration-200 hover:-translate-y-0.5 hover:bg-zinc-900/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 ${
+                  item.tone === "emerald"
+                    ? "border-emerald-500/20 text-emerald-200 hover:border-emerald-400/40"
+                    : item.tone === "amber"
+                      ? "border-amber-500/20 text-amber-200 hover:border-amber-400/40"
+                      : "border-violet-500/20 text-violet-200 hover:border-violet-400/40"
+                }`}
+              >
+                <span>{item.label}</span>
+                <ArrowUpRight aria-hidden="true" className="size-4 shrink-0 text-zinc-500 transition group-hover:text-zinc-200" />
+              </Link>
+            ))}
           </nav>
 
-          <section className="mt-14 max-w-4xl">
-            <p className="text-xs uppercase tracking-[0.28em] text-amber-500">Internal operations</p>
-            <h2 className="mt-3 bg-gradient-to-br from-white via-neutral-200 to-neutral-500 bg-clip-text text-5xl font-black leading-[0.98] tracking-tight text-transparent sm:text-6xl">
-              Admin tools stay private.
-            </h2>
-            <p className="mt-5 text-lg leading-8 text-neutral-400">
-              This endpoint is not linked from public navigation and is only available to authenticated SeedEnv administrators.
-            </p>
+          <section className="relative mt-8 overflow-hidden rounded-3xl border border-white/[0.08] bg-[linear-gradient(120deg,rgba(16,185,129,0.07),transparent_48%),linear-gradient(300deg,rgba(245,158,11,0.07),transparent_45%),rgba(9,9,11,0.8)] p-6 shadow-2xl shadow-black/20 sm:p-9">
+            <div aria-hidden="true" className="absolute -right-20 -top-24 size-64 rounded-full bg-emerald-500/[0.06] blur-3xl" />
+            <div className="relative max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/[0.06] px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.2em] text-emerald-300">
+                <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
+                Internal operations
+              </div>
+              <h2 className="mt-5 text-4xl font-semibold leading-tight tracking-tight text-zinc-100 sm:text-5xl">
+                Private by design.
+              </h2>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-zinc-400 sm:text-lg">
+                A secure control room for SeedEnv operations. These tools are available only to authenticated administrators and never appear in public navigation.
+              </p>
+            </div>
           </section>
 
           <section className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -74,10 +104,10 @@ export default async function AdminPage() {
 
 function AdminMetric({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[#1F2430] bg-[#0E1017]/80 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-md transition-all hover:border-violet-500/30">
-      <div className="text-amber-500">{icon}</div>
-      <p className="mt-4 text-xs uppercase tracking-[0.18em] text-neutral-500">{label}</p>
-      <p className="mt-2 font-mono text-2xl font-black text-white">{value}</p>
+    <div className="group rounded-2xl border border-white/[0.08] bg-[#111318]/85 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-md transition duration-200 hover:-translate-y-0.5 hover:border-emerald-500/25 hover:bg-[#14171d]">
+      <div className="grid size-9 place-items-center rounded-xl border border-amber-500/15 bg-amber-500/[0.07] text-amber-400 transition group-hover:border-amber-400/30 group-hover:bg-amber-500/10">{icon}</div>
+      <p className="mt-5 font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-500">{label}</p>
+      <p className="mt-2 font-mono text-2xl font-semibold tabular-nums tracking-tight text-zinc-100">{value}</p>
     </div>
   );
 }
