@@ -78,7 +78,9 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
     }
   }
 
-  if (user?.role === UserRole.ADMIN) redirect("/admin");
+  if (user?.role === UserRole.ADMIN) {
+    redirect(nextPath === "/console" || nextPath.startsWith("/console?") ? nextPath : "/admin");
+  }
   if (params.ref) {
     const received = await prisma.referral.findUnique({ where: { friendId: session.user.id } });
     if (!received) {

@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
     const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET, decode: decodeSessionToken });
     if (!token) {
       const signInUrl = new URL("/auth/signin", request.url);
-      signInUrl.searchParams.set("callbackUrl", pathname);
+      signInUrl.searchParams.set("callbackUrl", `${pathname}${request.nextUrl.search}`);
       const roleHint = pathname.startsWith("/dashboard/developer/") ? "DEVELOPER" : route.role;
       if (roleHint === "DEVELOPER" || roleHint === "TESTER") signInUrl.searchParams.set("role", roleHint);
       return NextResponse.redirect(signInUrl);

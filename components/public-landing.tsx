@@ -110,7 +110,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
   const signedIn = Boolean(viewer) || status === "authenticated";
   const workspaceHref = role === "DEVELOPER" ? "/console" : role === "ADMIN" ? "/admin" : "/dashboard";
   const developerHref = signedIn
-    ? role === "DEVELOPER" || role === "ADMIN" ? "/console?view=new-drop" : "/account"
+    ? role === "DEVELOPER" || role === "ADMIN" ? "/console?view=new-drop" : "/onboarding?role=DEVELOPER&next=%2Fconsole%3Fview%3Dnew-drop"
     : "/auth/signin?role=DEVELOPER&callbackUrl=%2Fconsole%3Fview%3Dnew-drop";
 
   function requestAccess(request: AuthRequest) {

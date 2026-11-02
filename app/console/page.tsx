@@ -38,7 +38,7 @@ const reviewPageSize = 20;
 export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string; stripePayment?: string; cohort?: string; launched?: string; topup?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/auth/signin");
-  if (session.user.role !== "DEVELOPER") redirect("/");
+  if (session.user.role !== "DEVELOPER" && session.user.role !== "ADMIN") redirect("/");
   const params = await searchParams;
   const activeView: ConsoleView = consoleViews.includes(params.view as ConsoleView) ? params.view as ConsoleView : "overview";
   const feeBenefits = activeView === "new-drop" ? await prisma.$transaction(tx => automaticFeeBenefits(tx, session.user.id, new Date(), params.draft)) : undefined;
@@ -47,7 +47,11 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     where: { id: session.user.id },
     select: { passwordHash: true, role: true, username: true, email: true, avatarUrl: true, stripeCustomerId: true, fundingBalanceCents: true, platformFeeWaived: true, launchWizardDrafts: true, launchWizardDraftRevision: true, companyName: true, billingProfile: { select: { companyName: true } }, _count: { select: { accounts: true } } },
   });
-  if (security && !security.passwordHash && security._count.accounts === 0) redirect("/onboarding/setup?next=/console");
+  if (security && !security.passwordHash && security._count.accounts === 0) {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) if (value) query.set(key, value);
+    redirect(`/onboarding/setup?next=${encodeURIComponent(`/console${query.size ? `?${query}` : ""}`)}`);
+  }
   const ownerEmail = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL?.trim().toLowerCase();
   const canSaveTestDraft = Boolean(
     security?.role === "DEVELOPER"
@@ -217,7 +221,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     publicProfileHref: isPublicHandle(accountUsername) ? publicProfilePath(accountUsername) : null,
   };
   return (
-    <AuthCheck role="DEVELOPER">
+    <AuthCheck role={session.user.role}>
     <main className="mobile-app-shell min-h-screen bg-[#0A0D12] pb-16 text-white" id="console-top">
       <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} cohortRules={cohortRules} />
       {security?.platformFeeWaived ? <ConsolePromoBanner>Platform fees are permanently waived for your developer account. Tester rewards remain fully funded. Existing charges are unchanged.</ConsolePromoBanner> : null}

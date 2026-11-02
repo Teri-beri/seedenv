@@ -170,7 +170,7 @@ export function CompactSignupForm() {
     try {
       const resumesMissionPair = nextPath.startsWith("/pair/");
       const baseCallback = provider === "github" && !resumesMissionPair
-        ? getOAuthCallback(developerReferral.trim() ? `/account?tab=profile&devref=${encodeURIComponent(developerReferral.trim())}` : "/console", "DEVELOPER")
+        ? getOAuthCallback(developerReferral.trim() ? `/account?tab=profile&devref=${encodeURIComponent(developerReferral.trim())}` : role === "DEVELOPER" ? nextPath : "/console", "DEVELOPER")
         : getOAuthCallback(nextPath, role);
       const callbackUrl = `${baseCallback}${(provider === "github" || role === "DEVELOPER") && developerReferral.trim() ? `&devref=${encodeURIComponent(developerReferral.trim())}` : ""}${searchParams.get("ref") ? `&ref=${encodeURIComponent(searchParams.get("ref") || "")}` : ""}`;
       const result = await signIn(provider, {

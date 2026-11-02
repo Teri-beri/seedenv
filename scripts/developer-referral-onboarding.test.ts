@@ -5,13 +5,14 @@ test("developer onboarding attaches entered referrals, preserves account redirec
   let attached = 0;
   let existing = false;
   let fail = false;
+  let memberRole = "DEVELOPER";
   class ReferralFailure extends Error {}
   class Redirect extends Error {}
   const mocks = [
     mock.module("next-auth", { namedExports: { getServerSession: async () => ({ user: { id: "referred-developer" } }) } }),
     mock.module("next/navigation", { namedExports: { redirect: (path: string) => { throw new Redirect(path); } } }),
     mock.module("../lib/auth-options.ts", { namedExports: { authOptions: {} } }),
-    mock.module("../lib/prisma.ts", { namedExports: { prisma: { user: { findUnique: async () => ({ role: "DEVELOPER", developerWorkspaceEnabled: true, testerWorkspaceEnabled: false, passwordHash: "fixture", _count: { accounts: 0 } }) } } } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: { user: { findUnique: async () => ({ role: memberRole, developerWorkspaceEnabled: true, testerWorkspaceEnabled: false, passwordHash: "fixture", _count: { accounts: 0 } }) } } } }),
     mock.module("../lib/member.ts", { namedExports: { requireMember: async () => assert.fail("Tester referral flow must remain separate.") } }),
     mock.module("../lib/quest-ledger.ts", { namedExports: { saveMemberReferral: async () => assert.fail("Developer code must not grant tester XP.") } }),
     mock.module("../lib/validator-handle.ts", { namedExports: { ensureValidatorHandle: async () => assert.fail("Not a tester.") } }),
@@ -41,6 +42,11 @@ test("developer onboarding attaches entered referrals, preserves account redirec
     fail = false;
     await assert.rejects(onboarding({ searchParams: Promise.resolve({ role: "DEVELOPER", next: "https://example.invalid" }) }), (error) => error instanceof Redirect && error.message === "/dashboard");
     assert.equal(attached, 1, "No entered developer code means no referral changes.");
+    memberRole = "ADMIN";
+    await assert.rejects(onboarding({ searchParams: Promise.resolve({ role: "DEVELOPER", next: "/console?view=new-drop" }) }), (error) => error instanceof Redirect && error.message === "/console?view=new-drop");
+    await assert.rejects(onboarding({ searchParams: Promise.resolve({ role: "DEVELOPER" }) }), (error) => error instanceof Redirect && error.message === "/admin");
+    await assert.rejects(onboarding({ searchParams: Promise.resolve({ role: "DEVELOPER", next: "//example.invalid" }) }), (error) => error instanceof Redirect && error.message === "/admin");
+    assert.equal(attached, 1, "Admin launch navigation preserves the admin role and skips member referral mutations.");
   } finally {
     log.mock.restore();
     for (const moduleMock of mocks.reverse()) moduleMock.restore();
