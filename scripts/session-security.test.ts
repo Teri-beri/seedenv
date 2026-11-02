@@ -5,16 +5,23 @@ import { encode, type JWT } from "next-auth/jwt";
 import { NextRequest } from "next/server";
 
 test("encrypted sessions are rejected after revocation, including at the route proxy", async () => {
-  let account: { sessionVersion: number; role: "TESTER" | "DEVELOPER" } | null = { sessionVersion: 0, role: "TESTER" };
+  let account: { sessionVersion: number; role: "TESTER" | "DEVELOPER" | "ADMIN" } | null = { sessionVersion: 0, role: "TESTER" };
   let failDatabase = false;
   let sessionCookie = "";
   const previousSecret = process.env.NEXTAUTH_SECRET;
+  const previousOwner = process.env.SEEDENV_ANALYTICS_OWNER_EMAIL;
   const secret = "isolated-session-test-secret-not-a-production-credential";
   process.env.NEXTAUTH_SECRET = secret;
+  process.env.SEEDENV_ANALYTICS_OWNER_EMAIL = "owner@seedenv.invalid";
   const database = mock.module("../lib/prisma.ts", {
     namedExports: { prisma: { user: { findUnique: async () => {
       if (failDatabase) throw new Error("Database unavailable");
       return account;
+    }, updateMany: async ({ where, data }: { where: { role: { not: string } }; data: { role: "DEVELOPER" } }) => {
+      assert.equal(where.role.not, "ADMIN", "owner promotion must atomically exclude administrators");
+      if (!account || account.role === where.role.not) return { count: 0 };
+      account.role = data.role;
+      return { count: 1 };
     } } } },
   });
   const requestScope = mock.module("next/headers", {
@@ -54,6 +61,15 @@ test("encrypted sessions are rejected after revocation, including at the route p
     const user = { id: "member-1", role: "TESTER" as const, sessionVersion: 3 };
     const issued = await callback({ token: { ...jwt }, user, account: null, trigger: "signIn" });
     assert.equal(issued.sessionVersion, 3);
+    assert.equal(issued.role, "TESTER");
+    const owner = { ...user, email: "owner@seedenv.invalid" };
+    account.role = "ADMIN";
+    const adminIssued = await callback({ token: { ...jwt }, user: owner, account: null, trigger: "signIn" });
+    assert.equal(adminIssued.role, "ADMIN", "signing in must preserve an explicitly assigned administrator role");
+    account.role = "TESTER";
+    const ownerIssued = await callback({ token: { ...jwt }, user: owner, account: null, trigger: "signIn" });
+    assert.equal(ownerIssued.role, "DEVELOPER", "ordinary owner accounts retain their existing developer promotion");
+    account.role = "TESTER";
     const { default: NextAuth } = await import("next-auth");
     const handler = NextAuth(authOptions);
     const issuedCookie = await encode({ token: issued, secret });
@@ -76,6 +92,8 @@ test("encrypted sessions are rejected after revocation, including at the route p
     database.restore();
     if (previousSecret === undefined) delete process.env.NEXTAUTH_SECRET;
     else process.env.NEXTAUTH_SECRET = previousSecret;
+    if (previousOwner === undefined) delete process.env.SEEDENV_ANALYTICS_OWNER_EMAIL;
+    else process.env.SEEDENV_ANALYTICS_OWNER_EMAIL = previousOwner;
   }
 });
 

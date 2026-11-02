@@ -239,7 +239,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         const shouldPromoteOwner = Boolean(user.email && analyticsOwnerEmail() === user.email.toLowerCase());
         if (shouldPromoteOwner) {
-          await prisma.user.update({ where: { id: user.id }, data: { role: UserRole.DEVELOPER, developerWorkspaceEnabled: true } });
+          await prisma.user.updateMany({ where: { id: user.id, role: { not: UserRole.ADMIN } }, data: { role: UserRole.DEVELOPER, developerWorkspaceEnabled: true } });
         }
         const currentUser = await prisma.user.findUnique({
           where: { id: user.id },
