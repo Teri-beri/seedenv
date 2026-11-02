@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { StatusPill } from "@/components/status-pill";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BackButton } from "@/components/back-button";
@@ -19,6 +20,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
             <Link href="/guides" className="inline-flex min-h-11 items-center px-2 hover:text-emerald-300">Guides</Link>
             <Link href="/about" className="inline-flex min-h-11 items-center px-2 hover:text-emerald-300">About</Link>
             <Link href="/auth/signin" className="inline-flex min-h-11 items-center px-2 font-semibold text-emerald-300">Sign In</Link>
+            <StatusPill className="ml-2 hidden md:inline-flex" />
           </nav>
         </div>
       </header>

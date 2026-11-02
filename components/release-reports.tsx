@@ -1,6 +1,8 @@
 "use client";
 
-import { Check, ChevronDown, Copy, FileText, LoaderCircle, RefreshCw, Sparkles } from "lucide-react";
+import { ChevronDown, FileText, LoaderCircle, RefreshCw, Sparkles } from "lucide-react";
+import { CopyFeedbackIcon } from "@/components/ui/copy-feedback-icon";
+import { useCopyFeedback } from "@/lib/use-copy-feedback";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -33,7 +35,8 @@ function ReportCard({ row }: { row: ReleaseReportRow }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { isCopied, copy: copyText } = useCopyFeedback();
+  const copied = isCopied();
   const [message, setMessage] = useState("");
   const report = row.synthesis;
 
@@ -55,13 +58,7 @@ function ReportCard({ row }: { row: ReleaseReportRow }) {
 
   async function copy() {
     if (!report) return;
-    try {
-      await navigator.clipboard.writeText(report.githubMarkdownExport);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setMessage("Copy failed. Your browser blocked clipboard access.");
-    }
+    if (!(await copyText(report.githubMarkdownExport))) setMessage("Copy failed. Your browser blocked clipboard access.");
   }
 
   return (
@@ -111,8 +108,8 @@ function ReportCard({ row }: { row: ReleaseReportRow }) {
             </ol>
           ) : <p className="text-sm text-zinc-500">No defects were reported in the approved submissions.</p>}
           <div className="flex flex-wrap items-center gap-2">
-            <button className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200" onClick={copy} type="button">
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? "Copied" : "Copy GitHub markdown"}
+            <button className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-zinc-200 transition motion-safe:active:scale-[0.97]" onClick={copy} type="button">
+              <CopyFeedbackIcon copied={copied} checkClassName="text-emerald-600" /> <span aria-live="polite">{copied ? "Copied" : "Copy GitHub markdown"}</span>
             </button>
             <button className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-300 hover:border-zinc-500 disabled:opacity-60" disabled={busy} onClick={() => generate(true)} type="button">
               {busy ? <LoaderCircle className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} {busy ? "Regenerating…" : "Regenerate"}

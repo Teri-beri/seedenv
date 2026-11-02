@@ -3,6 +3,7 @@ import type { Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/components/auth-provider";
 import { SupportModal } from "@/components/SupportModal";
+import { CommandPalette } from "@/components/command-palette";
 import { CursorGridTrail } from "@/components/cursor-grid-trail";
 import { siteMetadata, siteStructuredData } from "@/lib/seo";
 import "./globals.css";
@@ -59,7 +60,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(siteStructuredData).replace(/</g, "\\u003c") }}
         />
-        <AuthProvider>{children}<SupportModal aiEnabled={Boolean(process.env.GEMINI_API_KEY)} /></AuthProvider>
+        <AuthProvider>{children}<SupportModal aiEnabled={Boolean(process.env.GEMINI_API_KEY)} /><CommandPalette /></AuthProvider>
       </body>
     </html>
   );

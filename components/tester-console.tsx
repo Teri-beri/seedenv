@@ -1,4 +1,5 @@
 import type { AppCampaign, Submission, TaskInstruction, User } from "@prisma/client";
+import { StatusPill } from "@/components/status-pill";
 import { SubmissionStatus } from "@prisma/client";
 import { ArrowRight, Award, CheckCircle2, Medal, Settings, ShieldCheck, Trophy } from "lucide-react";
 import Image from "next/image";
@@ -75,6 +76,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
               />
             </div>
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+              <StatusPill className="hidden 2xl:inline-flex" />
               <Link className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] font-medium text-emerald-200 transition hover:border-emerald-400/50 hover:text-emerald-100" href="/account?tab=portfolio#stripe-setup">
                 {formatCents(pendingPayoutCents)}<span className="hidden sm:inline"> Cash Out</span>
               </Link>

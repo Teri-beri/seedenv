@@ -1,6 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
+import { StatusPill } from "@/components/status-pill";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { ArrowRight, CheckCircle2, CircleHelp, Code2, FileText, Fingerprint, Gamepad2, Globe, Layers, LockKeyhole, Menu, Search, ShieldCheck, Smartphone, Terminal, X } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -137,6 +138,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
             {landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => setActiveAnchor(item.anchor)} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 shrink-0 items-center rounded font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${activeAnchor === item.anchor ? "text-zinc-100" : "text-zinc-400 hover:text-zinc-100"}`}>{item.label}</Link>)}
           </nav>
           <nav className="ml-auto flex shrink-0 items-center gap-2 md:gap-4 lg:ml-0" aria-label="Landing actions">
+            <StatusPill className="hidden xl:inline-flex" />
             <div className="hidden items-center gap-4 md:flex">
               <Link href="/launch-circle" className={headerTextLink}>Launch Circle</Link>
               {signedIn ? (

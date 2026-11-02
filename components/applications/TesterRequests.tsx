@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Settings2, X } from "lucide-react";
 import { MemberAction } from "@/components/member-action";
+import { CopyFeedbackIcon } from "@/components/ui/copy-feedback-icon";
+import { useCopyFeedback } from "@/lib/use-copy-feedback";
+import { Link2 } from "lucide-react";
 import { ClaimTimer } from "@/components/applications/ClaimTimer";
 import { decideApplication } from "@/app/actions/applicationActions";
 
@@ -132,23 +135,20 @@ function ApplicantCard({ application, preview, balance, renderedAt }: { applicat
 }
 
 function ShareCohortButton({ cohort }: { cohort: { id: string; title: string } }) {
-  const [copied, setCopied] = useState(false);
+  const { isCopied, copy } = useCopyFeedback();
+  const copied = isCopied();
   return (
     <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
       <button
         type="button"
         onClick={async () => {
           const href = `${window.location.origin}/cohorts/${cohort.id}`;
-          try {
-            await navigator.clipboard.writeText(href);
-            setCopied(true);
-          } catch {
-            window.open(href, "_blank", "noopener");
-          }
+          if (!(await copy(href))) window.open(href, "_blank", "noopener");
         }}
-        className="min-h-11 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition-colors hover:bg-emerald-400"
+        className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-500 px-3 py-2 font-mono text-xs font-semibold text-black transition hover:bg-emerald-400 motion-safe:active:scale-[0.97]"
       >
-        {copied ? "Link copied" : "Share Cohort Link"}
+        <CopyFeedbackIcon copied={copied} icon={Link2} checkClassName="text-black" />
+        <span aria-live="polite">{copied ? "Link copied" : "Share Cohort Link"}</span>
       </button>
       <Link href={`/cohorts/${cohort.id}`} className="inline-flex min-h-11 items-center rounded-lg border border-zinc-800 px-3 py-2 font-mono text-xs text-zinc-400 transition-colors hover:text-white">Open public brief</Link>
     </div>

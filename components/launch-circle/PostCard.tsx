@@ -5,7 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ArrowRight, Check, Link2, MessageSquare, Zap } from "lucide-react";
+import { ArrowRight, Link2, MessageSquare, Zap } from "lucide-react";
+import { CopyFeedbackIcon } from "@/components/ui/copy-feedback-icon";
+import { useCopyFeedback } from "@/lib/use-copy-feedback";
 import { ProfileLink } from "@/components/profile-link";
 import { MemberAction } from "@/components/member-action";
 import { hideCommunityContent, publishComment, reportCommunityContent, toggleHelpful } from "@/app/actions/communityActions";
@@ -90,7 +92,8 @@ export function PostCard({ post, userId, admin = false, interactive = true, canC
 function PostFooter({ post, interactive, discussionHref }: { post: CirclePost; interactive: boolean; discussionHref: string }) {
   const [helpful, setHelpful] = useState(Boolean(post.viewerFoundHelpful));
   const [count, setCount] = useState(post.helpfulCount ?? 0);
-  const [copied, setCopied] = useState(false);
+  const { isCopied, copy } = useCopyFeedback();
+  const copied = isCopied();
   const [pending, startTransition] = useTransition();
   const router = useRouter();
   const footerButton = "inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-1.5 font-mono text-[11px] text-zinc-400 transition-colors hover:border-zinc-700 hover:text-zinc-200";
@@ -104,10 +107,7 @@ function PostFooter({ post, interactive, discussionHref }: { post: CirclePost; i
       try { await toggleHelpful(post.id); router.refresh(); }
       catch { setHelpful(!next); setCount((value) => Math.max(0, value + (next ? -1 : 1))); }
     })}><Zap className="size-3.5" aria-hidden="true" />Helpful {count}</button>
-    <button type="button" className={footerButton} onClick={() => {
-      const url = `${window.location.origin}${discussionHref}`;
-      navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => setCopied(false));
-    }}>{copied ? <Check className="size-3.5" aria-hidden="true" /> : <Link2 className="size-3.5" aria-hidden="true" />}{copied ? "Link copied" : "Share"}</button>
+    <button type="button" className={`${footerButton} motion-safe:active:scale-[0.97] ${copied ? "border-emerald-800 text-emerald-300" : ""}`} onClick={() => { void copy(`${window.location.origin}${discussionHref}`); }}><CopyFeedbackIcon copied={copied} icon={Link2} /><span aria-live="polite">{copied ? "Link copied" : "Share"}</span></button>
   </div>;
 }
 

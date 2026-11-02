@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { StatusPill } from "@/components/status-pill";
 import Link from "next/link";
 import { UserDropdown, type DropdownAccount } from "@/components/user-dropdown";
 import { SegmentedTabLinks } from "@/components/ui/SegmentedTabs";
@@ -86,6 +87,7 @@ export function ConsoleHeader({ activeView, paymentsMode, account, cohortRules =
           />
         </div>
         <div className="flex shrink-0 items-center gap-3">
+          <StatusPill className="hidden 2xl:inline-flex" />
           <CohortRulesMenu links={cohortRules} />
           <Link
             href="/console?view=new-drop"

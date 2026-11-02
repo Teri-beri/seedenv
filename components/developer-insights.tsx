@@ -16,6 +16,10 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useMemo, useState, useSyncExternalStore } from "react";
+import { CopyFeedbackIcon } from "@/components/ui/copy-feedback-icon";
+import { useCopyFeedback } from "@/lib/use-copy-feedback";
+
+type CopyTarget = "json" | "GitHub" | "Linear" | "logs";
 
 export type InsightSubmission = {
   id: string;
@@ -148,6 +152,7 @@ export function DeveloperInsights({
   const [resourceFilter, setResourceFilter] = useState<ResourceCategory>("All");
   const [logOpen, setLogOpen] = useState(false);
   const [notice, setNotice] = useState("");
+  const { copiedKey: copiedTarget, copy: copyToClipboard } = useCopyFeedback<CopyTarget>();
   const filteredSubmissions = useMemo(
     () =>
       submissions.filter((submission) => {
@@ -237,14 +242,11 @@ export function DeveloperInsights({
       networkLogs: selected.networkLogs,
       recordingUrl: selected.recordingUrl,
     };
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-      setNotice("Diagnostic payload JSON copied to clipboard.");
-    } catch {
-      setNotice(
-        "Clipboard access failed. Allow clipboard permission and try again.",
-      );
-    }
+    setNotice(
+      (await copyToClipboard(JSON.stringify(payload, null, 2), "json"))
+        ? "Diagnostic payload JSON copied to clipboard."
+        : "Clipboard access failed. Allow clipboard permission and try again.",
+    );
   }
 
   async function copyIssue(target: "GitHub" | "Linear" | "logs") {
@@ -252,16 +254,11 @@ export function DeveloperInsights({
       target === "logs"
         ? "No crash or network logs were attached to this submission."
         : `## ${selected?.campaign.title || "SeedEnv finding"}\n\n**Tester:** ${selected?.tester.username || "Unknown"}\n**Severity:** ${severity.label}\n**Expected:** ${parseField(feedback, "Expected")}\n**Actual:** ${parseField(feedback, "Actual")}\n\n### Feedback\n${feedback}`;
-    try {
-      await navigator.clipboard.writeText(content);
-      setNotice(
-        `${target === "logs" ? "Logs" : `${target} issue`} markdown copied to clipboard.`,
-      );
-    } catch {
-      setNotice(
-        "Clipboard access failed. Allow clipboard permission and try again.",
-      );
-    }
+    setNotice(
+      (await copyToClipboard(content, target))
+        ? `${target === "logs" ? "Logs" : `${target} issue`} markdown copied to clipboard.`
+        : "Clipboard access failed. Allow clipboard permission and try again.",
+    );
   }
 
   const reportCounts: Record<ReportFilter, number> = {
@@ -340,6 +337,7 @@ export function DeveloperInsights({
               setLogOpen={setLogOpen}
               copyIssue={copyIssue}
               copyDiagnosticPayload={copyDiagnosticPayload}
+              copiedTarget={copiedTarget}
               exportTelemetry={exportTelemetry}
               notice={notice}
             />
@@ -371,6 +369,7 @@ type TelemetryProps = {
   setLogOpen: (open: boolean) => void;
   copyIssue: (target: "GitHub" | "Linear" | "logs") => void;
   copyDiagnosticPayload: () => void;
+  copiedTarget: CopyTarget | null;
   exportTelemetry: () => void;
   notice: string;
 };
@@ -404,6 +403,7 @@ function TelemetryHub({
   setLogOpen,
   copyIssue,
   copyDiagnosticPayload,
+  copiedTarget,
   exportTelemetry,
   notice,
 }: TelemetryProps) {
@@ -473,11 +473,11 @@ function TelemetryHub({
                   {severity.label}
                 </span>
                 <button
-                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/15"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15 transition motion-safe:active:scale-[0.97]"
                   onClick={copyDiagnosticPayload}
                   type="button"
                 >
-                  <ClipboardCopy className="size-3.5" /> Copy Diagnostic JSON
+                  <CopyFeedbackIcon copied={copiedTarget === "json"} icon={ClipboardCopy} /> {copiedTarget === "json" ? "JSON copied" : "Copy Diagnostic JSON"}
                 </button>
               </div>
             </header>
@@ -583,29 +583,29 @@ function TelemetryHub({
                     </pre>
                   ) : null}
                   <button
-                    className="mt-3 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-emerald-400"
+                    className="mt-3 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-emerald-400 transition motion-safe:active:scale-[0.97]"
                     onClick={() => copyIssue("logs")}
                     type="button"
                   >
-                    <Clipboard className="size-3.5" /> Copy Full Log
+                    <CopyFeedbackIcon copied={copiedTarget === "logs"} icon={Clipboard} /> {copiedTarget === "logs" ? "Log copied" : "Copy Full Log"}
                   </button>
                 </div>
               </div>
             </div>
             <div className="mt-5 flex flex-wrap gap-2">
               <button
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white transition motion-safe:active:scale-[0.97]"
                 onClick={() => copyIssue("GitHub")}
                 type="button"
               >
-                <Code2 className="size-3.5" /> Copy GitHub Issue
+                <CopyFeedbackIcon copied={copiedTarget === "GitHub"} icon={Code2} /> {copiedTarget === "GitHub" ? "Issue copied" : "Copy GitHub Issue"}
               </button>
               <button
-                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white"
+                className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-zinc-600 hover:text-white transition motion-safe:active:scale-[0.97]"
                 onClick={() => copyIssue("Linear")}
                 type="button"
               >
-                <Send className="size-3.5" /> Copy for Linear
+                <CopyFeedbackIcon copied={copiedTarget === "Linear"} icon={Send} /> {copiedTarget === "Linear" ? "Issue copied" : "Copy for Linear"}
               </button>
               <button
                 className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15"
