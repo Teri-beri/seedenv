@@ -10,6 +10,7 @@ import { authOptions } from "@/lib/auth-options";
 import AuthCheck from "@/components/AuthCheck";
 import { AnalyticsSummary, type AnalyticsExclusionState, type AnalyticsSummaryData } from "@/components/analytics-summary";
 import { AccountSettingsForm } from "@/components/account-settings-form";
+import { DeveloperResources } from "@/components/developer-resources";
 import { DeveloperReferralSettings } from "@/components/developer-referral-settings";
 import { MessageInbox } from "@/components/message-inbox";
 import { MessageSettings } from "@/components/message-settings";
@@ -43,7 +44,7 @@ const accountTabs = [
 ] as const;
 
 type AccountTab = (typeof accountTabs)[number]["id"];
-type VisibleAccountTab = AccountTab | "site-performance";
+type VisibleAccountTab = AccountTab | "resources" | "site-performance";
 
 function normalizeNotificationPreferences(value: unknown): NotificationPreferences {
   const saved = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -98,9 +99,12 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     && user.email.trim().toLowerCase() === analyticsOwnerEmail
     && user.username.trim().toLowerCase() === "teriberi",
   );
-  const visibleTabs = canViewSitePerformance
-    ? [...accountTabs, { id: "site-performance" as const, label: "Site Performance" }]
-    : accountTabs;
+  const canViewDeveloperResources = user.role === UserRole.DEVELOPER || user.role === UserRole.ADMIN;
+  const visibleTabs: ReadonlyArray<{ id: VisibleAccountTab; label: string }> = [
+    ...accountTabs,
+    ...(canViewDeveloperResources ? [{ id: "resources" as const, label: "Developer Resources" }] : []),
+    ...(canViewSitePerformance ? [{ id: "site-performance" as const, label: "Site Performance" }] : []),
+  ];
   const activeTab: VisibleAccountTab = visibleTabs.some((tab) => tab.id === params.tab)
     ? params.tab as VisibleAccountTab
     : "profile";
@@ -242,6 +246,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 {user.role !== UserRole.TESTER || user.developerWorkspaceEnabled ? <GitHubTokenForm connected={Boolean(user.githubTokenEncrypted)} defaultRepo={user.githubDefaultRepo} /> : null}
               </div>
             ) : null}
+            {activeTab === "resources" ? <DeveloperResources /> : null}
             {activeTab === "messages" ? <MessageInbox memberId={user.id} params={params} /> : null}
             {activeTab === "message-settings" ? <MessageSettings enabled={user.messageRequestsEnabled} blocks={blocks.map(block => block.blocked)} /> : null}
             {activeTab === "connections" ? <ConnectionSettings memberId={user.id} page={Math.max(1, Math.min(10000, Number.parseInt(params.page || "1", 10) || 1))} /> : null}

@@ -1,3 +1,5 @@
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import AuthCheck from "@/components/AuthCheck";
@@ -92,6 +94,9 @@ export default async function TelemetryMonitorPage({ searchParams }: { searchPar
       <main className="mobile-app-shell min-h-screen bg-[#0A0D12] pb-20 text-white">
         <ConsoleHeader activeView="monitor" paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={account} />
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <Link href="/account?tab=resources" className="mb-6 inline-flex min-h-11 items-center gap-2 rounded-lg font-mono text-xs text-zinc-400 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
+            <ArrowLeft aria-hidden="true" className="size-4" /> Developer resources
+          </Link>
           <TelemetryMonitor
             cohorts={cohorts}
             activeCohort={selectedCohort}

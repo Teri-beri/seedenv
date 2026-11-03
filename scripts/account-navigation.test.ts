@@ -110,6 +110,7 @@ test("Account profile avoids unmigrated invoice columns and unrelated analytics"
     mock.module("../components/stripe-settings-card.tsx", { namedExports: { StripeSettingsCard: Empty } }),
     mock.module("../components/workspace-access-switcher.tsx", { namedExports: { WorkspaceAccessSwitcher: Empty } }),
     mock.module("../components/navigation.tsx", { namedExports: { DeveloperBottomNav: Empty, TesterBottomNav: Empty } }),
+    mock.module("../components/developer-resources.tsx", { namedExports: { DeveloperResources: () => createElement("div", null, "developer-resources-panel") } }),
   ];
   try {
     const { default: AccountPage } = await import(`../app/account/page.tsx?account-compat=${randomUUID()}`);
@@ -117,6 +118,9 @@ test("Account profile avoids unmigrated invoice columns and unrelated analytics"
     const developerPage = renderToStaticMarkup(result);
     assert.match(developerPage, /<a href="\/console"[^>]*>.*?Back<\/a>/);
     assert.doesNotMatch(developerPage, /Private Admin Control/);
+    assert.match(developerPage, /href="\/account\?tab=resources"[^>]*>Developer Resources<\/a>/);
+    assert.doesNotMatch(developerPage, /developer-resources-panel/);
+    assert.match(renderToStaticMarkup(await AccountPage({ searchParams: Promise.resolve({ tab: "resources" }) })), /developer-resources-panel/);
     assert.equal(analyticsCalls, 0);
     assert.deepEqual(Object.keys(query.include?.transactions?.select || {}).sort(), ["amountCents", "createdAt", "description", "id", "status", "type"]);
     await AccountPage({ searchParams: Promise.resolve({ tab: "security" }) });
@@ -127,14 +131,26 @@ test("Account profile avoids unmigrated invoice columns and unrelated analytics"
     const adminPage = renderToStaticMarkup(await AccountPage({ searchParams: Promise.resolve({}) }));
     assert.match(adminPage, /<a href="\/console"[^>]*>.*?Back<\/a>/);
     assert.match(adminPage, /<a href="\/admin"[^>]*>.*?Private Admin Control/);
+    assert.match(adminPage, /href="\/account\?tab=resources"/);
 
     role = "TESTER";
     const testerPage = renderToStaticMarkup(await AccountPage({ searchParams: Promise.resolve({}) }));
     assert.match(testerPage, /<a href="\/dashboard"[^>]*>.*?Back<\/a>/);
     assert.doesNotMatch(testerPage, /Private Admin Control/);
+    assert.doesNotMatch(testerPage, /tab=resources/);
+    assert.doesNotMatch(renderToStaticMarkup(await AccountPage({ searchParams: Promise.resolve({ tab: "resources" }) })), /developer-resources-panel/);
   } finally {
     for (const item of modules.reverse()) item.restore();
     if (previousOwner === undefined) delete process.env.SEEDENV_ANALYTICS_OWNER_EMAIL;
     else process.env.SEEDENV_ANALYTICS_OWNER_EMAIL = previousOwner;
   }
+});
+test("developer tools live in account resources instead of the console tab bar", async () => {
+  const { developerResources } = await import("../components/developer-resources");
+  const hrefs = developerResources.map((resource) => resource.href);
+  for (const href of ["/console/monitor", "/tools/swarm-detector", "/docs", "/status"]) assert.ok(hrefs.includes(href), href);
+  const header = await readFile(new URL("../components/console-header.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(header, /href: "\/console\/monitor"|href: "\/tools\/swarm-detector"/);
+  const navigation = await readFile(new URL("../components/navigation.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(navigation, /\/console\/monitor/);
 });

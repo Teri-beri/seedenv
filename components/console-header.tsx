@@ -14,11 +14,9 @@ export type CohortRuleLink = { label: string; href: string; tone?: "default" | "
 
 const tabs = [
   { label: "Console", href: "/console", view: "overview" },
-  { label: "Swarm Detector", href: "/tools/swarm-detector", view: null, badge: "NEW" },
   { label: "Tester requests", href: "/applications", view: null },
   { label: "Submissions", href: "/console?view=review-deck", view: "review-deck" },
   { label: "Artifacts", href: "/console?view=asset-vault", view: "asset-vault" },
-  { label: "Monitor", href: "/console/monitor", view: "monitor" },
   { label: "Billing", href: "/console?view=billing", view: "billing" },
   { label: "Launch Circle", href: "/launch-circle", view: null },
   { label: "Messages", href: "/messages", view: "messages" },
@@ -81,7 +79,6 @@ export function ConsoleHeader({ activeView, paymentsMode, account, cohortRules =
               id: tab.label,
               label: tab.label,
               href: tab.href,
-              badge: "badge" in tab ? tab.badge : undefined,
             }))}
             className="max-w-full"
             itemClassName="lg:px-3"
