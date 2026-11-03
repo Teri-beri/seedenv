@@ -3,7 +3,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { StatusPill } from "@/components/status-pill";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { ArrowRight, CheckCircle2, CircleHelp, Code2, FileText, Fingerprint, Gamepad2, Globe, Layers, LockKeyhole, Menu, Search, ShieldCheck, Smartphone, Terminal, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleHelp, Code2, FileText, Fingerprint, Gamepad2, Globe, Layers, LockKeyhole, Menu, Search, ShieldCheck, Smartphone, Terminal, UserRound, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -46,7 +46,7 @@ type AuthRequest = { role: "DEVELOPER" | "TESTER"; callbackUrl: string; title: s
 const primaryAction = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
 const secondaryAction = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-[#171923] px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:border-zinc-600 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
 const headerTextLink = "inline-flex min-h-11 items-center gap-1 font-mono text-xs text-zinc-400 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded";
-const headerPrimaryAction = "items-center gap-1.5 rounded-lg bg-zinc-100 px-3.5 py-1.5 text-xs font-semibold tracking-tight text-zinc-950 shadow-sm transition-all hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
+const headerProfileAction = "grid size-11 shrink-0 place-items-center rounded-full border border-white/[0.08] bg-[#171923] text-zinc-300 transition-colors hover:border-emerald-500/40 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
 const sectionClass = "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8";
 const sectionShell = "relative scroll-mt-14 border-t border-zinc-800/60 py-16 sm:py-24";
 const surfaceTint = "bg-[#12161F]/20";
@@ -110,6 +110,8 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
   const role = viewer?.role ?? session?.user?.role;
   const signedIn = Boolean(viewer) || status === "authenticated";
   const workspaceHref = workspaceHome(role);
+  const profileHref = signedIn ? "/account" : "/auth/signin";
+  const profileInitial = (session?.user?.name || session?.user?.email || "").trim().charAt(0).toUpperCase();
   const developerHref = signedIn
     ? role === "DEVELOPER" || role === "ADMIN" ? "/console?view=new-drop" : "/onboarding?role=DEVELOPER&next=%2Fconsole%3Fview%3Dnew-drop"
     : "/auth/signin?role=DEVELOPER&callbackUrl=%2Fconsole%3Fview%3Dnew-drop";
@@ -142,18 +144,16 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
             <StatusPill className="hidden xl:inline-flex" />
             <div className="hidden items-center gap-4 md:flex">
               <Link href="/launch-circle" className={headerTextLink}>Launch Circle</Link>
-              {signedIn ? (
-                <Link href={workspaceHref} className={headerTextLink}>Console</Link>
-              ) : (
-                <button type="button" className={headerTextLink} onClick={() => setAuthRequest({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Access SeedEnv" })}>Sign In</button>
-              )}
+              {signedIn ? <Link href={workspaceHref} className={headerTextLink}>Console</Link> : null}
               <div aria-hidden="true" className="h-4 w-px bg-zinc-800" />
             </div>
-            <Link href={developerHref} className={`${headerPrimaryAction} hidden sm:inline-flex`}>Deploy a Cohort</Link>
+            <Link href={profileHref} aria-label={signedIn ? "Account profile" : "Sign in or create an account"} title={signedIn ? "Account profile" : "Sign in / Sign up"} className={headerProfileAction} onClick={signedIn ? undefined : () => trackAnalytics("signup_start", { role: "DEVELOPER", callbackUrl: "/auth/signin" })}>
+              {signedIn && profileInitial ? <span aria-hidden="true" className="font-mono text-sm font-semibold text-emerald-300">{profileInitial}</span> : <UserRound aria-hidden="true" className="size-5" />}
+            </Link>
             <button type="button" aria-label={mobileNavigationOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileNavigationOpen} aria-controls="landing-mobile-navigation" className="grid size-11 place-items-center rounded-lg border border-white/10 text-zinc-300 lg:hidden" onClick={() => setMobileNavigationOpen((open) => !open)}>{mobileNavigationOpen ? <X className="size-5" /> : <Menu className="size-5" />}</button>
           </nav>
         </div>
-        {mobileNavigationOpen ? <nav id="landing-mobile-navigation" aria-label="Mobile landing sections" className="grid grid-cols-2 gap-2 border-t border-white/10 px-4 py-3 sm:px-6 lg:hidden">{landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => { setMobileNavigationOpen(false); setActiveAnchor(item.anchor); }} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm ${activeAnchor === item.anchor ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}>{item.label}</Link>)}<Link href={developerHref} className={`${primaryAction} col-span-2 sm:hidden`} onClick={() => setMobileNavigationOpen(false)}>Deploy a Cohort <ArrowRight className="size-4" /></Link>{signedIn ? <Link href={workspaceHref} className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Console <ArrowRight className="size-4" /></Link> : <button type="button" className={`${secondaryAction} md:hidden`} onClick={() => { setMobileNavigationOpen(false); setAuthRequest({ role: "DEVELOPER", callbackUrl: "/console?view=new-drop", title: "Access SeedEnv" }); }}>Sign In <ArrowRight className="size-4" /></button>}<Link href="/launch-circle" className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Launch Circle <ArrowRight className="size-4" /></Link></nav> : null}
+        {mobileNavigationOpen ? <nav id="landing-mobile-navigation" aria-label="Mobile landing sections" className="grid grid-cols-2 gap-2 border-t border-white/10 px-4 py-3 sm:px-6 lg:hidden">{landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => { setMobileNavigationOpen(false); setActiveAnchor(item.anchor); }} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm ${activeAnchor === item.anchor ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}>{item.label}</Link>)}{signedIn ? <Link href={workspaceHref} className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Console <ArrowRight className="size-4" /></Link> : <Link href="/auth/signin" className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Sign In <ArrowRight className="size-4" /></Link>}<Link href="/launch-circle" className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Launch Circle <ArrowRight className="size-4" /></Link></nav> : null}
       </header>
 
       <main id="main-content" className="terminal-grid">

@@ -66,9 +66,13 @@ test("the landing Console link points to the correct workspace for each role", a
       const actions = html.match(/<nav[^>]*aria-label="Landing actions"[^>]*>.*?<\/nav>/)?.[0] ?? "";
       assert.match(actions, new RegExp(`href="${destination}"[^>]*>Console<\\/a>`));
       assert.doesNotMatch(actions, /href="\/admin"/);
+      assert.match(actions, /href="\/account"[^>]*aria-label="Account profile"/);
+      assert.doesNotMatch(actions, /Deploy a Cohort/);
     }
     const visitor = renderToStaticMarkup(createElement(PublicLanding, { missions: [], viewer: null }));
-    assert.match(visitor, />Sign In<\/button>/);
+    const visitorActions = visitor.match(/<nav[^>]*aria-label="Landing actions"[^>]*>.*?<\/nav>/)?.[0] ?? "";
+    assert.match(visitorActions, /href="\/auth\/signin"[^>]*aria-label="Sign in or create an account"/);
+    assert.doesNotMatch(visitorActions, /Deploy a Cohort/);
   } finally {
     for (const moduleMock of modules.reverse()) moduleMock.restore();
   }
