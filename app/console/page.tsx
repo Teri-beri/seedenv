@@ -13,7 +13,7 @@ import { BillingMetrics } from "@/components/billing/billing-metrics";
 import { BillingInfoForm, PaymentMethodCard } from "@/components/billing/billing-profile";
 import { InvoiceTable } from "@/components/billing/invoice-table";
 import { DeveloperStudio } from "@/components/developer-studio";
-import { ConsoleHeader, type CohortRuleLink } from "@/components/console-header";
+import { ConsoleHeader } from "@/components/console-header";
 import { ConsolePromoBanner } from "@/components/console-promo-banner";
 import { ActiveCohorts, ConsoleMetricStrip } from "@/components/console-overview";
 import { ReleaseReports } from "@/components/release-reports";
@@ -25,7 +25,6 @@ import { isPublicHandle, publicProfilePath } from "@/lib/public-profile";
 import { getProofImageUrl } from "@/lib/storage";
 import { COHORT_PLATFORM_FEE_RATE } from "@/lib/pricing";
 import { launchDraftKey, launchWizardDraftsSchema } from "@/lib/launch-wizard-draft";
-import { canManageCohortPromos } from "@/lib/cohort-promos";
 import { automaticFeeBenefits } from "@/lib/services/billing.service";
 import { parseRobloxDeviceConstraints } from "@/lib/roblox-cohorts";
 
@@ -210,9 +209,6 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     Promise.all(auditReports.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl), recordingUrl: recordingHref(submission.id, submission.recordingUrl) }))),
   ]);
   const accountUsername = security?.username || session.user.name || "account";
-  const cohortRules: CohortRuleLink[] = canManageCohortPromos(session.user)
-    ? [{ label: "Manage cohort promo codes", href: "/admin/promos" }, { label: "Review denied tester work", href: "/admin/proof-reviews", tone: "caution" }]
-    : [];
   const consoleAccount = {
     username: accountUsername,
     avatarUrl: security?.avatarUrl || null,
@@ -223,7 +219,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   return (
     <AuthCheck role={session.user.role}>
     <main className="mobile-app-shell min-h-screen bg-[#0A0D12] pb-16 text-white" id="console-top">
-      <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} cohortRules={cohortRules} />
+      <ConsoleHeader activeView={activeView} paymentsMode={process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "test"} account={consoleAccount} />
       {security?.platformFeeWaived ? <ConsolePromoBanner>Platform fees are permanently waived for your developer account. Tester rewards remain fully funded. Existing charges are unchanged.</ConsolePromoBanner> : null}
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {overview ? <>

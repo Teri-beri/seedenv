@@ -15,7 +15,7 @@ export default async function ProofReviewsPage() {
     include: { instructionVersion: true, campaign: { include: { instructionVersions: { orderBy: { revision: "asc" } } } }, tester: { select: { username: true } } },
   });
   return <main className="min-h-screen bg-[#0A0D12] p-6 text-white"><div className="mx-auto max-w-4xl space-y-6">
-    <Link href="/console">Back to console</Link>
+    <Link href="/account?tab=resources">Back to settings</Link>
     <h1 className="text-2xl font-semibold">Denied proof: manual review</h1>
     <p className="text-zinc-400">Oldest 100 open cases. Only this work&apos;s unpaid reward is held. Review the original instructions, evidence, and any 14-day participation requirements before deciding. Previously paid earnings are not reversed.</p>
     {cases.map((item) => <article key={item.id} className="rounded-xl border border-zinc-700 p-5">

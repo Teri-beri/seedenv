@@ -24,6 +24,7 @@ import { WorkspaceAccessSwitcher } from "@/components/workspace-access-switcher"
 import { DeveloperBottomNav, TesterBottomNav } from "@/components/navigation";
 import { getAnalyticsSummary, parseAnalyticsRange } from "@/lib/analytics";
 import { ANALYTICS_OPT_OUT_COOKIE, clientIp, excludedIps } from "@/lib/analytics-context";
+import { canManageCohortPromos } from "@/lib/cohort-promos";
 import { prisma } from "@/lib/prisma";
 import { isPublicHandle, publicProfilePath } from "@/lib/public-profile";
 import { rankProgress } from "@/lib/rank";
@@ -246,7 +247,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                 {user.role !== UserRole.TESTER || user.developerWorkspaceEnabled ? <GitHubTokenForm connected={Boolean(user.githubTokenEncrypted)} defaultRepo={user.githubDefaultRepo} /> : null}
               </div>
             ) : null}
-            {activeTab === "resources" ? <DeveloperResources /> : null}
+            {activeTab === "resources" ? <DeveloperResources showCohortRules={canManageCohortPromos({ id: user.id, role: user.role })} /> : null}
             {activeTab === "messages" ? <MessageInbox memberId={user.id} params={params} /> : null}
             {activeTab === "message-settings" ? <MessageSettings enabled={user.messageRequestsEnabled} blocks={blocks.map(block => block.blocked)} /> : null}
             {activeTab === "connections" ? <ConnectionSettings memberId={user.id} page={Math.max(1, Math.min(10000, Number.parseInt(params.page || "1", 10) || 1))} /> : null}

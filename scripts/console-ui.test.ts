@@ -27,34 +27,30 @@ test("the join requests card mutes its action until testers are actually waiting
   } finally { for (const item of modules.reverse()) item.restore(); }
 });
 
-test("admin cohort tools collapse into one menu and stay hidden from non-admins", async () => {
+test("console header stays focused: cohort rules and developer tools live in settings", async () => {
   const modules = [
     mock.module("next/link", anchorMock),
     mock.module("next/image", { defaultExport: Empty }),
     mock.module("../components/user-dropdown.tsx", { namedExports: { UserDropdown: Empty } }),
   ];
   try {
-    const { ConsoleHeader, CohortRulesMenu } = await import(`../components/console-header.tsx?header=${randomUUID()}`);
+    const { ConsoleHeader } = await import(`../components/console-header.tsx?header=${randomUUID()}`);
     const account = { username: "teri", avatarUrl: null, organization: null, roleLabel: "Developer", publicProfileHref: null };
-    const admin = renderToStaticMarkup(createElement(ConsoleHeader, {
-      activeView: "overview", paymentsMode: "test", account,
-      cohortRules: [{ label: "Manage cohort promo codes", href: "/admin/promos" }, { label: "Review denied tester work", href: "/admin/proof-reviews", tone: "caution" }],
-    }));
-    assert.ok(admin.includes("Cohort Rules"));
-    assert.ok(admin.includes('aria-haspopup="menu"'));
-    assert.ok(admin.includes("flex shrink-0 items-center gap-2.5 whitespace-nowrap"));
-    assert.ok(admin.includes("hidden min-w-0 flex-1 md:block"));
-    assert.ok(admin.includes("max-w-full"));
-    assert.ok(admin.includes('href="/tools/swarm-detector"'));
-    assert.ok(admin.includes("Swarm Detector"));
-    assert.ok(admin.includes("NEW"));
-    assert.ok(admin.indexOf("Swarm Detector") < admin.indexOf("Tester requests"));
-    // Collapsed into the menu: the links are no longer loose text under the header.
-    assert.ok(!admin.includes("Manage cohort promo codes"));
+    const header = renderToStaticMarkup(createElement(ConsoleHeader, { activeView: "overview", paymentsMode: "test", account }));
+    assert.ok(header.includes("flex shrink-0 items-center gap-2.5 whitespace-nowrap"));
+    assert.ok(header.includes("hidden min-w-0 flex-1 md:block"));
+    assert.ok(header.includes("max-w-full"));
+    assert.ok(!header.includes("Cohort Rules"));
+    assert.ok(!header.includes('href="/tools/swarm-detector"'));
+    assert.ok(!header.includes('href="/console/monitor"'));
 
-    const plain = renderToStaticMarkup(createElement(ConsoleHeader, { activeView: "overview", paymentsMode: "test", account }));
-    assert.ok(!plain.includes("Cohort Rules"));
-    assert.equal(renderToStaticMarkup(createElement(CohortRulesMenu, { links: [] })), "");
+    const { DeveloperResources } = await import(`../components/developer-resources.tsx?resources=${randomUUID()}`);
+    const operator = renderToStaticMarkup(createElement(DeveloperResources, { showCohortRules: true }));
+    assert.ok(operator.includes('href="/admin/promos"'));
+    assert.ok(operator.includes('href="/admin/proof-reviews"'));
+    const developer = renderToStaticMarkup(createElement(DeveloperResources, {}));
+    assert.ok(!developer.includes("/admin/"));
+    assert.ok(developer.includes('href="/console/monitor"'));
 
     const messages = renderToStaticMarkup(createElement(ConsoleHeader, { activeView: "messages", paymentsMode: "live", account }));
     const anchorAt = (html: string, href: string) => {
