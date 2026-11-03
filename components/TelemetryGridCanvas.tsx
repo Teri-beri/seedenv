@@ -2,9 +2,10 @@
 
 import { useEffect, useRef } from "react";
 
-// Matches the 44px `.terminal-grid` lines so pulses land on intersections.
+// Grid lines and dots share one centered lattice so pulses land on intersections.
 const GRID_SPACING = 44;
 const BASE_DOT_COLOR = "rgba(255, 255, 255, 0.05)";
+const BASE_LINE_COLOR = "rgba(255, 255, 255, 0.025)";
 const BASE_DOT_RADIUS = 1;
 const PULSE_DURATION_MS = 1200;
 const GLOW_RADIUS = 6;
@@ -33,6 +34,8 @@ export default function TelemetryGridCanvas() {
     let height = 0;
     let cols = 0;
     let rows = 0;
+    let offsetX = 0;
+    let offsetY = 0;
     let rafId: number | null = null;
 
     // Static base grid is pre-rendered once per resize, then blitted each frame.
@@ -48,8 +51,11 @@ export default function TelemetryGridCanvas() {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       width = window.innerWidth;
       height = window.innerHeight;
-      cols = Math.ceil(width / GRID_SPACING) + 1;
-      rows = Math.ceil(height / GRID_SPACING) + 1;
+      // Center the lattice so leftover space is split evenly on both sides.
+      offsetX = (width % GRID_SPACING) / 2;
+      offsetY = (height % GRID_SPACING) / 2;
+      cols = Math.floor(width / GRID_SPACING) + 1;
+      rows = Math.floor(height / GRID_SPACING) + 1;
 
       for (const target of [canvas, baseLayer]) {
         target.width = Math.round(width * dpr);
@@ -62,12 +68,26 @@ export default function TelemetryGridCanvas() {
       if (baseCtx) {
         baseCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         baseCtx.clearRect(0, 0, width, height);
+        baseCtx.strokeStyle = BASE_LINE_COLOR;
+        baseCtx.lineWidth = 1;
+        baseCtx.beginPath();
+        for (let c = 0; c < cols; c++) {
+          const x = Math.round(offsetX + c * GRID_SPACING) + 0.5;
+          baseCtx.moveTo(x, 0);
+          baseCtx.lineTo(x, height);
+        }
+        for (let r = 0; r < rows; r++) {
+          const y = Math.round(offsetY + r * GRID_SPACING) + 0.5;
+          baseCtx.moveTo(0, y);
+          baseCtx.lineTo(width, y);
+        }
+        baseCtx.stroke();
         baseCtx.fillStyle = BASE_DOT_COLOR;
         baseCtx.beginPath();
         for (let c = 0; c < cols; c++) {
           for (let r = 0; r < rows; r++) {
-            const x = c * GRID_SPACING;
-            const y = r * GRID_SPACING;
+            const x = Math.round(offsetX + c * GRID_SPACING) + 0.5;
+            const y = Math.round(offsetY + r * GRID_SPACING) + 0.5;
             baseCtx.moveTo(x + BASE_DOT_RADIUS, y);
             baseCtx.arc(x, y, BASE_DOT_RADIUS, 0, Math.PI * 2);
           }
@@ -92,8 +112,8 @@ export default function TelemetryGridCanvas() {
           continue;
         }
         const intensity = 1 - easeOutCubic(t);
-        const x = point.col * GRID_SPACING;
-        const y = point.row * GRID_SPACING;
+        const x = Math.round(offsetX + point.col * GRID_SPACING) + 0.5;
+        const y = Math.round(offsetY + point.row * GRID_SPACING) + 0.5;
         const [r, g, b] = EMERALD_PULSE;
 
         const glow = ctx.createRadialGradient(x, y, 0, x, y, GLOW_RADIUS);
@@ -159,5 +179,5 @@ export default function TelemetryGridCanvas() {
     };
   }, []);
 
-  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-0" />;
+  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 [mask-image:radial-gradient(ellipse_at_center,black_60%,transparent_100%)]" />;
 }

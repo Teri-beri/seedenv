@@ -157,7 +157,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
       </header>
 
       <main id="main-content" className="terminal-grid">
-        <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px), linear-gradient(90deg,rgba(255,255,255,0.025) 1px, transparent 1px)", backgroundSize: "44px 44px" }}>
+        <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
           <div className="min-w-0">
             <a href="#cohorts" onClick={() => setActiveAnchor("cohorts")} className="group inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 font-mono text-xs text-emerald-400 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
               <span className="relative flex size-2" aria-hidden="true">
