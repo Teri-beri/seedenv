@@ -5,8 +5,9 @@ import { PDFDocument, rgb } from "pdf-lib";
 import { invoiceNumber } from "./billing";
 import type { InvoiceSnapshot } from "./enterprise-rules";
 import { redemptionLineItems } from "@/lib/billing/ledger";
+import { SEEDENV_LEGAL_ENTITY, legalDisclosureLines } from "@/lib/legal-entity";
 
-export async function generateInvoicePdf(input: { id: string; date: Date; amountCents: number; paymentReference: string; snapshot: InvoiceSnapshot }) {
+export async function generateInvoicePdf(input: { id: string; date: Date; amountCents: number; paymentReference: string; stripeInvoiceId?: string | null; snapshot: InvoiceSnapshot }) {
   const document = await PDFDocument.create();
   document.registerFontkit(fontkit);
   const font = await document.embedFont(await readFile(join(process.cwd(), "assets/fonts/NotoSans.ttf")), { subset: true });
@@ -37,11 +38,13 @@ export async function generateInvoicePdf(input: { id: string; date: Date; amount
   page.drawImage(logo, { x: 475, y: 722, width: 72, height: 72 });
   line("SeedEnv", 24);
   line("Payment receipt / invoice", 16);
-  line("TERIMUS LLC");
+  for (const disclosure of legalDisclosureLines()) line(disclosure, 9);
+  cursor -= 6;
   line(`Invoice: ${invoiceNumber(input.id, input.date)}`);
   line(`Receipt: ${input.id}`);
   line(`Date: ${input.date.toISOString().slice(0, 10)}`);
   line(`Payment reference: ${input.paymentReference}`);
+  if (input.stripeInvoiceId) line(`Stripe invoice: ${input.stripeInvoiceId}`);
   cursor -= 20;
   line("Bill to", 14);
   const company = input.snapshot.company;
@@ -80,6 +83,6 @@ export async function generateInvoicePdf(input: { id: string; date: Date; amount
   cursor -= 20;
   line("Unless itemized above, Stripe processing and payout fees are separate. This receipt does not certify VAT registration or replace a jurisdiction-specific tax invoice.", 9);
   document.setTitle(`SeedEnv receipt ${invoiceNumber(input.id, input.date)}`);
-  document.setAuthor("TERIMUS LLC");
+  document.setAuthor(SEEDENV_LEGAL_ENTITY.name);
   return document.save();
 }

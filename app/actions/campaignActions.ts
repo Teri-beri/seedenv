@@ -13,6 +13,7 @@ import { cancelCohort } from "@/lib/slot-funding";
 import { formatCents } from "@/lib/utils";
 import { serviceTaxAudit, taxLedgerFields, QA_SERVICE_TAX_CODE, stripeTaxEnabled } from "@/lib/billing/tax-policy";
 import { seedenvTaxMetadata, storedValueCheckoutTax } from "@/lib/stripe/billing";
+import { checkoutInvoiceCreation } from "@/lib/stripe/invoicing";
 import { ensureStripeCustomer, syncStripeCustomerBillingAddress } from "@/lib/stripe-customer";
 import { CohortPromoError, eligibleCohortPromo, failedCohortPromoCheckout, prepareCohortPromoRetry, promoStackSchema, recordCohortPromoCheckout, reserveCohortPromo } from "@/lib/cohort-promos";
 import { billingTransaction } from "@/lib/billing-transaction";
@@ -411,6 +412,10 @@ async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, o
       expires_at: Math.floor(Date.now() / 1000) + 3600,
       customer: stripeTaxEnabled() ? await taxCheckoutCustomer() : developer.stripeCustomerId || undefined,
       ...storedValueCheckoutTax(),
+      ...checkoutInvoiceCreation({
+        description: `SeedEnv cohort escrow: ${campaign.title}. ${terms.totalSlots} tester slots held in escrow for tester compensation.`,
+        metadata: { type: "SEEDENV_CAMPAIGN_ESCROW", ...escrowAccountingMetadata },
+      }),
       payment_method_types: ["card"],
       line_items: [
         {

@@ -18,6 +18,7 @@ export type InvoiceLedgerRow = {
   kind: InvoiceKind;
   escrowStatus: EscrowStatus;
   downloadable: boolean;
+  stripeInvoice: boolean;
 };
 
 export function invoiceNumber(id: string, date: Date) {
@@ -48,6 +49,7 @@ export function buildInvoiceLedgerRow(transaction: {
   createdAt: Date;
   type?: string;
   stripePaymentId?: string | null;
+  stripeInvoiceId?: string | null;
   campaign: { id: string; title: string; platform: PlatformType; status: CampaignStatus } | null;
 }): InvoiceLedgerRow {
   const snapshot = invoiceSnapshotSchema.safeParse(transaction.invoiceSnapshot);
@@ -72,6 +74,7 @@ export function buildInvoiceLedgerRow(transaction: {
     kind,
     escrowStatus: kind === "TOP_UP" && transaction.status === "COMPLETED" ? "CREDITED" : escrowStatusFor(transaction.status, transaction.campaign?.status),
     downloadable: transaction.status === "COMPLETED" && snapshot.success && invoiceTotalMatches(snapshot.data, transaction.amountCents),
+    stripeInvoice: transaction.status === "COMPLETED" && Boolean(transaction.stripeInvoiceId),
   };
 }
 

@@ -847,6 +847,9 @@ model WalletTransaction {
   campaign         AppCampaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   platformFeeCents Int?
   invoiceSnapshot  Json?
+  stripeInvoiceId  String?
+  hostedInvoiceUrl String?
+  invoicePdfUrl    String?
   taxAmountCents   Int?
   taxCode          String?
   taxAudit         Json?
@@ -856,6 +859,7 @@ model WalletTransaction {
   @@index([userId, createdAt])
   @@index([type, status])
   @@index([stripePaymentId])
+  @@index([stripeInvoiceId])
   @@index([campaignId])
 }
 

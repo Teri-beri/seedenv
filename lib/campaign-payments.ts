@@ -12,6 +12,9 @@ import { consumeCohortPromo } from "@/lib/cohort-promos";
 import { queueFollowerEmails } from "@/lib/social-connections";
 import { recordCampaignFeeBenefits, reconcileReferralMilestone } from "@/lib/services/billing.service";
 import { releaseExpiredCampaignCheckout } from "@/lib/services/checkout-reconciliation";
+import { handleInvoiceEvent, linkCheckoutInvoice } from "@/lib/stripe/invoicing";
+
+const stripeId = (value: string | { id: string } | null) => typeof value === "string" ? value : value?.id;
 
 export type CampaignPaymentEvent = { type: string; data: { object: { id?: string } } };
 
@@ -21,6 +24,10 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     const session = await getStripe().checkout.sessions.retrieve(event.data.object.id);
     if (session.metadata?.type === "SEEDENV_BALANCE_TOPUP") return { awaitingTopUpSweep: true };
     return releaseExpiredCampaignCheckout(session);
+  }
+  if (event.type === "invoice.finalized" || event.type === "invoice.paid") {
+    if (!event.data.object.id) throw new Error("Invoice event has no invoice ID.");
+    return handleInvoiceEvent(event.data.object.id);
   }
   if (["charge.refunded", "refund.updated", "refund.created", "refund.failed", "charge.dispute.created", "charge.dispute.updated", "charge.dispute.closed", "charge.dispute.funds_withdrawn", "charge.dispute.funds_reinstated"].includes(event.type)) {
     if (!event.data.object.id) throw new Error("Stripe reversal event has no object ID.");
@@ -45,7 +52,11 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     await stripe.customers.update(customerId, { invoice_settings: { default_payment_method: paymentMethod } });
     return { paymentMethodSaved: true, userId: user.id };
   }
-  if (metadata.type === "SEEDENV_BALANCE_TOPUP") return handleTopUpCheckout(session);
+  if (metadata.type === "SEEDENV_BALANCE_TOPUP") {
+    const credited = await handleTopUpCheckout(session);
+    if (!("awaitingPayment" in credited)) await linkCheckoutInvoice(session, stripeId(session.payment_intent));
+    return credited;
+  }
   if (metadata.type !== "SEEDENV_CAMPAIGN_ESCROW") return { ignored: true };
   if (session.mode !== "payment" || session.status !== "complete" || session.payment_status !== "paid") return { awaitingPayment: true };
   const paymentId = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id;
@@ -78,6 +89,7 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     await queueFollowerEmails(tx, campaign.developerId, `cohort:${campaign.id}`, `/cohorts/${campaign.id}`, "A developer you follow launched a new cohort");
     return { activated: true, campaignId: campaign.id };
   });
+  await linkCheckoutInvoice(session, paymentId);
   // A cohort cancelled while checkout was open is refunded instead of activated.
   if ("cancelledBeforePayment" in result) await reconcileCampaignFunding(result.campaignId);
   return result;

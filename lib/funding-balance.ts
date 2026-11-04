@@ -8,6 +8,7 @@ import { ensureStripeCustomer } from "@/lib/stripe-customer";
 import { reconcileFundingPayment } from "@/lib/funding-reversals";
 import { cancelFailedRefund, operationRefund, reserveBillingOperation } from "@/lib/billing-operations";
 import { storedValueCheckoutTax, storedValueProductTax, seedenvTaxMetadata, validateStoredValueCheckout } from "@/lib/stripe/billing";
+import { checkoutInvoiceCreation } from "@/lib/stripe/invoicing";
 import { storedValueTaxAudit, stripeTaxEnabled, taxLedgerFields, type TaxAudit } from "@/lib/billing/tax-policy";
 import { consumeCohortPromo } from "@/lib/cohort-promos";
 import { queueFollowerEmails } from "@/lib/social-connections";
@@ -119,6 +120,7 @@ export async function createTopUpCheckout(user: TopUpMember, creditCents: number
       mode: "payment",
       customer: customerId,
       ...storedValueCheckoutTax(),
+      ...checkoutInvoiceCreation({ description: "SeedEnv prepaid balance top-up", metadata: { type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id, ...topUpAccountingMetadata } }),
       expires_at: Math.floor(Date.now() / 1000) + CHECKOUT_EXPIRY_SECONDS,
       payment_method_types: ["card"],
       line_items: [

@@ -16,7 +16,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!transaction) return new Response("Invoice not found.", { status: 404, headers: privateHeaders });
   const snapshot = invoiceSnapshotSchema.safeParse(transaction.invoiceSnapshot);
   if (!snapshot.success || !invoiceTotalMatches(snapshot.data, transaction.amountCents)) return new Response("This payment needs receipt reconciliation. Contact support.", { status: 409, headers: privateHeaders });
-  const bytes = await generateInvoicePdf({ id: transaction.id, date: transaction.createdAt, amountCents: transaction.amountCents, paymentReference: transaction.stripePaymentId || "SeedEnv prepaid balance", snapshot: snapshot.data });
+  const bytes = await generateInvoicePdf({ id: transaction.id, date: transaction.createdAt, amountCents: transaction.amountCents, paymentReference: transaction.stripePaymentId || "SeedEnv prepaid balance", stripeInvoiceId: transaction.stripeInvoiceId, snapshot: snapshot.data });
   return new Response(Buffer.from(bytes), { headers: { ...privateHeaders, "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="seedenv-invoice-${transaction.id.replace(/[^a-zA-Z0-9_-]/g, "")}.pdf"` } });
   } catch (error) {
     console.error("SeedEnv private invoice generation failed:", error);

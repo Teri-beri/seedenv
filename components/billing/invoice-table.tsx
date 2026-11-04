@@ -1,10 +1,12 @@
 "use client";
 
-import { Download, FileText, Search } from "lucide-react";
+import { Download, ExternalLink, FileText, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { EscrowStatus, InvoiceLedgerRow } from "@/lib/billing";
 import { formatCents } from "@/lib/utils";
+
+const receiptLink = "inline-flex h-7 min-h-11 items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 font-mono text-[11px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
 
 const statusChip: Record<EscrowStatus, { label: string; className: string }> = {
   ESCROW_ACTIVE: { label: "Escrow Active", className: "border-amber-500/20 bg-amber-500/10 text-amber-400" },
@@ -100,10 +102,24 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-sm font-semibold text-zinc-100">{formatCents(invoice.totalCents)}{invoice.kind === "SLOT_FROM_BALANCE" ? <span className="block text-[10px] font-normal text-zinc-600">from balance</span> : invoice.kind === "TOP_UP" ? <span className="block text-[10px] font-normal text-zinc-600">card</span> : null}</td>
                     <td className="whitespace-nowrap px-3 py-3"><span className={`inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${chip.className}`}>{chip.label}</span></td>
                     <td className="whitespace-nowrap px-5 py-3 text-right">
-                      {invoice.downloadable ? (
-                        <a href={`/api/billing/invoices/${invoice.id}`} className="inline-flex h-7 min-h-11 items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 font-mono text-[11px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100" aria-label={`Download PDF receipt ${invoice.invoiceNumber}`}>
-                          PDF <Download className="size-3" />
-                        </a>
+                      {invoice.downloadable || invoice.stripeInvoice ? (
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          {invoice.downloadable ? (
+                            <a href={`/api/billing/invoices/${invoice.id}`} className={receiptLink} aria-label={`Download PDF receipt ${invoice.invoiceNumber}`}>
+                              PDF <Download className="size-3" />
+                            </a>
+                          ) : null}
+                          {invoice.stripeInvoice ? (
+                            <>
+                              <a href={`/api/billing/invoices/${invoice.id}/stripe?view=hosted`} target="_blank" rel="noopener noreferrer" className={receiptLink} aria-label={`Open Stripe hosted invoice for ${invoice.invoiceNumber} in a new tab`} title="Stripe-hosted tax invoice">
+                                Invoice <ExternalLink className="size-3" />
+                              </a>
+                              <a href={`/api/billing/invoices/${invoice.id}/stripe?view=pdf`} className={receiptLink} aria-label={`Download Stripe invoice PDF for ${invoice.invoiceNumber}`} title="Stripe invoice PDF">
+                                Stripe PDF <Download className="size-3" />
+                              </a>
+                            </>
+                          ) : null}
+                        </div>
                       ) : <span className="font-mono text-[11px] text-zinc-600" title={invoice.escrowStatus === "AWAITING_PAYMENT" ? "Receipt available after Stripe confirms payment" : "Receipt unavailable for this record"}>—</span>}
                     </td>
                   </tr>

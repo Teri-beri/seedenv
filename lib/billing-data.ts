@@ -48,7 +48,7 @@ export async function getBillingOverview(userId: string, stripeCustomerId: strin
       orderBy: { createdAt: "desc" },
       take: 200,
       select: {
-        id: true, type: true, stripePaymentId: true, amountCents: true, status: true, platformFeeCents: true, invoiceSnapshot: true, campaignId: true, createdAt: true,
+        id: true, type: true, stripePaymentId: true, stripeInvoiceId: true, amountCents: true, status: true, platformFeeCents: true, invoiceSnapshot: true, campaignId: true, createdAt: true,
         campaign: { select: { id: true, title: true, platform: true, status: true } },
       },
     }),
