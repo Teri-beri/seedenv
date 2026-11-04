@@ -31,6 +31,8 @@ import { rankProgress } from "@/lib/rank";
 import { getStripe } from "@/lib/stripe";
 import { formatCents } from "@/lib/utils";
 import { workspaceHome } from "@/lib/workspace-navigation";
+import { getTesterReferralStats } from "@/lib/tester-referrals";
+import { TesterReferralCard } from "@/components/tester-referral-card";
 
 export const dynamic = "force-dynamic";
 
@@ -120,13 +122,14 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   let pendingPayoutAmountCents = 0;
   if (activeTab === "portfolio" && user.role === UserRole.TESTER) {
     const pendingPayouts = await prisma.walletTransaction.aggregate({
-      where: { userId: user.id, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING },
+      where: { userId: user.id, type: { in: [TransactionType.BOUNTY_PAYOUT, TransactionType.REFERRAL_REWARD] }, status: TransactionStatus.PENDING },
       _count: { _all: true },
       _sum: { amountCents: true },
     });
     pendingPayoutCount = pendingPayouts._count._all;
     pendingPayoutAmountCents = pendingPayouts._sum.amountCents || 0;
   }
+  const referrals = activeTab === "portfolio" && user.role === UserRole.TESTER ? await getTesterReferralStats(user.id) : null;
   if (stripeConfigured && activeTab === "portfolio") {
     const stripe = getStripe();
     const [customer, connectAccount] = await Promise.all([
@@ -320,6 +323,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
                     draftId={stripeDraft?.id}
                   />
                 ) : null}
+                {referrals ? <TesterReferralCard stats={referrals} /> : null}
               </div>
             ) : null}
           </section>

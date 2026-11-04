@@ -11,6 +11,7 @@ import { createNotifier } from "@/lib/growth/notify";
 import { AiUnavailableError, getGeminiClient, type GeminiClient, type InlineMedia } from "@/lib/ai/gemini-client";
 import { runQaIntakeAgent, type QaIntakeResult } from "@/lib/ai/agents/qa-intake.agent";
 import { runFraudWatchdogAgent, type FraudWatchdogResult } from "@/lib/ai/agents/fraud-watchdog.agent";
+import { feedbackWithBug } from "@/lib/organic-growth";
 
 export const FRAUD_HOLD_THRESHOLD = 70;
 export const AUTO_CLARIFY_MAX_SCORE = 4;
@@ -212,10 +213,11 @@ export async function auditSubmission(submissionId: string, options: { client?: 
     });
     if (!submission.instructionVersion) throw new Error("Accepted directions are missing; manual review is required.");
     const missionSteps = versionDirections(submission.instructionVersion).map((step) => `${step.instructionTitle}: ${step.instructionDetail}`);
+    const feedback = feedbackWithBug(submission.feedbackText, submission.bugTitle && submission.bugSeverity ? { title: submission.bugTitle, severity: submission.bugSeverity, reproSteps: submission.reproSteps } : null);
     const intake = await runQaIntakeAgent(client, {
       missionTitle: submission.campaign.title,
       missionSteps,
-      feedbackText: submission.feedbackText,
+      feedbackText: feedback,
       deviceInfo: { deviceModel: submission.deviceModel, osBuild: submission.osBuild, appBuildVersion: submission.appBuildVersion, networkType: submission.networkType, screenResolution: submission.screenResolution },
       hasScreenshot: Boolean(submission.proofImageUrl),
       hasRecording: Boolean(submission.recordingUrl),
@@ -225,7 +227,7 @@ export async function auditSubmission(submissionId: string, options: { client?: 
 
     const { media, recordingSkipped } = await loadMedia(submission);
     const fraud = media.length
-      ? await runFraudWatchdogAgent(client, media, { missionTitle: submission.campaign.title, missionSteps, appName: submission.campaign.title, platform: submission.campaign.platform, reportedDescription: submission.feedbackText })
+      ? await runFraudWatchdogAgent(client, media, { missionTitle: submission.campaign.title, missionSteps, appName: submission.campaign.title, platform: submission.campaign.platform, reportedDescription: feedback })
       : null;
     const nearCopy = others.find((item) => textSimilarity(item.feedbackText ?? "", submission.feedbackText ?? "") >= NEAR_COPY_SIMILARITY);
     const decision = decideAuditOutcome(intake, fraud, { nearCopyOfId: nearCopy?.id ?? null, emulatorFlagged: submission.hardwareStatus === "EMULATOR_FLAGGED" });

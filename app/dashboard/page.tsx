@@ -2,7 +2,7 @@ import { after } from "next/server";
 import Link from "next/link";
 import { z } from "zod";
 import { assignedCampaign } from "@/lib/instruction-versions";
-import { sweepOverdueSubmissionsLazily } from "@/lib/submission-approval";
+import { sweepOverdueSubmissionsLazily, releaseTesterPayouts } from "@/lib/submission-approval";
 import { CampaignStatus, SubmissionStatus, TransactionStatus, TransactionType } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
@@ -12,10 +12,11 @@ import { TesterConsole } from "@/components/tester-console";
 import { getCurrentUser } from "@/lib/auth";
 import { ensurePreviewData } from "@/lib/preview-data";
 import { prisma } from "@/lib/prisma";
-import { awardDailyCheckIn } from "@/lib/quest-ledger";
+import { awardDailyCheckIn, serializable } from "@/lib/quest-ledger";
 import { resolveTesterView } from "@/lib/tester-console";
 import { ensureValidatorHandle } from "@/lib/validator-handle";
 import { clippersEnabled } from "@/lib/clippers";
+import { getTesterReferralStats, awardTesterReferralBounty } from "@/lib/tester-referrals";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   await ensurePreviewData();
   after(sweepOverdueSubmissionsLazily);
   await awardDailyCheckIn(session.user.id);
+  const referralReward = await serializable((tx) => awardTesterReferralBounty(tx, session.user.id));
+  if (referralReward) after(() => releaseTesterPayouts(referralReward.userId).then(() => undefined));
+  const referrals = await getTesterReferralStats(session.user.id);
   const now = new Date();
   const [tester, missions, leaderboard, summary, recent, pending, approvedCampaigns, payouts, applications, clipTotal] = await Promise.all([
     getCurrentUser("TESTER"),
@@ -80,7 +84,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       select: { campaignId: true },
     }),
     prisma.walletTransaction.aggregate({
-      where: { userId: session.user.id, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING },
+      where: { userId: session.user.id, type: { in: [TransactionType.BOUNTY_PAYOUT, TransactionType.REFERRAL_REWARD] }, status: TransactionStatus.PENDING },
       _sum: { amountCents: true },
     }),
     prisma.missionApplication.findMany({ where: { testerId: session.user.id }, select: { campaignId: true, status: true, startBy: true, instructionVersion: true } }),
@@ -100,7 +104,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   ]) : [null, [], null];
   return (
     <AuthCheck role="TESTER">
-      <TesterConsole activeView={activeView} tester={tester} missions={testerMissions} leaderboard={leaderboard.map((entry) => ({ ...entry, submissions: entry.submissions.flatMap((submission) => submission.submittedAt ? [{ ...submission, submittedAt: submission.submittedAt.toISOString() }] : []) }))} summary={summary} recent={recent} pending={pendingWithPreviews} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ campaignId: item.campaignId, status: item.status, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} clippers={{ enabled: clipsEnabled, profileStatus: clipProfile?.status || null, profileAvailable: clipProfile?.available ?? false, reviewNote: clipProfile?.reviewNote || null, paidCents: clipPayments?._sum.feeCents || 0, page: clipPage, total: clipTotal, agreements: clipAgreements.map((item) => ({ ...item, invitationExpiresAt: item.invitationExpiresAt?.toISOString() || null, dueAt: item.dueAt?.toISOString() || null, reviewDueAt: item.reviewDueAt?.toISOString() || null, publishDueAt: item.publishDueAt?.toISOString() || null })) }} />
+      <TesterConsole referrals={referrals} activeView={activeView} tester={tester} missions={testerMissions} leaderboard={leaderboard.map((entry) => ({ ...entry, submissions: entry.submissions.flatMap((submission) => submission.submittedAt ? [{ ...submission, submittedAt: submission.submittedAt.toISOString() }] : []) }))} summary={summary} recent={recent} pending={pendingWithPreviews} approvedCampaigns={approvedCampaigns} pendingPayoutCents={payouts._sum.amountCents || 0} now={now} applications={applications.map((item) => ({ campaignId: item.campaignId, status: item.status, startBy: item.startBy?.toISOString() || null }))} questXp={tester.questXp} discoveryPasses={tester.discoveryPasses} clippers={{ enabled: clipsEnabled, profileStatus: clipProfile?.status || null, profileAvailable: clipProfile?.available ?? false, reviewNote: clipProfile?.reviewNote || null, paidCents: clipPayments?._sum.feeCents || 0, page: clipPage, total: clipTotal, agreements: clipAgreements.map((item) => ({ ...item, invitationExpiresAt: item.invitationExpiresAt?.toISOString() || null, dueAt: item.dueAt?.toISOString() || null, reviewDueAt: item.reviewDueAt?.toISOString() || null, publishDueAt: item.publishDueAt?.toISOString() || null })) }} />
     </AuthCheck>
   );
 }

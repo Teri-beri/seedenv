@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
     if (!token) {
       const signInUrl = new URL("/auth/signin", request.url);
       signInUrl.searchParams.set("callbackUrl", `${pathname}${request.nextUrl.search}`);
-      const roleHint = pathname.startsWith("/dashboard/developer/") ? "DEVELOPER" : route.role;
+      const roleHint = pathname.startsWith("/dashboard/developer/") || pathname.startsWith("/dashboard/projects/") ? "DEVELOPER" : route.role;
       if (roleHint === "DEVELOPER" || roleHint === "TESTER") signInUrl.searchParams.set("role", roleHint);
       return NextResponse.redirect(signInUrl);
     }

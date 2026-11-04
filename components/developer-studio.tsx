@@ -23,8 +23,13 @@ import { CohortPromoInput, type AppliedCohortPromo } from "@/components/cohort-p
 import { CheckoutSummaryModal } from "@/components/campaign/CheckoutSummaryModal";
 import { ArtifactsToolbar, type ArtifactFilter } from "@/components/console/ArtifactsToolbar";
 import { extractRobloxPlaceId, isRobloxAccessMethod, parseRobloxSubmissionChecklist, ROBLOX_AUDIT_FOCUS_LABELS } from "@/lib/roblox-cohorts";
+import { ShareReportControl, type ShareReportDraft } from "@/components/share-report-control";
+import type { StructuredBug } from "@/lib/organic-growth";
 
 type ReviewSubmission = {
+  bugTitle?: string | null;
+  bugSeverity?: StructuredBug["severity"] | null;
+  reproSteps?: string[];
   revisionRequestedAt?: Date | null;
   autoApproveHoursLeft?: number | null;
   aiHold?: boolean;
@@ -73,6 +78,10 @@ type Asset = {
   networkLogs: string | null;
   tester: { username: string };
   campaign: { id: string; title: string };
+  bugTitle?: string | null;
+  bugSeverity?: StructuredBug["severity"] | null;
+  reproSteps?: string[];
+  publicReport?: ShareReportDraft | null;
 };
 
 type ReviewCohort = {
@@ -131,7 +140,7 @@ const taskStepFieldKeys = ["instruction", "discoveryMinRep", "estimatedMinutes",
 
 export type DeveloperStudioView = "overview" | "new-drop" | "review-deck" | "asset-vault";
 
-export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, approvedSubmissionCount = 0, activeCohort = null, canSaveTestDraft, initialDraft, initialCohortType, view, balanceCents = 0, platformFeeWaived = false, automaticBenefits, userId, savedWizard, draftRevision }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; approvedSubmissionCount?: number; activeCohort?: ReviewCohort | null; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; view: DeveloperStudioView; balanceCents?: number; platformFeeWaived?: boolean; automaticBenefits?: { firstCohort: boolean; referralDiscountPercent: number }; userId: string; savedWizard?: LaunchWizardDraft; draftRevision: number }) {
+export function DeveloperStudio({ submissions, assets, auditReports, reviewPage, reviewTotalPages, reviewTotalCount, approvedSubmissionCount = 0, activeCohort = null, canSaveTestDraft, initialDraft, initialCohortType, initialAppUrl, initialSprint = false, view, balanceCents = 0, platformFeeWaived = false, automaticBenefits, userId, savedWizard, draftRevision }: { submissions: ReviewSubmission[]; assets: Asset[]; auditReports: InsightSubmission[]; reviewPage: number; reviewTotalPages: number; reviewTotalCount: number; approvedSubmissionCount?: number; activeCohort?: ReviewCohort | null; canSaveTestDraft: boolean; initialDraft?: CampaignDraft; initialCohortType?: CohortTypeKey; initialAppUrl?: string; initialSprint?: boolean; view: DeveloperStudioView; balanceCents?: number; platformFeeWaived?: boolean; automaticBenefits?: { firstCohort: boolean; referralDiscountPercent: number }; userId: string; savedWizard?: LaunchWizardDraft; draftRevision: number }) {
   const router = useRouter();
   const [step, setStep] = useState(savedWizard?.step ?? 1);
   const [highestStep, setHighestStep] = useState(savedWizard?.highestStep ?? 1);
@@ -165,7 +174,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
   } : {
     title: "",
     platform: PlatformType.TESTFLIGHT,
-    appUrl: "",
+    appUrl: initialAppUrl || "",
     robloxExperienceUrl: "",
     robloxUniverseId: "",
     robloxPlaceId: "",
@@ -177,7 +186,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     iconUrl: "",
     targetVibe: vibes[0],
     description: "",
-    totalSlots: 25,
+    totalSlots: initialSprint ? 5 : 25,
     bountyPerTaskUsd: 4,
     instructions: [defaultTask],
     discoveryAllowed: false,
@@ -193,6 +202,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     hardwareStrict: true,
     estimatedMinutes: null,
     testerPerk: "",
+    ...(initialAppUrl ? { platform: PlatformType.WEB_STAGING } : {}),
   });
   const [message, setMessage] = useState<string | null>(null);
   const [createdCampaignUrl, setCreatedCampaignUrl] = useState<string | null>(null);
@@ -220,7 +230,7 @@ export function DeveloperStudio({ submissions, assets, auditReports, reviewPage,
     version: 1, form, step, highestStep, topUpTesters, iconFileName, ai: aiInputs,
   }), [form, step, highestStep, topUpTesters, iconFileName, aiInputs]);
   const autosave = useLaunchAutosave({
-    userId, sourceDraftId: draftId, revision: draftRevision, draft: autosaveSnapshot, enabled: view === "new-drop",
+    userId, sourceDraftId: draftId, revision: draftRevision, draft: autosaveSnapshot, enabled: view === "new-drop", expectedAppUrl: initialAppUrl,
     restore: (saved) => {
       setForm({ ...saved.form, ...(initialDraft?.promoReserved ? { promoCode: initialDraft.promoCode } : {}) });
       setStep(saved.step);
@@ -1015,6 +1025,7 @@ function ReviewDeck({ submissions, onReview, isPending, page, totalPages, totalC
                 </div>
                 {active.recordingUrl && active.proofImageUrl ? <a className="inline-flex text-xs font-semibold text-emerald-400 hover:text-emerald-300" href={active.recordingUrl} target="_blank" rel="noreferrer">Open tester recording</a> : null}
                 <AiAuditCard key={`audit-${active.id}`} audit={active.audit} submissionId={active.id} />
+                {active.bugTitle ? <section className="rounded-xl border border-emerald-500/20 bg-zinc-950 p-4"><p className="font-mono text-xs text-amber-300">{active.bugSeverity} BUG</p><h3 className="mt-2 text-sm font-semibold text-zinc-200">{active.bugTitle}</h3><ol className="mt-3 list-inside list-decimal space-y-2 text-sm leading-6 text-zinc-400">{active.reproSteps?.map((step, index) => <li key={index}>{step}</li>)}</ol></section> : null}
 
                 {decision ? (
                   <div className="space-y-3 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
@@ -1195,6 +1206,7 @@ function AssetVault({ assets, cohort }: { assets: Asset[]; cohort: ReviewCohort 
                   {asset.recordingUrl && asset.proofImageUrl ? <a className="text-emerald-400 hover:text-emerald-300" href={asset.recordingUrl} rel="noreferrer" target="_blank">Open recording ↗</a> : null}
                   <span className="inline-flex items-center gap-1 text-zinc-500"><FileJson className="size-3.5" /> JSON included in export</span>
                 </div>
+                <ShareReportControl submissionId={asset.id} title={asset.bugTitle} severity={asset.bugSeverity} reproSteps={asset.reproSteps} summary={asset.feedbackText} existing={asset.publicReport} />
               </div>
             </article>
           ))}

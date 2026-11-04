@@ -28,6 +28,7 @@ import { COHORT_PLATFORM_FEE_RATE } from "@/lib/pricing";
 import { launchDraftKey, launchWizardDraftsSchema } from "@/lib/launch-wizard-draft";
 import { automaticFeeBenefits } from "@/lib/services/billing.service";
 import { parseRobloxDeviceConstraints } from "@/lib/roblox-cohorts";
+import { toolUrlSchema } from "@/lib/organic-growth";
 
 export const dynamic = "force-dynamic";
 
@@ -35,11 +36,13 @@ const consoleViews = ["overview", "new-drop", "review-deck", "asset-vault", "bil
 type ConsoleView = (typeof consoleViews)[number];
 const reviewPageSize = 20;
 
-export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string; stripePayment?: string; cohort?: string; launched?: string; topup?: string }> }) {
+export default async function ConsolePage({ searchParams }: { searchParams: Promise<{ view?: string; escrow?: string; campaign?: string; reviewPage?: string; testDraft?: string; draft?: string; stripePayment?: string; cohort?: string; launched?: string; topup?: string; url?: string; sprint?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "DEVELOPER" && session.user.role !== "ADMIN") redirect("/");
   const params = await searchParams;
+  const handoffUrl = params.url ? toolUrlSchema.safeParse(params.url) : null;
+  if (handoffUrl && !handoffUrl.success) return <main className="min-h-screen bg-zinc-950 p-6 text-zinc-200"><p role="alert">The sprint URL is invalid. Enter a full HTTP or HTTPS URL without embedded credentials.</p><a href="/console?view=new-drop" className="mt-4 inline-flex min-h-11 items-center text-emerald-300">Open a blank launch wizard</a></main>;
   const activeView: ConsoleView = consoleViews.includes(params.view as ConsoleView) ? params.view as ConsoleView : "overview";
   const feeBenefits = activeView === "new-drop" ? await prisma.$transaction(tx => automaticFeeBenefits(tx, session.user.id, new Date(), params.draft)) : undefined;
 
@@ -107,7 +110,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
     }),
     activeView === "asset-vault" ? prisma.submission.findMany({
       where: approvedEvidenceWhere,
-      include: { tester: { select: { username: true, avatarUrl: true } }, campaign: { select: { id: true, title: true } } },
+      include: { tester: { select: { username: true, avatarUrl: true } }, campaign: { select: { id: true, title: true } }, publicReport: true },
       take: 50,
       orderBy: { reviewedAt: "desc" },
     }) : [],
@@ -206,7 +209,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
         autoApproveHoursLeft: deadline && !submission.revisionRequestedAt && !isFraudHeld(submission.audit) ? Math.max(0, Math.ceil((deadline.getTime() - renderedAt) / 3_600_000)) : null,
       };
     })),
-    Promise.all(approvedAssets.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl), recordingUrl: recordingHref(submission.id, submission.recordingUrl) }))),
+    Promise.all(approvedAssets.map(async (submission) => ({ ...submission, publicReport: submission.publicReport ? { id: submission.publicReport.id, isPublic: submission.publicReport.isPublic, title: submission.publicReport.title, severity: submission.publicReport.severity, summary: submission.publicReport.summary, reproSteps: submission.publicReport.reproSteps, includeMedia: Boolean(submission.publicReport.proofImageUrl || submission.publicReport.recordingUrl) } : null, proofImageUrl: await getProofImageUrl(submission.proofImageUrl), recordingUrl: recordingHref(submission.id, submission.recordingUrl) }))),
     Promise.all(auditReports.map(async (submission) => ({ ...submission, proofImageUrl: await getProofImageUrl(submission.proofImageUrl), recordingUrl: recordingHref(submission.id, submission.recordingUrl) }))),
   ]);
   const accountUsername = security?.username || session.user.name || "account";
@@ -229,7 +232,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
           <ActiveCohorts cohorts={cohortRows} total={activeCohortCount} />
           <ReleaseReports rows={releaseReports} />
         </> : null}
-        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}`} userId={session.user.id} automaticBenefits={feeBenefits} savedWizard={savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} approvedSubmissionCount={approvedSubmissionCount} activeCohort={(activeView === "review-deck" || activeView === "asset-vault") && campaigns[0] ? { id: campaigns[0].id, title: campaigns[0].title, platform: campaigns[0].platform, totalSlots: campaigns[0].totalSlots, claimedSlots: campaigns[0].claimedSlots } : null} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft ? { ...launchDraft, robloxMobileOnly: launchDraftRobloxConstraints.mobileOnly, robloxAllowIpad: launchDraftRobloxConstraints.allowIpad, robloxAllowDesktop: launchDraftRobloxConstraints.allowDesktop, promoCode: launchDraft.promoRedemptions.map((entry) => entry.promoCode.code).join(",") || launchDraft.promoCodeDraft || undefined, promoReserved: Boolean(launchDraft.promoRedemptions.length) } : undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
+        {activeView !== "billing" ? <DeveloperStudio key={`${activeView}:${launchDraft?.id || "new-drop"}:${params.url || ""}:${params.sprint || ""}`} initialAppUrl={handoffUrl?.success ? handoffUrl.data : undefined} initialSprint={params.sprint === "1"} userId={session.user.id} automaticBenefits={feeBenefits} savedWizard={params.sprint === "1" && !launchDraft ? undefined : savedWizard} draftRevision={security?.launchWizardDraftRevision ?? 0} submissions={pendingPreviews} assets={approvedPreviews} auditReports={auditPreviews} reviewPage={reviewPage} reviewTotalPages={reviewTotalPages} reviewTotalCount={pendingReviewCount} approvedSubmissionCount={approvedSubmissionCount} activeCohort={(activeView === "review-deck" || activeView === "asset-vault") && campaigns[0] ? { id: campaigns[0].id, title: campaigns[0].title, platform: campaigns[0].platform, totalSlots: campaigns[0].totalSlots, claimedSlots: campaigns[0].claimedSlots } : null} canSaveTestDraft={canSaveTestDraft} initialDraft={launchDraft ? { ...launchDraft, robloxMobileOnly: launchDraftRobloxConstraints.mobileOnly, robloxAllowIpad: launchDraftRobloxConstraints.allowIpad, robloxAllowDesktop: launchDraftRobloxConstraints.allowDesktop, promoCode: launchDraft.promoRedemptions.map((entry) => entry.promoCode.code).join(",") || launchDraft.promoCodeDraft || undefined, promoReserved: Boolean(launchDraft.promoRedemptions.length) } : undefined} initialCohortType={params.cohort === "GOOGLE_PLAY_14_DAY" || params.cohort === "LIVE_STRESS_DROP" ? params.cohort : undefined} view={activeView} balanceCents={security?.fundingBalanceCents ?? 0} platformFeeWaived={security?.platformFeeWaived ?? false} /> : null}
         {heldDenials.length ? <section className="mt-6 space-y-3 rounded-xl border border-amber-500/30 p-5">
           <h2 className="font-semibold text-amber-200">Denials awaiting manual review</h2>
           <p className="text-sm text-zinc-400">Oldest 100 cases. These places and unpaid rewards stay reserved until SeedEnv approves the work or confirms denial. They cannot auto-approve, be edited, or be reused while held.</p>

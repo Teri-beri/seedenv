@@ -77,6 +77,23 @@ const sections = [
     ],
   },
   {
+    id: "tester-referrals",
+    title: "Tester Referral Rewards",
+    bullets: [
+      { label: "Eligibility", text: "A tester may invite a new tester through their SeedEnv invite link before that tester's first approved task and within seven days of joining. Both accounts must have verified email addresses and tester workspaces. The invited tester must complete a profile with a valid handle, name and bio, submit a structured bug report with verified physical-device signals, and have that bug approved by the campaign's actual Developer. Automatic approvals, administrator overrides and approvals by the inviter do not qualify." },
+      { label: "Reward & Payment", text: "SeedEnv credits one $1.00 reward per eligible invited tester to the inviter's earnings ledger. There is no monthly cash-reward cap. Cash rewards are separate from existing Quest XP referral limits. Rewards are funded by SeedEnv, never Developer escrow, and paid through the inviter's linked Stripe account. Pending transfers remain visible and retryable; the wallet's transferred balance increases only after Stripe confirms payment." },
+      { label: "Abuse", text: "Self-referrals, circular or reciprocal referrals, duplicate or shared accounts, fabricated bugs, copied evidence and arranged approvals are prohibited. SeedEnv may withhold fraudulent rewards under Fraud & Chargebacks and Tester Work Standards. Referral attribution is permanent and cannot be reassigned to collect another reward." },
+    ],
+  },
+  {
+    id: "public-reports",
+    title: "Public Bug Report Sharing",
+    bullets: [
+      { label: "Opt-In Publication", text: "Tester evidence is private by default. A Developer may explicitly publish a reviewed, read-only report for their own approved submission. Only the chosen summary, severity, reproduction steps, device specifications and separately opted-in media are made public. Tester identities, private installation links, logs and payment records are not included automatically. The Developer is responsible for having permission to publish the content and removing personal data, secrets and confidential information, including information visible in screenshots and recordings." },
+      { label: "Search & Revocation", text: "Public reports may be indexed by search engines and included in SeedEnv's sitemap. Turning sharing off disables the report and its media endpoints. Revocation cannot erase screenshots, downloaded files or copies previously obtained by viewers or third-party services. Hardware verification labels describe captured device signals and are not an independent certification." },
+    ],
+  },
+  {
     title: "6. Intellectual Property",
     bullets: [
       { label: "SeedEnv IP", text: "All branding, interfaces, code, designs, and content provided directly by SeedEnv remain the exclusive property of SeedEnv." },

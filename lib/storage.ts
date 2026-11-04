@@ -18,7 +18,7 @@ async function privateProofBucket(supabase: NonNullable<ReturnType<typeof getSup
   return supabase.storage.from(name);
 }
 
-function proofPath(value: string) {
+export function proofPath(value: string) {
   if (value.startsWith(proofPrefix)) return value.slice(proofPrefix.length);
   const url = process.env.SUPABASE_URL;
   if (!url) return null;

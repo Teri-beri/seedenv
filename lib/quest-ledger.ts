@@ -40,7 +40,14 @@ export async function saveMemberReferral(member: Pick<User, "id" | "role" | "cre
     if (await tx.submission.count({ where: { testerId: member.id, status: "APPROVED" } })) throw new Error("Enter your referral before your first approved task.");
     const inviter = await tx.user.findFirst({ where: { referralCode: { equals: normalized, mode: "insensitive" } } });
     if (!inviter || inviter.id === member.id) throw new Error("Enter another tester's valid referral code.");
-    if (await tx.referral.findUnique({ where: { friendId: inviter.id }, select: { inviterId: true } }).then((entry) => entry?.inviterId === member.id)) throw new Error("Reciprocal referrals are not eligible.");
+    const visited = new Set([member.id]);
+    let ancestor: string | null = inviter.id;
+    while (ancestor) {
+      if (visited.has(ancestor)) throw new Error("Circular or reciprocal referrals are not eligible.");
+      visited.add(ancestor);
+      const parent: { inviterId: string } | null = await tx.referral.findUnique({ where: { friendId: ancestor }, select: { inviterId: true } });
+      ancestor = parent?.inviterId ?? null;
+    }
     await tx.referral.create({ data: { inviterId: inviter.id, friendId: member.id } });
   });
 }

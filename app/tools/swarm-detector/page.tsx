@@ -15,6 +15,7 @@ import {
 import { CopyFeedbackIcon } from "@/components/ui/copy-feedback-icon";
 import { COPY_FEEDBACK_MS } from "@/lib/use-copy-feedback";
 import { AdPlaybackError, isAdNetworkConfigured, playRewardedAd, resolveAdNetwork } from "@/lib/ad-network";
+import { ToolHandoff } from "@/components/tools/tool-handoff";
 
 // Read as full literal member expressions so Next.js can inline them into the browser bundle.
 const adNetwork = resolveAdNetwork({
@@ -195,6 +196,7 @@ export default function SwarmDetectorPage() {
   const router = useRouter();
   const [rawInput, setRawInput] = useState(initialInput);
   const [auditedInput, setAuditedInput] = useState(initialInput);
+  const [auditedUrl, setAuditedUrl] = useState<string | null>(null);
   const [platformPreset, setPlatformPreset] = useState<PlatformPreset>("tiktok");
   const [aspectMode, setAspectMode] = useState<AspectMode>("card");
   const [receiptTheme, setReceiptTheme] = useState<ReceiptTheme>("cyber");
@@ -258,7 +260,7 @@ export default function SwarmDetectorPage() {
     setAuditPhase(null);
   };
 
-  const runAudit = (overrideInput?: string) => {
+  const runAudit = (overrideInput?: string, sourceUrl: string | null = null) => {
     const value = overrideInput ?? rawInput;
     const pendingEntries = parseSwarmInput(value);
     if (!pendingEntries.length) {
@@ -274,6 +276,7 @@ export default function SwarmDetectorPage() {
       window.setTimeout(() => setAuditPhase(2), 800),
       window.setTimeout(() => {
         setAuditedInput(value);
+        setAuditedUrl(sourceUrl);
         setHasResults(true);
         setInputDirty(false);
         setAuditPhase(null);
@@ -345,7 +348,7 @@ export default function SwarmDetectorPage() {
       setRawInput(serialized);
       setPlatformPreset(matchedPreset);
       setLinkNotice(`Imported ${payload.comments.length} comments via ${payload.source}. Running the audit now.`);
-      runAudit(serialized);
+      runAudit(serialized, gate.url);
     } catch (error) {
       console.error("Swarm link fetch failed:", error);
       setLinkError("That link couldn't be reached. Switch to the “Paste Comments” tab for instant offline processing.");
@@ -582,6 +585,8 @@ export default function SwarmDetectorPage() {
                 </div>
               )}
             </section>
+
+            <ToolHandoff key={auditedUrl || "paste"} url={auditedUrl} lead="Your heuristic analysis is ready. It is not a definitive bot verdict." />
 
             <section className="mt-6 rounded-3xl border border-zinc-800 bg-zinc-950/75 p-5 sm:p-6">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><div className="flex items-center gap-2"><Copy className="size-5 text-amber-300" /><h2 className="text-xl font-semibold text-white">The copy-paste script</h2></div><p className="mt-2 text-sm leading-6 text-zinc-400">These are the repeated lines we matched across accounts. Switch to organic-only to read just the real people.</p></div><div className="inline-flex rounded-full border border-zinc-800 bg-black/30 p-1">{(["all", "organic"] as const).map((filter) => <button key={filter} type="button" aria-pressed={commentFilter === filter} onClick={() => setCommentFilter(filter)} className={`inline-flex min-h-11 items-center rounded-full px-3 py-2 font-mono text-[10px] uppercase tracking-[0.12em] ${commentFilter === filter ? "bg-emerald-500/15 text-emerald-200" : "text-zinc-500"}`}>{filter === "all" ? "All Comments" : "Organic Only"}</button>)}</div></div>

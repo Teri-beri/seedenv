@@ -24,12 +24,14 @@ import { auditSubmission } from "@/lib/ai/qa-audit";
 import { recordCompliancePing } from "@/lib/compliance-pings";
 import { assertProofEditable, proofWindowMs, rejectProof, requestProofRevision, startProofRevision } from "@/lib/submission-lifecycle";
 import { reconcileReferralMilestone } from "@/lib/services/billing.service";
+import { structuredBugSchema } from "@/lib/organic-growth";
 
 const proofSchema = z.object({
   proofImageBase64: z.string().max(7 * 1024 * 1024).optional(),
   proofImageMimeType: z.string().regex(/^image\/(png|jpe?g|webp)$/).optional(),
   proofImageHash: z.string().min(16).max(128).optional(),
   feedbackText: z.string().trim().min(12).max(2000),
+  bug: structuredBugSchema.nullable().optional(),
   appRating: z.number().int().min(1).max(5).optional(),
   robloxUsername: z.string().trim().regex(/^[A-Za-z0-9_]{3,20}$/, "Enter a valid Roblox username.").optional().or(z.literal("")),
   robloxChecklist: z.object({
@@ -110,6 +112,10 @@ export async function claimTaskSlot(campaignId: string) {
         proofImageUrl: null,
         proofImageHash: null,
         feedbackText: null,
+        bugTitle: null,
+        bugSeverity: null,
+        reproSteps: [],
+        approvedById: null,
         appRating: null,
         recordingUrl: null,
         robloxUsername: null,
@@ -141,7 +147,9 @@ export async function claimTaskSlot(campaignId: string) {
 
 export async function submitTaskProof(submissionId: string, proofData: z.infer<typeof proofSchema>) {
   const tester = await requireMember("TESTER");
-  const input = proofSchema.parse(proofData);
+  const parsed = proofSchema.safeParse(proofData);
+  if (!parsed.success) throw new Error(parsed.error.issues[0].message);
+  const input = parsed.data;
 
   const submission = await prisma.submission.findUnique({
     where: { id: submissionId },
@@ -209,6 +217,9 @@ export async function submitTaskProof(submissionId: string, proofData: z.infer<t
       proofImageUrl,
       proofImageHash: hash,
       feedbackText: input.feedbackText,
+      bugTitle: input.bug?.title ?? null,
+      bugSeverity: input.bug?.severity ?? null,
+      reproSteps: input.bug?.reproSteps ?? [],
       appRating: input.appRating ?? current.appRating,
       recordingUrl: input.recordingUrl || (isStoredRecording(current.recordingUrl) ? current.recordingUrl : null),
       robloxUsername: isRoblox ? input.robloxUsername : null,

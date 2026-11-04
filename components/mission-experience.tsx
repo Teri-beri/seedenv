@@ -23,6 +23,8 @@ import { requestMission } from "@/app/actions/applicationActions";
 import { applicationEligibility } from "@/lib/quest-rules";
 import { buildRobloxLaunchUrl } from "@/lib/roblox-cohorts";
 import Link from "next/link";
+import { StructuredBugFields } from "@/components/structured-bug-fields";
+import { feedbackWithBug, structuredBugSchema, type StructuredBug } from "@/lib/organic-growth";
 
 type Instruction = {
   id: string;
@@ -59,7 +61,7 @@ type Mission = {
 
 type ProofTelemetry = { osBuild: string; deviceModel: string; screenResolution: string; appBuildVersion: string; networkType: string; recordingUrl: string; crashLogs: string; networkLogs: string };
 type RobloxChecklist = { interfaceScaled: boolean; stableFramerate: boolean; consoleCaptured: boolean };
-type Assignment = { id: string; campaign: Mission; expiresAt: string; submitted: boolean; denialReviewPending?: boolean; revisionRequested?: boolean; revisionStarted?: boolean; revisionNote?: string | null; feedbackText?: string | null; appRating?: number | null; proofPreviewUrl?: string | null; hasScreenshot?: boolean; hasRecording?: boolean; telemetry?: ProofTelemetry; robloxUsername?: string | null; robloxChecklist?: RobloxChecklist | null };
+type Assignment = { id: string; campaign: Mission; expiresAt: string; submitted: boolean; denialReviewPending?: boolean; revisionRequested?: boolean; revisionStarted?: boolean; revisionNote?: string | null; feedbackText?: string | null; appRating?: number | null; proofPreviewUrl?: string | null; hasScreenshot?: boolean; hasRecording?: boolean; telemetry?: ProofTelemetry; robloxUsername?: string | null; robloxChecklist?: RobloxChecklist | null; bug?: StructuredBug | null };
 type MissionHistory = { id: string; campaignTitle: string; status: string; payoutCents: number; rejectionReason: string | null; expiresAt: string };
 type MissionView = "progress" | "review" | "revisions" | "history";
 
@@ -169,6 +171,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   const [recordingUpload, setRecordingUpload] = useState<{ state: "idle" | "uploading" | "error"; name?: string; message?: string }>({ state: "idle" });
   const [now, setNow] = useState(initialNow);
   const [telemetry, setTelemetry] = useState({ osBuild: "", deviceModel: "", screenResolution: "", appBuildVersion: "", networkType: "", recordingUrl: "", crashLogs: "", networkLogs: "" });
+  const [bug, setBug] = useState<StructuredBug | null>(null);
   const [detectedGpu, setDetectedGpu] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [showPairingModal, setShowPairingModal] = useState(false);
@@ -211,7 +214,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
   const requiresRecording = activeMission?.platform === "ROBLOX_EXPERIENCE";
   const showEvidenceForm = companionMode ? mobileEvidenceOpen : !pairSession?.state.connectedAt;
   const evidencePreview = useMemo(() => previewTesterEvidenceQuality({
-    feedbackText: feedback,
+    feedbackText: feedbackWithBug(feedback, bug),
     hasRecording: Boolean(storedRecording || telemetry.recordingUrl || pairSession?.state.recordingConfirmedAt),
     hasScreenshot: Boolean(preview || retainedScreenshot),
     deviceModel: telemetry.deviceModel || pairSession?.state.confirmedDeviceModel || null,
@@ -220,7 +223,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
     networkType: telemetry.networkType || null,
     crashLogs: telemetry.crashLogs,
     networkLogs: telemetry.networkLogs,
-  }), [feedback, pairSession?.state.confirmedDeviceModel, pairSession?.state.deviceProfile?.osVersion, pairSession?.state.recordingConfirmedAt, preview, retainedScreenshot, storedRecording, telemetry]);
+  }), [bug, feedback, pairSession?.state.confirmedDeviceModel, pairSession?.state.deviceProfile?.osVersion, pairSession?.state.recordingConfirmedAt, preview, retainedScreenshot, storedRecording, telemetry]);
 
   const filteredMissions = useMemo(() => discoverMissions(missions, query, filter, sort), [missions, query, filter, sort]);
   const showCompletedPreviews = mode === "discover" && query.trim() === "" && filter === "all";
@@ -458,6 +461,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
     setPreview(null);
     setProofHash(null);
     setFeedback("");
+    setBug(null);
     setAppRating(0);
     setRobloxUsername("");
     setRobloxChecklist(emptyRobloxChecklist);
@@ -492,6 +496,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
           setSubmissionId(assignment.id);
           setExpiresAt(new Date(updated.expiresAt));
           setFeedback(updated.feedbackText || "");
+          setBug(assignment.bug ?? null);
           setAppRating(assignment.appRating || 0);
           setRobloxUsername(assignment.robloxUsername || "");
           setRobloxChecklist(assignment.robloxChecklist || emptyRobloxChecklist);
@@ -517,6 +522,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
       setRetainedScreenshot(Boolean(assignment.hasScreenshot));
       setStoredRecording(Boolean(assignment.hasRecording));
       setFeedback(assignment.feedbackText || "");
+      setBug(assignment.bug ?? null);
       setAppRating(assignment.appRating || 0);
       setRobloxUsername(assignment.robloxUsername || "");
       setRobloxChecklist(assignment.robloxChecklist || emptyRobloxChecklist);
@@ -668,6 +674,11 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
       setMessage("Rate the app from 1 to 5 before submitting.");
       return;
     }
+    const parsedBug = bug ? structuredBugSchema.safeParse({ ...bug, reproSteps: bug.reproSteps.filter((step) => step.trim()) }) : null;
+    if (parsedBug && !parsedBug.success) {
+      setMessage(parsedBug.error.issues[0].message);
+      return;
+    }
     startTransition(async () => {
       try {
         const hardware = await collectHardwareSignals().catch(() => null);
@@ -675,6 +686,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
           hardware,
           ...(selectedFile && preview && proofHash ? { proofImageBase64: preview, proofImageMimeType: selectedFile.type, proofImageHash: proofHash } : {}),
           feedbackText: feedback,
+          bug: parsedBug?.success ? parsedBug.data : null,
           appRating,
           ...(isRoblox ? { robloxUsername, robloxChecklist } : {}),
           ...telemetry,
@@ -956,6 +968,7 @@ export function MissionExperience({ mode, missions, assignments = noAssignments,
               </div>
             ) : null}
             <div className={showEvidenceForm ? "contents" : "hidden"}>
+            <StructuredBugFields value={bug} onChange={setBug} disabled={isPending} />
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">{pairSession?.state.deviceProfile ? "Paired mobile telemetry" : "Live device telemetry"}</p>

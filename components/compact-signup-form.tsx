@@ -169,7 +169,8 @@ export function CompactSignupForm() {
 
     try {
       const resumesMissionPair = nextPath.startsWith("/pair/");
-      const baseCallback = provider === "github" && !resumesMissionPair
+      const testerInvite = role === "TESTER" && Boolean(searchParams.get("ref"));
+      const baseCallback = provider === "github" && !resumesMissionPair && !testerInvite
         ? getOAuthCallback(developerReferral.trim() ? `/account?tab=profile&devref=${encodeURIComponent(developerReferral.trim())}` : role === "DEVELOPER" ? nextPath : "/console", "DEVELOPER")
         : getOAuthCallback(nextPath, role);
       const callbackUrl = `${baseCallback}${(provider === "github" || role === "DEVELOPER") && developerReferral.trim() ? `&devref=${encodeURIComponent(developerReferral.trim())}` : ""}${searchParams.get("ref") ? `&ref=${encodeURIComponent(searchParams.get("ref") || "")}` : ""}`;
@@ -222,7 +223,7 @@ export function CompactSignupForm() {
         <button aria-label="Continue with GitHub" className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800/50 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} onClick={() => continueWithProvider("github")} type="button"><GitHubMark /> {loading ? "Opening..." : "GitHub"}</button>
         <button aria-label="Continue with Google" className="flex items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/60 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:border-zinc-700 hover:bg-zinc-800/50 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} onClick={() => continueWithProvider("google")} type="button"><GoogleMark /> Google</button>
       </div>
-      <p className="-mt-4 text-center text-xs leading-5 text-zinc-500">{nextPath.startsWith("/pair/") ? "Choose any sign-in method. SeedEnv will return to your connected mission automatically." : "GitHub opens your Developer Console. Switch workspaces anytime in Account settings."}</p>
+      <p className="-mt-4 text-center text-xs leading-5 text-zinc-500">{nextPath.startsWith("/pair/") ? "Choose any sign-in method. SeedEnv will return to your connected mission automatically." : role === "TESTER" && searchParams.get("ref") ? "Your tester invite is preserved with any sign-in method." : "GitHub opens your Developer Console. Switch workspaces anytime in Account settings."}</p>
 
       <div className="relative flex items-center justify-center"><div className="w-full border-t border-zinc-800" /><span className="absolute bg-[#0b0c10] px-3 text-xs font-mono uppercase tracking-wider text-zinc-500">or continue with email</span></div>
 

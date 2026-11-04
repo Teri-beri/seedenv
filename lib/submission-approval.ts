@@ -10,12 +10,13 @@ import { operationTransfer, reserveBillingOperation } from "@/lib/billing-operat
 import { payoutSourceCandidates } from "@/lib/payout-funding-source";
 import { assertCampaignFunding } from "@/lib/funding-reversals";
 import { releaseBountyAndDeductFee } from "@/lib/billing/ledger";
+import { awardTesterReferralBounty } from "@/lib/tester-referrals";
 
 export { AUTO_APPROVE_AFTER_MS, isAutoApprovalDue, isFraudHeld, autoApproveDeadlineFrom as autoApproveDeadline } from "@/lib/auto-approval-window";
 
 export type ApprovalActor = { kind: "reviewer"; id: string; admin: boolean } | { kind: "auto"; now: Date };
 
-export type ApprovalResult = { payoutCents: number; xpGain: number; testerId: string; payoutTransactionId: string; campaignTitle: string };
+export type ApprovalResult = { payoutCents: number; xpGain: number; testerId: string; payoutTransactionId: string; campaignTitle: string; referralReward?: { userId: string; transactionId: string } | null };
 
 export function testerPayoutErrorMessage(error: unknown): string {
   const code = error instanceof Error && "code" in error ? error.code : undefined;
@@ -41,7 +42,7 @@ export function testerPayoutErrorMessage(error: unknown): string {
 
 export async function releaseTesterPayouts(testerId: string) {
   const pending = await prisma.walletTransaction.findMany({
-    where: { userId: testerId, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING },
+    where: { userId: testerId, type: { in: [TransactionType.BOUNTY_PAYOUT, TransactionType.REFERRAL_REWARD] }, status: TransactionStatus.PENDING },
     orderBy: { createdAt: "asc" },
     select: { id: true },
   });
@@ -57,7 +58,7 @@ export async function releaseTesterPayouts(testerId: string) {
     }
   }
   const pendingCount = await prisma.walletTransaction.count({
-    where: { userId: testerId, type: TransactionType.BOUNTY_PAYOUT, status: TransactionStatus.PENDING },
+    where: { userId: testerId, type: { in: [TransactionType.BOUNTY_PAYOUT, TransactionType.REFERRAL_REWARD] }, status: TransactionStatus.PENDING },
   });
   return { releasedCount, pendingCount, failures };
 }
@@ -78,7 +79,7 @@ export async function approvePendingSubmission(tx: Prisma.TransactionClient, sub
   const xpGain = xpForBounty(submission.payoutCents);
   const approval = await tx.submission.updateMany({
     where: { id: submissionId, status: SubmissionStatus.PENDING, denialReviewPending: false, ...(actor.kind === "auto" ? { revisionRequestedAt: null } : {}) },
-    data: { status: SubmissionStatus.APPROVED, reviewedAt: new Date() },
+    data: { status: SubmissionStatus.APPROVED, reviewedAt: new Date(), approvedById: actor.kind === "reviewer" && !actor.admin ? actor.id : null },
   });
   if (approval.count !== 1) throw new Error("This submission has already been reviewed.");
   await tx.appCampaign.update({ where: { id: submission.campaignId }, data: { completedSlots: { increment: 1 } } });
@@ -88,6 +89,7 @@ export async function approvePendingSubmission(tx: Prisma.TransactionClient, sub
   });
   await awardQuestXp(tx, submission.testerId, `approved:${submission.id}`, 25, actor.kind === "auto" ? "Auto-approved contribution" : "Developer-approved contribution");
   await qualifyReferral(tx, submission.testerId);
+  const referralReward = await awardTesterReferralBounty(tx, submission.testerId);
   const payout = await releaseBountyAndDeductFee(tx, {
     testerId: submission.testerId,
     missionId: submission.campaignId,
@@ -97,7 +99,7 @@ export async function approvePendingSubmission(tx: Prisma.TransactionClient, sub
     description: `${actor.kind === "auto" ? "Auto-approved payout" : "Payout"} pending Stripe transfer for ${submission.campaign.title}`,
   });
 
-  return { payoutCents: submission.payoutCents, xpGain, testerId: submission.testerId, payoutTransactionId: payout.id, campaignTitle: submission.campaign.title };
+  return { payoutCents: submission.payoutCents, xpGain, testerId: submission.testerId, payoutTransactionId: payout.id, campaignTitle: submission.campaign.title, referralReward };
 }
 
 export async function transferTesterPayout(testerId: string, transactionId: string) {
@@ -105,7 +107,7 @@ export async function transferTesterPayout(testerId: string, transactionId: stri
     prisma.user.findUnique({ where: { id: testerId }, select: { stripeConnectAccountId: true } }),
     prisma.walletTransaction.findUnique({ where: { id: transactionId } }),
   ]);
-  if (!tester || !transaction || transaction.userId !== testerId || transaction.type !== TransactionType.BOUNTY_PAYOUT) throw new Error("Tester payout ledger does not match this member.");
+  if (!tester || !transaction || transaction.userId !== testerId || (transaction.type !== TransactionType.BOUNTY_PAYOUT && transaction.type !== TransactionType.REFERRAL_REWARD)) throw new Error("Tester payout ledger does not match this member.");
   if (transaction.status === TransactionStatus.COMPLETED) return true;
   if (transaction.status !== TransactionStatus.PENDING) throw new Error("This tester payout is not pending.");
   if (!process.env.STRIPE_SECRET_KEY) return false;
@@ -115,6 +117,7 @@ export async function transferTesterPayout(testerId: string, transactionId: stri
     const operation = await serializable(async (tx) => {
       let pending = await tx.billingOperation.findUnique({ where: { id: `seedenv-payout-${transactionId}` } });
       if (!pending) {
+        if (transaction.type === TransactionType.REFERRAL_REWARD) throw new Error("Referral payout reservation is missing; reconciliation is required.");
         if (!tester.stripeConnectAccountId) return null;
         // Before this migration, any PENDING payout may already have reached Stripe.
         pending = await reserveBillingOperation(tx, { id: `seedenv-payout-${transactionId}`, kind: "LEGACY_PAYOUT", resourceId: transactionId, ledgerId: transactionId, userId: testerId, campaignId: transaction.campaignId, destinationId: tester.stripeConnectAccountId, amountCents: transaction.amountCents });
@@ -124,18 +127,22 @@ export async function transferTesterPayout(testerId: string, transactionId: stri
     });
     if (!operation?.destinationId) return false;
     if (operation.userId !== testerId || operation.ledgerId !== transactionId || operation.amountCents !== transaction.amountCents) throw new Error("Payout operation does not match its immutable ledger.");
+    const referralPayout = transaction.type === TransactionType.REFERRAL_REWARD;
+    if (referralPayout !== (operation.kind === "REFERRAL_PAYOUT") || (referralPayout && (operation.campaignId || operation.sourceChargeId))) throw new Error("Payout funding provenance does not match its ledger type.");
 
     const transfer = await operationTransfer(operation, async () => {
-      if (!operation.campaignId) throw new Error("Payout funding provenance is missing; reconciliation is required.");
-      await serializable((tx) => assertCampaignFunding(tx, operation.campaignId!));
+      if (!referralPayout) {
+        if (!operation.campaignId) throw new Error("Payout funding provenance is missing; reconciliation is required.");
+        await serializable((tx) => assertCampaignFunding(tx, operation.campaignId!));
+      }
       const account = await stripe.accounts.retrieve(operation.destinationId!);
       if (!account.payouts_enabled) throw new Error("Stripe payout account is not ready. Finish Stripe onboarding before releasing this payout.");
-    }, { sourceCandidates: () => payoutSourceCandidates(operation) });
+    }, referralPayout ? {} : { sourceCandidates: () => payoutSourceCandidates(operation) });
 
     const settled = await prisma.$transaction(async (database) => {
       const updated = await database.walletTransaction.updateMany({
         where: { id: transactionId, status: TransactionStatus.PENDING },
-        data: { status: TransactionStatus.COMPLETED, stripePaymentId: transfer.id, description: "Tester payout transferred to Stripe" },
+        data: { status: TransactionStatus.COMPLETED, stripePaymentId: transfer.id, description: referralPayout ? "Tester referral reward transferred to Stripe" : "Tester payout transferred to Stripe" },
       });
       if (updated.count) {
         await database.user.update({ where: { id: testerId }, data: { walletBalanceCents: { increment: transaction.amountCents } } });
@@ -153,6 +160,13 @@ export async function transferTesterPayout(testerId: string, transactionId: stri
 }
 
 export async function settleApprovedPayout(result: ApprovalResult, automatic: boolean) {
+  if (result.referralReward) {
+    try {
+      await transferTesterPayout(result.referralReward.userId, result.referralReward.transactionId);
+    } catch (error) {
+      console.error("SeedEnv referral reward remains pending:", { payoutId: result.referralReward.transactionId, error });
+    }
+  }
   let payoutSent = false;
   try {
     payoutSent = await transferTesterPayout(result.testerId, result.payoutTransactionId);

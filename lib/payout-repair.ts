@@ -21,7 +21,7 @@ export type StuckPayout = {
 // Payouts whose Stripe outcome is unknown past the safe idempotent-retry window; the tester cannot retry these.
 export async function listStuckPayouts(now = new Date()): Promise<StuckPayout[]> {
   const operations = await prisma.billingOperation.findMany({
-    where: { kind: { in: ["PAYOUT", "LEGACY_PAYOUT"] }, state: { in: ["SUBMITTED", "FAILED"] }, remoteId: null },
+    where: { kind: { in: ["PAYOUT", "REFERRAL_PAYOUT", "LEGACY_PAYOUT"] }, state: { in: ["SUBMITTED", "FAILED"] }, remoteId: null },
     orderBy: { createdAt: "asc" },
     take: 50,
   });
@@ -37,7 +37,7 @@ export async function listStuckPayouts(now = new Date()): Promise<StuckPayout[]>
     error: operation.error,
     firstAttemptAt: operation.firstAttemptAt?.toISOString() ?? null,
     testerEmail: emails.get(operation.userId) ?? null,
-    repairable: operation.kind === "PAYOUT" && (!operation.firstAttemptAt || now.getTime() - operation.firstAttemptAt.getTime() >= SAFE_STRIPE_RETRY_MS),
+    repairable: (operation.kind === "PAYOUT" || operation.kind === "REFERRAL_PAYOUT") && (!operation.firstAttemptAt || now.getTime() - operation.firstAttemptAt.getTime() >= SAFE_STRIPE_RETRY_MS),
   }));
 }
 
@@ -56,14 +56,15 @@ export type PayoutRepairResult = { reopened: boolean; existingTransfer: string |
 export async function repairStuckPayout(operationId: string, operatorId: string, now = new Date()): Promise<PayoutRepairResult> {
   const operation = await prisma.billingOperation.findUnique({ where: { id: operationId } });
   if (!operation) throw new Error("Payout operation not found.");
-  if (operation.kind !== "PAYOUT") throw new Error("Only modern payout operations can be repaired here. Reconcile legacy payouts in Stripe.");
+  if (operation.kind !== "PAYOUT" && operation.kind !== "REFERRAL_PAYOUT") throw new Error("Only modern payout operations can be repaired here. Reconcile legacy payouts in Stripe.");
   if (operation.state === "SETTLED" || operation.remoteId) throw new Error("This payout already has a Stripe transfer.");
   if (!operation.destinationId) throw new Error("This payout has no destination Stripe account.");
   if (operation.firstAttemptAt && now.getTime() - operation.firstAttemptAt.getTime() < SAFE_STRIPE_RETRY_MS) {
     throw new Error("This payout is still inside Stripe's safe retry window. The tester can retry it normally.");
   }
   const ledger = await prisma.walletTransaction.findUnique({ where: { id: operation.ledgerId ?? "" } });
-  if (!ledger || ledger.type !== TransactionType.BOUNTY_PAYOUT || ledger.status !== TransactionStatus.PENDING || ledger.amountCents !== operation.amountCents || ledger.userId !== operation.userId) {
+  const expectedType = operation.kind === "REFERRAL_PAYOUT" ? TransactionType.REFERRAL_REWARD : TransactionType.BOUNTY_PAYOUT;
+  if (!ledger || ledger.type !== expectedType || ledger.status !== TransactionStatus.PENDING || ledger.amountCents !== operation.amountCents || ledger.userId !== operation.userId) {
     throw new Error("The wallet ledger is not a matching pending payout.");
   }
   if (!process.env.STRIPE_SECRET_KEY) throw new Error("Stripe is not configured on this server.");

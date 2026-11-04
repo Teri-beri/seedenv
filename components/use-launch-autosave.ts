@@ -7,8 +7,8 @@ import { launchDraftKey, launchWizardDraftSchema, type LaunchWizardDraft } from 
 
 const recoverySchema = z.object({ revision: z.number().int().min(0), draft: launchWizardDraftSchema });
 
-export function useLaunchAutosave({ userId, sourceDraftId, revision: initialRevision, draft, restore, enabled }: {
-  userId: string; sourceDraftId?: string; revision: number; draft: LaunchWizardDraft; restore: (draft: LaunchWizardDraft) => void; enabled: boolean;
+export function useLaunchAutosave({ userId, sourceDraftId, revision: initialRevision, draft, restore, enabled, expectedAppUrl }: {
+  userId: string; sourceDraftId?: string; revision: number; draft: LaunchWizardDraft; restore: (draft: LaunchWizardDraft) => void; enabled: boolean; expectedAppUrl?: string;
 }) {
   const storageKey = `seedenv:launch-draft:v1:${userId}:${launchDraftKey(sourceDraftId)}`;
   const revision = useRef(initialRevision);
@@ -25,6 +25,10 @@ export function useLaunchAutosave({ userId, sourceDraftId, revision: initialRevi
       const raw = localStorage.getItem(storageKey);
       if (raw) {
         const recovery = recoverySchema.parse(JSON.parse(raw));
+        if (expectedAppUrl !== undefined && recovery.draft.form.appUrl !== expectedAppUrl) {
+          setError("Browser edits for a different app were not applied. Using the URL from your free tool.");
+          return;
+        }
         if (recovery.revision === revision.current) {
           latest.current = recovery.draft;
           restore(recovery.draft);

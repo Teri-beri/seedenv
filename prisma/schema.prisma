@@ -73,6 +73,12 @@ enum SubmissionStatus {
   EXPIRED
 }
 
+enum BugSeverity {
+  CRITICAL
+  MAJOR
+  MINOR
+}
+
 enum TransactionType {
   CLIPPER_DEPOSIT
   CLIPPER_PAYOUT
@@ -88,6 +94,7 @@ enum TransactionType {
   WITHDRAWAL
   SUPPORT_REFUND
   SUPPORT_CREDIT
+  REFERRAL_REWARD
 }
 
 enum CohortFundingModel {
@@ -636,6 +643,8 @@ model Referral {
   friendId    String    @unique
   friend      User      @relation("ReferralFriend", fields: [friendId], references: [id], onDelete: Cascade)
   qualifiedAt DateTime?
+  rewardedAt  DateTime?
+  rewardTransactionId String? @unique
   createdAt   DateTime  @default(now())
 
   @@index([inviterId, qualifiedAt])
@@ -750,6 +759,11 @@ model Submission {
   robloxChecklist      Json?                     @map("roblox_checklist")
   proofImageHash       String?
   feedbackText         String?
+  bugTitle             String?                   @db.VarChar(160)
+  bugSeverity          BugSeverity?
+  reproSteps           String[]                  @default([])
+  approvedById         String?
+  publicReport         PublicBugReport?
   appRating            Int?                      @map("app_rating")
   osBuild              String?
   deviceModel          String?
@@ -789,6 +803,27 @@ model Submission {
   @@index([proofImageHash])
   @@index([expiresAt, status])
   @@index([status, submittedAt])
+}
+
+model PublicBugReport {
+  id             String            @id @default(cuid())
+  submissionId   String            @unique
+  submission     Submission        @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  isPublic       Boolean           @default(false)
+  title          String            @db.VarChar(160)
+  severity       BugSeverity
+  summary        String            @db.VarChar(2000)
+  reproSteps     String[]
+  deviceModel    String            @db.VarChar(120)
+  osVersion      String            @db.VarChar(120)
+  viewport       String            @db.VarChar(80)
+  hardwareStatus HardwareIntegrity
+  proofImageUrl  String?
+  recordingUrl   String?
+  publishedAt    DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([isPublic, updatedAt])
 }
 
 model TelemetryIncident {

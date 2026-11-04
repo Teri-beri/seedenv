@@ -397,6 +397,38 @@ test("concurrent payout retries reconcile a lost response after 48 hours without
   });
 });
 
+test("referral payouts transfer $1 from platform funds and reconcile replay without touching developer escrow", async () => {
+  await withHarness(async (h, { payouts }) => {
+    h.payout();
+    const ledger = h.rows("walletTransaction")[0];
+    const operation = h.rows("billingOperation")[0];
+    ledger.type = "REFERRAL_REWARD";
+    ledger.amountCents = 100;
+    ledger.campaignId = null;
+    operation.kind = "REFERRAL_PAYOUT";
+    operation.amountCents = 100;
+    operation.campaignId = null;
+    h.remote.loseTransferResponse = true;
+    await assert.rejects(payouts.transferTesterPayout("tester", "payout"), /Lost Stripe transfer response/);
+    await Promise.all([payouts.transferTesterPayout("tester", "payout"), payouts.transferTesterPayout("tester", "payout")]);
+    assert.equal(h.remote.transferCreates, 1);
+    assert.equal(h.remote.transfers[0].amount, 100);
+    assert.equal(h.remote.transfers[0].source_transaction, undefined);
+    assert.equal(h.rows("user")[1].walletBalanceCents, 100);
+    assert.equal(h.rows("user")[0].fundingBalanceCents, 5000);
+    assert.equal(h.rows("walletTransaction")[0].status, "COMPLETED");
+  });
+});
+
+test("referral ledger entries cannot masquerade as campaign payouts or attach an escrow source", async () => {
+  await withHarness(async (h, { payouts }) => {
+    h.payout();
+    h.rows("walletTransaction")[0].type = "REFERRAL_REWARD";
+    await assert.rejects(payouts.transferTesterPayout("tester", "payout"), /provenance/);
+    assert.equal(h.remote.transferCreates, 0);
+  });
+});
+
 test("payout database failure before remote identity persistence still discovers the existing transfer on delayed retry", async () => {
   await withHarness(async (h, { payouts }) => {
     h.payout();

@@ -215,6 +215,35 @@ const statements = [
   `CREATE INDEX IF NOT EXISTS "refund_requests_developerId_createdAt_idx" ON "refund_requests"("developerId", "createdAt")`,
   `CREATE INDEX IF NOT EXISTS "refund_requests_status_createdAt_idx" ON "refund_requests"("status", "createdAt")`,
   `CREATE INDEX IF NOT EXISTS "refund_requests_walletTransactionId_idx" ON "refund_requests"("walletTransactionId")`,
+  `DO $$ BEGIN CREATE TYPE "BugSeverity" AS ENUM ('CRITICAL', 'MAJOR', 'MINOR'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+  `ALTER TYPE "TransactionType" ADD VALUE IF NOT EXISTS 'REFERRAL_REWARD'`,
+  `ALTER TABLE "Submission"
+    ADD COLUMN IF NOT EXISTS "bugTitle" VARCHAR(160),
+    ADD COLUMN IF NOT EXISTS "bugSeverity" "BugSeverity",
+    ADD COLUMN IF NOT EXISTS "reproSteps" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+    ADD COLUMN IF NOT EXISTS "approvedById" TEXT`,
+  `ALTER TABLE "Referral"
+    ADD COLUMN IF NOT EXISTS "rewardedAt" TIMESTAMP(3),
+    ADD COLUMN IF NOT EXISTS "rewardTransactionId" TEXT`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Referral_rewardTransactionId_key" ON "Referral"("rewardTransactionId")`,
+  `CREATE TABLE IF NOT EXISTS "PublicBugReport" (
+    "id" TEXT PRIMARY KEY,
+    "submissionId" TEXT NOT NULL UNIQUE REFERENCES "Submission"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    "isPublic" BOOLEAN NOT NULL DEFAULT FALSE,
+    "title" VARCHAR(160) NOT NULL,
+    "severity" "BugSeverity" NOT NULL,
+    "summary" VARCHAR(2000) NOT NULL,
+    "reproSteps" TEXT[] NOT NULL,
+    "deviceModel" VARCHAR(120) NOT NULL,
+    "osVersion" VARCHAR(120) NOT NULL,
+    "viewport" VARCHAR(80) NOT NULL,
+    "hardwareStatus" "HardwareIntegrity" NOT NULL,
+    "proofImageUrl" TEXT,
+    "recordingUrl" TEXT,
+    "publishedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "PublicBugReport_isPublic_updatedAt_idx" ON "PublicBugReport"("isPublic", "updatedAt")`,
 ];
 
 async function main() {

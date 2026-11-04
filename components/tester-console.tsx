@@ -17,6 +17,8 @@ import { formatRankLevel, validatorNodeId } from "@/lib/validator-identity";
 import { parseRobloxSubmissionChecklist } from "@/lib/roblox-cohorts";
 import { ClipperDashboard, type ClipperDashboardData } from "@/components/clipper-dashboard";
 import { CommandPaletteTrigger } from "@/components/command-palette";
+import { TesterReferralCard } from "@/components/tester-referral-card";
+import type { TesterReferralStats } from "@/lib/tester-referrals";
 
 type ConsoleMission = Pick<AppCampaign, "id" | "title" | "appUrl" | "iconUrl" | "targetVibe" | "description" | "bountyPerTaskUsd" | "totalSlots" | "claimedSlots" | "completedSlots" | "platform" | "discoveryAllowed" | "discoveryMinRep" | "estimatedMinutes" | "testerPerk"> & { instructions: TaskInstruction[]; acceptedInstructionRevision?: number; directionsUpdated?: boolean; ownedByTester?: boolean };
 
@@ -35,9 +37,10 @@ export type TesterConsoleData = {
   questXp: number;
   discoveryPasses: number;
   clippers?: ClipperDashboardData;
+  referrals?: TesterReferralStats;
 };
 
-export function TesterConsole({ activeView, tester, missions, leaderboard, summary, recent, pending, approvedCampaigns, pendingPayoutCents, now, applications, questXp, discoveryPasses, clippers }: TesterConsoleData) {
+export function TesterConsole({ activeView, tester, missions, leaderboard, summary, recent, pending, approvedCampaigns, pendingPayoutCents, now, applications, questXp, discoveryPasses, clippers, referrals }: TesterConsoleData) {
   const approved = summary.find((item) => item.status === SubmissionStatus.APPROVED);
   const approvedCount = approved?._count._all || 0;
   const rejectedCount = summary.find((item) => item.status === SubmissionStatus.REJECTED)?._count._all || 0;
@@ -146,6 +149,7 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
               revisionRequested: Boolean(item.revisionRequestedAt), revisionStarted: Boolean(item.revisionStartedAt), revisionNote: item.rejectionReason,
               denialReviewPending: item.denialReviewPending,
               feedbackText: item.feedbackText, appRating: item.appRating, proofPreviewUrl: item.proofPreviewUrl, hasScreenshot: Boolean(item.proofImageUrl), hasRecording: isStoredRecording(item.recordingUrl),
+              bug: item.bugTitle && item.bugSeverity ? { title: item.bugTitle, severity: item.bugSeverity, reproSteps: item.reproSteps } : null,
               robloxUsername: item.robloxUsername, robloxChecklist: parseRobloxSubmissionChecklist(item.robloxChecklist),
               telemetry: { osBuild: item.osBuild || "", deviceModel: item.deviceModel || "", screenResolution: item.screenResolution || "", appBuildVersion: item.appBuildVersion || "", networkType: item.networkType || "", recordingUrl: isStoredRecording(item.recordingUrl) ? "" : item.recordingUrl || "", crashLogs: item.crashLogs || "", networkLogs: item.networkLogs || "" },
             }))} history={recent.map((item) => ({
@@ -153,6 +157,8 @@ export function TesterConsole({ activeView, tester, missions, leaderboard, summa
               rejectionReason: item.rejectionReason, expiresAt: item.expiresAt.toISOString(),
             }))} completedCampaignIds={approvedCampaigns.map((item) => item.campaignId)} initialNow={now.getTime()} applications={applications} reputation={tester.xpPoints} discoveryPasses={discoveryPasses} />
           </section> : null}
+
+          {(activeView === "missions" || activeView === "reputation") && referrals ? <TesterReferralCard stats={referrals} /> : null}
 
           {activeView === "reputation" ? <section id="reputation" className="grid scroll-mt-6 gap-6 lg:grid-cols-[1fr_1.1fr]">
             <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">

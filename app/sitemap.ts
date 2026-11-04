@@ -4,8 +4,9 @@ import { isPublicHandle, publicProfilePath, SEED_ACCOUNT_EMAIL_SUFFIX } from "@/
 import { SITE_URL } from "@/lib/seo";
 import { listPublishedPosts } from "@/lib/growth/blog";
 import { testingGuides } from "@/lib/testing-guides";
+import { freeTools } from "@/lib/organic-growth";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 async function developerProfiles(): Promise<MetadataRoute.Sitemap> {
   try {
@@ -27,6 +28,11 @@ async function developerProfiles(): Promise<MetadataRoute.Sitemap> {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const reports = await prisma.publicBugReport.findMany({
+    where: { isPublic: true, submission: { status: "APPROVED", denialReviewPending: false } },
+    select: { id: true, updatedAt: true },
+    orderBy: { updatedAt: "desc" },
+  });
   return [
     { url: SITE_URL, changeFrequency: "weekly", priority: 1 },
     { url: `${SITE_URL}/explore`, changeFrequency: "daily", priority: 0.9 },
@@ -36,7 +42,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/blog`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE_URL}/guides`, changeFrequency: "monthly", priority: 0.8 },
     ...testingGuides.map((guide) => ({ url: `${SITE_URL}/guides/${guide.slug}`, changeFrequency: "monthly" as const, priority: 0.7 })),
-    { url: `${SITE_URL}/tools/swarm-detector`, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${SITE_URL}/tools`, changeFrequency: "monthly", priority: 0.8 },
+    ...freeTools.map((tool) => ({ url: `${SITE_URL}${tool.path}`, changeFrequency: "monthly" as const, priority: 0.7 })),
+    ...reports.map((report) => ({ url: `${SITE_URL}/report/${report.id}`, lastModified: report.updatedAt, changeFrequency: "weekly" as const, priority: 0.5 })),
     { url: `${SITE_URL}/auth/signin`, changeFrequency: "yearly", priority: 0.5 },
     { url: `${SITE_URL}/faq`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/about`, changeFrequency: "monthly", priority: 0.6 },
