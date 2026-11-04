@@ -2,14 +2,17 @@ import assert from "node:assert/strict";
 import test, { mock } from "node:test";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { checklistMarkdown, feedbackWithBug, freeTools, githubReportMarkdown, sprintHandoffPath, structuredBugSchema, toolUrlSchema, viewportPresets } from "../lib/organic-growth";
+import { checklistMarkdown, feedbackWithBug, freeTools, githubReportMarkdown, sprintHandoffPath, structuredBugSchema, toolTargetUrlSchema, toolUrlSchema, viewportPresets } from "../lib/organic-growth";
 
-test("free tools validate full URLs and retain URL queries/fragments through the sprint handoff", () => {
+test("free tools validate full URLs and strip queries/fragments from targets and the sprint handoff", () => {
   for (const bad of ["javascript:alert(1)", "data:text/html,x", "//evil.example", "https://user:secret@example.com", "example.com", ""]) assert.equal(toolUrlSchema.safeParse(bad).success, false);
   const target = "https://example.com/cart?a=1&b=2#checkout";
   const handoff = new URL(sprintHandoffPath(target), "https://seedenv.com");
   assert.equal(handoff.pathname, "/dashboard/projects/new");
-  assert.equal(handoff.searchParams.get("url"), target);
+  assert.equal(handoff.searchParams.get("url"), "https://example.com/cart");
+  assert.equal(toolTargetUrlSchema.parse("https://example.com/?a=1&b=2#preview"), "https://example.com/");
+  assert.equal(toolTargetUrlSchema.safeParse("javascript:alert(1)").success, false);
+  assert.equal(toolUrlSchema.parse(target), target);
   assert.equal(sprintHandoffPath(), "/dashboard/projects/new");
   assert.equal(new Set(freeTools.map((tool) => tool.path)).size, 3);
   assert.ok(viewportPresets.some((preset) => preset.width === 360));
@@ -49,7 +52,7 @@ test("tool handoff renders SSR-safe, readable conversion content without an acti
   } finally { moduleMock.restore(); }
 });
 
-test("anonymous handoffs keep the project URL through developer-role sign-in and launch redirect", async () => {
+test("anonymous handoffs keep the cleaned project URL through developer-role sign-in and launch redirect", async () => {
   class Redirect extends Error { constructor(readonly destination: string) { super(destination); } }
   let sessionRole = "DEVELOPER";
   const mocks = [
@@ -75,7 +78,7 @@ test("anonymous handoffs keep the project URL through developer-role sign-in and
       const destination = new URL(error.destination, "https://seedenv.com");
       assert.equal(destination.pathname, "/console");
       assert.equal(destination.searchParams.get("view"), "new-drop");
-      assert.equal(destination.searchParams.get("url"), target);
+      assert.equal(destination.searchParams.get("url"), "https://example.com/cart");
       assert.equal(destination.searchParams.get("sprint"), "1");
       return true;
     });
@@ -86,7 +89,7 @@ test("anonymous handoffs keep the project URL through developer-role sign-in and
       const destination = new URL(error.destination, "https://seedenv.com");
       assert.equal(destination.pathname, "/onboarding");
       assert.equal(destination.searchParams.get("role"), "DEVELOPER");
-      assert.equal(new URL(destination.searchParams.get("next")!, "https://seedenv.com").searchParams.get("url"), target);
+      assert.equal(new URL(destination.searchParams.get("next")!, "https://seedenv.com").searchParams.get("url"), "https://example.com/cart");
       return true;
     });
   } finally { for (const item of mocks.reverse()) item.restore(); }

@@ -17,8 +17,16 @@ export const toolUrlSchema = z.string().trim().max(2000).transform((value, ctx) 
   }
 });
 
+// Free-tool targets drop query strings and fragments so tokens or tracking params are never echoed or forwarded.
+export const toolTargetUrlSchema = toolUrlSchema.transform((value) => {
+  const url = new URL(value);
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+});
+
 export function sprintHandoffPath(url?: string | null) {
-  const parsed = toolUrlSchema.safeParse(url);
+  const parsed = toolTargetUrlSchema.safeParse(url);
   return `/dashboard/projects/new${parsed.success ? `?${new URLSearchParams({ url: parsed.data })}` : ""}`;
 }
 

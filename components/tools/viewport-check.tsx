@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { MonitorSmartphone } from "lucide-react";
 import { CopyTextButton } from "@/components/ui/copy-text-button";
 import { ToolHandoff } from "@/components/tools/tool-handoff";
-import { toolUrlSchema, viewportPresets } from "@/lib/organic-growth";
+import { toolTargetUrlSchema, viewportPresets } from "@/lib/organic-growth";
 
 export function ViewportCheck() {
   const [input, setInput] = useState("");
@@ -23,7 +23,7 @@ export function ViewportCheck() {
   const scale = availableWidth ? Math.min(1, availableWidth / viewport.width) : 0;
   const output = url ? [`# Viewport QA matrix`, `Target: ${url}`, "", ...viewportPresets.map((item) => `${item.name}: ${item.width} x ${item.height} CSS px`), "", "Manual checks: overflow, navigation, virtual keyboard, 44px touch targets, orientation.", "Preview only: cross-origin pages cannot be automatically inspected. No pass/fail verdict is asserted.", "Generated with https://seedenv.com/tools/viewport-check"].join("\n") : "";
   function analyze(value: string) {
-    const parsed = toolUrlSchema.safeParse(value);
+    const parsed = toolTargetUrlSchema.safeParse(value);
     if (!parsed.success) { setError(parsed.error.issues[0].message); return; }
     setError("");
     setUrl(parsed.data);

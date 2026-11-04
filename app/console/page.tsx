@@ -28,7 +28,7 @@ import { COHORT_PLATFORM_FEE_RATE } from "@/lib/pricing";
 import { launchDraftKey, launchWizardDraftsSchema } from "@/lib/launch-wizard-draft";
 import { automaticFeeBenefits } from "@/lib/services/billing.service";
 import { parseRobloxDeviceConstraints } from "@/lib/roblox-cohorts";
-import { toolUrlSchema } from "@/lib/organic-growth";
+import { toolTargetUrlSchema } from "@/lib/organic-growth";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +41,7 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
   if (!session?.user) redirect("/auth/signin");
   if (session.user.role !== "DEVELOPER" && session.user.role !== "ADMIN") redirect("/");
   const params = await searchParams;
-  const handoffUrl = params.url ? toolUrlSchema.safeParse(params.url) : null;
+  const handoffUrl = params.url ? toolTargetUrlSchema.safeParse(params.url) : null;
   if (handoffUrl && !handoffUrl.success) return <main className="min-h-screen bg-zinc-950 p-6 text-zinc-200"><p role="alert">The sprint URL is invalid. Enter a full HTTP or HTTPS URL without embedded credentials.</p><a href="/console?view=new-drop" className="mt-4 inline-flex min-h-11 items-center text-emerald-300">Open a blank launch wizard</a></main>;
   const activeView: ConsoleView = consoleViews.includes(params.view as ConsoleView) ? params.view as ConsoleView : "overview";
   const feeBenefits = activeView === "new-drop" ? await prisma.$transaction(tx => automaticFeeBenefits(tx, session.user.id, new Date(), params.draft)) : undefined;

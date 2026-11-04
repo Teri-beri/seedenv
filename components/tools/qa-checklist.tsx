@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ListChecks } from "lucide-react";
 import { CopyTextButton } from "@/components/ui/copy-text-button";
 import { ToolHandoff } from "@/components/tools/tool-handoff";
-import { checklistMarkdown, qaChecklistGroups, toolUrlSchema, type ChecklistGroup } from "@/lib/organic-growth";
+import { checklistMarkdown, qaChecklistGroups, toolTargetUrlSchema, type ChecklistGroup } from "@/lib/organic-growth";
 
 export function QaChecklist() {
   const [input, setInput] = useState("");
@@ -13,7 +13,7 @@ export function QaChecklist() {
   const [error, setError] = useState("");
   function generate(value: string, selected: ChecklistGroup[]) {
     if (!selected.length) { setError("Select at least one testing area."); return; }
-    const parsed = value.trim() ? toolUrlSchema.safeParse(value) : null;
+    const parsed = value.trim() ? toolTargetUrlSchema.safeParse(value) : null;
     if (parsed && !parsed.success) { setError(parsed.error.issues[0].message); return; }
     setError("");
     setResult({ url: parsed?.success ? parsed.data : null, groups: selected });
