@@ -27,12 +27,22 @@ async function developerProfiles(): Promise<MetadataRoute.Sitemap> {
   }
 }
 
+async function publicReports(): Promise<MetadataRoute.Sitemap> {
+  try {
+    const reports = await prisma.publicBugReport.findMany({
+      where: { isPublic: true, submission: { status: "APPROVED", denialReviewPending: false } },
+      select: { id: true, updatedAt: true },
+      orderBy: { updatedAt: "desc" },
+      take: 5000,
+    });
+    return reports.map((report) => ({ url: `${SITE_URL}/report/${report.id}`, lastModified: report.updatedAt, changeFrequency: "weekly" as const, priority: 0.5 }));
+  } catch (error) {
+    console.error("SeedEnv sitemap report lookup failed:", error);
+    return [];
+  }
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const reports = await prisma.publicBugReport.findMany({
-    where: { isPublic: true, submission: { status: "APPROVED", denialReviewPending: false } },
-    select: { id: true, updatedAt: true },
-    orderBy: { updatedAt: "desc" },
-  });
   return [
     { url: SITE_URL, changeFrequency: "weekly", priority: 1 },
     { url: `${SITE_URL}/explore`, changeFrequency: "daily", priority: 0.9 },
@@ -44,7 +54,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...testingGuides.map((guide) => ({ url: `${SITE_URL}/guides/${guide.slug}`, changeFrequency: "monthly" as const, priority: 0.7 })),
     { url: `${SITE_URL}/tools`, changeFrequency: "monthly", priority: 0.8 },
     ...freeTools.map((tool) => ({ url: `${SITE_URL}${tool.path}`, changeFrequency: "monthly" as const, priority: 0.7 })),
-    ...reports.map((report) => ({ url: `${SITE_URL}/report/${report.id}`, lastModified: report.updatedAt, changeFrequency: "weekly" as const, priority: 0.5 })),
+    ...(await publicReports()),
     { url: `${SITE_URL}/auth/signin`, changeFrequency: "yearly", priority: 0.5 },
     { url: `${SITE_URL}/faq`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/about`, changeFrequency: "monthly", priority: 0.6 },
