@@ -107,6 +107,13 @@ export async function createTopUpCheckout(user: TopUpMember, creditCents: number
   const customerId = await ensureStripeCustomer(user);
   const topUp = await prisma.balanceTopUp.create({ data: { userId: user.id, creditCents: quote.creditCents, processingFeeCents: quote.processingFeeCents, totalCents: quote.totalCents, source: "CHECKOUT", campaignId: options.campaignId || null } });
   const base = process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com";
+  const topUpAccountingMetadata = {
+    seedenvUserId: user.id,
+    developerId: user.id,
+    creditCents: String(quote.creditCents),
+    processingFeeCents: String(quote.processingFeeCents),
+    ...(options.campaignId ? { campaignId: options.campaignId } : {}),
+  };
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: "payment",
@@ -117,10 +124,10 @@ export async function createTopUpCheckout(user: TopUpMember, creditCents: number
       line_items: [
         { quantity: 1, price_data: { currency: "usd", unit_amount: quote.creditCents, tax_behavior: "exclusive", product_data: { ...storedValueProductTax(), name: "SeedEnv prepaid balance", description: "Used for tester rewards and platform fees as you accept testers. Unused balance is refundable to your card at any time." } } },
       ],
-      payment_intent_data: { setup_future_usage: "off_session", description: "SeedEnv prepaid balance top-up", metadata: { ...seedenvTaxMetadata(), type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id } },
+      payment_intent_data: { setup_future_usage: "off_session", description: "SeedEnv prepaid balance top-up", metadata: { ...seedenvTaxMetadata(), type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id, ...topUpAccountingMetadata } },
       success_url: `${base}${options.successPath}`,
       cancel_url: `${base}${options.cancelPath}`,
-      metadata: { ...seedenvTaxMetadata(), seedenvAutomaticTax: stripeTaxEnabled() ? "1" : "0", type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id, seedenvUserId: user.id },
+      metadata: { ...seedenvTaxMetadata(), seedenvAutomaticTax: stripeTaxEnabled() ? "1" : "0", type: "SEEDENV_BALANCE_TOPUP", topUpId: topUp.id, ...topUpAccountingMetadata },
     }, { idempotencyKey: `seedenv-topup-${topUp.id}` });
     await prisma.balanceTopUp.update({ where: { id: topUp.id }, data: { stripeCheckoutSessionId: session.id } });
     if (!session.url) throw new Error("Stripe did not return a checkout link.");

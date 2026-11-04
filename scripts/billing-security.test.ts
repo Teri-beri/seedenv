@@ -352,6 +352,38 @@ test("Stripe-confirmed failed withdrawals return reserved funds exactly once and
   });
 });
 
+test("a withdrawal refund that Stripe fails after settlement returns the money to the balance exactly once", async () => {
+  await withHarness(async (h, { balance, reversals }) => {
+    h.topUp();
+    const settled = await balance.withdrawBalance("dev");
+    assert.equal(settled.refundedCents, 5000);
+    assert.equal(h.rows("user")[0].fundingBalanceCents, 0);
+    h.remote.refunds[0].status = "failed";
+    await h.serializable((tx) => reversals.reconcileFundingPayment(tx, "pi_topup"));
+    await h.serializable((tx) => reversals.reconcileFundingPayment(tx, "pi_topup"));
+    assert.equal(h.rows("user")[0].fundingBalanceCents, 5000);
+    assert.equal(h.rows("balanceTopUp")[0].refundedCents, 0);
+    assert.equal(h.rows("billingOperation").find((row) => row.kind === "WITHDRAWAL_REFUND")!.state, "CANCELLED");
+    assert.equal(h.rows("walletTransaction").filter((row) => row.type === "FUNDING_RESTORATION").length, 1);
+    const retried = await balance.withdrawBalance("dev");
+    assert.equal(retried.refundedCents, 5000);
+    assert.equal(h.remote.refundCreates, 2);
+  });
+});
+
+test("a cohort card refund that Stripe fails after settlement is held open for reconciliation", async () => {
+  await withHarness(async (h, { reversals }) => {
+    h.prepaid();
+    h.rows("billingOperation").push({ id: "op-prepaid", kind: "PREPAID_REFUND", resourceId: "campaign", userId: "dev", campaignId: "campaign", paymentId: "pi_prepaid", amountCents: 2000, state: "SETTLED", remoteId: "re_late" });
+    h.remote.refunds.push({ id: "re_late", payment_intent: "pi_prepaid", amount: 2000, currency: "usd", status: "failed", metadata: { seedenvOperationId: "op-prepaid" } });
+    await h.serializable((tx) => reversals.reconcileFundingPayment(tx, "pi_prepaid"));
+    const operation = h.rows("billingOperation").find((row) => row.id === "op-prepaid")!;
+    assert.equal(operation.state, reversals.LATE_FAILED_REFUND_STATE);
+    assert.match(operation.error, /reconciliation required/);
+    assert.equal(h.rows("user")[0].fundingBalanceCents, 5000);
+  });
+});
+
 test("concurrent payout retries reconcile a lost response after 48 hours without a second transfer or wallet credit", async () => {
   await withHarness(async (h, { payouts }) => {
     h.payout();

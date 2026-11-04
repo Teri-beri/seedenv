@@ -7,6 +7,32 @@ export function reversedFundingCents(creditCents: number, refundCents: number, d
   return Math.min(creditCents, Math.max(0, refundCents) + Math.max(0, disputeCents));
 }
 
+export const LATE_FAILED_REFUND_STATE = "REFUND_REVERSED";
+
+// Stripe can fail a refund after first reporting success (e.g. the issuer rejects it), returning the
+// money to the platform. Undo the settlement so the developer's money is never silently treated as returned.
+async function unwindLateFailedRefund(tx: Prisma.TransactionClient, paymentId: string, refund: { id: string; amount: number; status: string | null; metadata: Record<string, string> | null }) {
+  const operationId = refund.metadata?.seedenvOperationId;
+  if (!operationId) return;
+  const operation = await tx.billingOperation.findUnique({ where: { id: operationId } });
+  if (!operation || operation.state !== "SETTLED") return;
+  if (operation.paymentId !== paymentId || operation.amountCents !== refund.amount || operation.kind === "PAYOUT") throw new Error("Stripe refund metadata does not match its reserved operation.");
+  const error = `Stripe refund ${refund.id} ${refund.status} after settlement`;
+  if (operation.kind === "WITHDRAWAL_REFUND") {
+    await tx.balanceTopUp.update({ where: { id: operation.resourceId }, data: { refundedCents: { decrement: operation.amountCents } } });
+    await tx.user.update({ where: { id: operation.userId }, data: { fundingBalanceCents: { increment: operation.amountCents } } });
+    await tx.walletTransaction.create({ data: {
+      userId: operation.userId, amountCents: operation.amountCents, type: "FUNDING_RESTORATION", status: "COMPLETED", stripePaymentId: refund.id,
+      description: "Card refund failed at the bank; amount returned to your SeedEnv balance",
+    } });
+    await tx.billingOperation.update({ where: { id: operation.id }, data: { state: "CANCELLED", error } });
+    return;
+  }
+  // Slot and prepaid refunds also changed cohort ledgers; hold them as an open liability for operator reconciliation.
+  await tx.billingOperation.update({ where: { id: operation.id }, data: { state: LATE_FAILED_REFUND_STATE, error: `${error}; reconciliation required` } });
+  console.error("SeedEnv refund failed after settlement; reconciliation required:", operation.id, refund.id);
+}
+
 // Fetch authoritative Stripe state while the accounting transaction is open. Replayed and
 // out-of-order events must never overwrite a newer reversal with an old event payload.
 export async function reconcileFundingPayment(tx: Prisma.TransactionClient, paymentId: string) {
@@ -16,6 +42,10 @@ export async function reconcileFundingPayment(tx: Prisma.TransactionClient, paym
   if (!chargeId) return;
   let externalRefunds = 0;
   for await (const refund of stripe.refunds.list({ payment_intent: paymentId, limit: 100 })) {
+    if (refund.status === "failed" || refund.status === "canceled") {
+      await unwindLateFailedRefund(tx, paymentId, refund);
+      continue;
+    }
     if (refund.status !== "succeeded") continue;
     const operation = refund.metadata?.seedenvOperationId
       ? await tx.billingOperation.findUnique({ where: { id: refund.metadata.seedenvOperationId } }) : null;

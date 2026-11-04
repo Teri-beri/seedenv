@@ -13,7 +13,7 @@ import { cancelCohort } from "@/lib/slot-funding";
 import { formatCents } from "@/lib/utils";
 import { serviceTaxAudit, taxLedgerFields, QA_SERVICE_TAX_CODE, stripeTaxEnabled } from "@/lib/billing/tax-policy";
 import { seedenvTaxMetadata, storedValueCheckoutTax } from "@/lib/stripe/billing";
-import { ensureStripeCustomer } from "@/lib/stripe-customer";
+import { ensureStripeCustomer, syncStripeCustomerBillingAddress } from "@/lib/stripe-customer";
 import { CohortPromoError, eligibleCohortPromo, failedCohortPromoCheckout, prepareCohortPromoRetry, promoStackSchema, recordCohortPromoCheckout, reserveCohortPromo } from "@/lib/cohort-promos";
 import { billingTransaction } from "@/lib/billing-transaction";
 import Stripe from "stripe";
@@ -391,12 +391,25 @@ async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, o
   const { campaign, escrowTotalCents, terms, discountPercent, checkoutAttemptId } = await persistLaunchCampaign(input, developer, draftId, tax, expectedPlatformFeeCents);
 
   const stripe = getStripe();
+  const escrowAccountingMetadata = {
+    campaignId: campaign.id,
+    developerId: developer.id,
+    checkoutAttemptId: checkoutAttemptId!,
+    testerSlotCount: String(terms.totalSlots),
+    bountyPerSlotCents: String(Math.round(terms.bountyPerTaskUsd * 100)),
+    platformFeeAmountCents: String(Math.round(campaign.platformFeeUsd * 100)),
+  };
+  const taxCheckoutCustomer = async () => {
+    const customerId = await ensureStripeCustomer(developer);
+    if (tax) await syncStripeCustomerBillingAddress(developer.id, customerId);
+    return customerId;
+  };
   let session;
   try {
     session = await stripe.checkout.sessions.create({
       mode: "payment",
       expires_at: Math.floor(Date.now() / 1000) + 3600,
-      customer: stripeTaxEnabled() ? await ensureStripeCustomer(developer) : developer.stripeCustomerId || undefined,
+      customer: stripeTaxEnabled() ? await taxCheckoutCustomer() : developer.stripeCustomerId || undefined,
       ...storedValueCheckoutTax(),
       payment_method_types: ["card"],
       line_items: [
@@ -429,14 +442,16 @@ async function launchCampaignWithEscrow(data: CampaignInput, draftId?: string, o
       ],
       success_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?view=billing&escrow=success&campaign=${campaign.id}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || "https://seedenv.com"}/console?view=billing&escrow=cancelled&campaign=${campaign.id}`,
+      payment_intent_data: {
+        description: `SeedEnv cohort escrow: ${campaign.title}`.slice(0, 1000),
+        metadata: { ...seedenvTaxMetadata(), type: "SEEDENV_CAMPAIGN_ESCROW", ...escrowAccountingMetadata },
+      },
       metadata: {
         ...seedenvTaxMetadata(),
         seedenvServiceTax: tax ? "1" : "0",
         type: "SEEDENV_CAMPAIGN_ESCROW",
-        campaignId: campaign.id,
-        developerId: developer.id,
         cohortType: input.cohortType,
-        checkoutAttemptId: checkoutAttemptId!,
+        ...escrowAccountingMetadata,
       },
     }, { idempotencyKey: `seedenv-campaign-${checkoutAttemptId}` });
   } catch (error) {

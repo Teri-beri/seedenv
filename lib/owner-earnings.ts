@@ -8,7 +8,8 @@ import { stripeProcessingCostCents } from "@/lib/pricing";
 
 const DAY_MS = 86_400_000;
 const REFUND_KINDS = ["SLOT_REFUND", "PREPAID_REFUND", "PREPAID_BALANCE_REFUND", "WITHDRAWAL", "WITHDRAWAL_REFUND"];
-const OPEN_OPERATION_STATES = ["RESERVED", "SUBMITTED", "FAILED"];
+// REFUND_REVERSED: Stripe failed a refund after settlement, so the developer is still owed that money.
+const OPEN_OPERATION_STATES = ["RESERVED", "SUBMITTED", "FAILED", "REFUND_REVERSED"];
 const PAYOUT_TIMEZONE = "America/New_York";
 
 function envInt(name: string, fallback: number, min: number, max: number) {

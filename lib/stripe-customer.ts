@@ -26,3 +26,21 @@ export async function ensureStripeCustomer(user: { id: string; email: string; na
   }
   return customerId;
 }
+
+// Prefills Stripe Checkout with the member's saved billing profile so tax validation sees the same jurisdiction.
+export async function syncStripeCustomerBillingAddress(userId: string, customerId: string) {
+  const profile = await prisma.billingProfile.findUnique({ where: { userId } });
+  if (!profile) return;
+  await getStripe().customers.update(customerId, {
+    name: profile.companyName,
+    ...(profile.billingEmail ? { email: profile.billingEmail } : {}),
+    address: {
+      line1: profile.addressLine1,
+      line2: profile.addressLine2 ?? undefined,
+      city: profile.city,
+      state: profile.region ?? undefined,
+      postal_code: profile.postalCode,
+      country: profile.country,
+    },
+  });
+}
