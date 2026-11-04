@@ -1,10 +1,11 @@
 "use client";
 
-import { Download, ExternalLink, FileText, Search } from "lucide-react";
+import { Download, ExternalLink, FileText, RotateCcw, Search } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { EscrowStatus, InvoiceLedgerRow } from "@/lib/billing";
 import { formatCents } from "@/lib/utils";
+import { RefundRequestDialog } from "@/components/billing/refund-requests";
 
 const receiptLink = "inline-flex h-7 min-h-11 items-center gap-1.5 rounded-md border border-zinc-800 px-2.5 font-mono text-[11px] text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
 
@@ -18,12 +19,19 @@ const statusChip: Record<EscrowStatus, { label: string; className: string }> = {
 
 const dateInputClass = "h-8 min-h-11 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 font-mono text-xs text-zinc-300 outline-none transition-colors focus:border-zinc-600 [color-scheme:dark]";
 
+// Refunds apply to money actually paid: card payments and paid cohort funding (not balance-drawn places).
+function refundable(invoice: InvoiceLedgerRow) {
+  return invoice.kind !== "SLOT_FROM_BALANCE" && (invoice.escrowStatus === "SETTLED" || invoice.escrowStatus === "ESCROW_ACTIVE" || invoice.escrowStatus === "CREDITED");
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
-export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
+export function InvoiceTable({ invoices, openRefundReceiptIds = [] }: { invoices: InvoiceLedgerRow[]; openRefundReceiptIds?: string[] }) {
   const [query, setQuery] = useState("");
+  const [refunding, setRefunding] = useState<InvoiceLedgerRow | null>(null);
+  const closeRefund = useCallback(() => setRefunding(null), []);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const filtered = useMemo(() => {
@@ -102,7 +110,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
                     <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-sm font-semibold text-zinc-100">{formatCents(invoice.totalCents)}{invoice.kind === "SLOT_FROM_BALANCE" ? <span className="block text-[10px] font-normal text-zinc-600">from balance</span> : invoice.kind === "TOP_UP" ? <span className="block text-[10px] font-normal text-zinc-600">card</span> : null}</td>
                     <td className="whitespace-nowrap px-3 py-3"><span className={`inline-flex rounded border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${chip.className}`}>{chip.label}</span></td>
                     <td className="whitespace-nowrap px-5 py-3 text-right">
-                      {invoice.downloadable || invoice.stripeInvoice ? (
+                      {invoice.downloadable || invoice.stripeInvoice || refundable(invoice) ? (
                         <div className="inline-flex items-center justify-end gap-1.5">
                           {invoice.downloadable ? (
                             <a href={`/api/billing/invoices/${invoice.id}`} className={receiptLink} aria-label={`Download PDF receipt ${invoice.invoiceNumber}`}>
@@ -119,6 +127,11 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
                               </a>
                             </>
                           ) : null}
+                          {refundable(invoice) ? (
+                            openRefundReceiptIds.includes(invoice.id)
+                              ? <span className="font-mono text-[11px] text-amber-300" title="A refund request for this payment is in review">Refund in review</span>
+                              : <button type="button" onClick={() => setRefunding(invoice)} className={receiptLink} aria-label={`Request a refund for ${invoice.invoiceNumber}`}>Refund <RotateCcw className="size-3" /></button>
+                          ) : null}
                         </div>
                       ) : <span className="font-mono text-[11px] text-zinc-600" title={invoice.escrowStatus === "AWAITING_PAYMENT" ? "Receipt available after Stripe confirms payment" : "Receipt unavailable for this record"}>—</span>}
                     </td>
@@ -129,6 +142,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceLedgerRow[] }) {
           </table>
         </div>
       )}
+      {refunding ? <RefundRequestDialog invoice={refunding} onClose={closeRefund} /> : null}
     </section>
   );
 }

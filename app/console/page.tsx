@@ -12,6 +12,7 @@ import { BalanceCard } from "@/components/billing/balance-card";
 import { BillingMetrics } from "@/components/billing/billing-metrics";
 import { BillingInfoForm, PaymentMethodCard } from "@/components/billing/billing-profile";
 import { InvoiceTable } from "@/components/billing/invoice-table";
+import { RefundRequestList } from "@/components/billing/refund-requests";
 import { DeveloperStudio } from "@/components/developer-studio";
 import { ConsoleHeader } from "@/components/console-header";
 import { ConsolePromoBanner } from "@/components/console-promo-banner";
@@ -262,7 +263,9 @@ export default async function ConsolePage({ searchParams }: { searchParams: Prom
             <BillingInfoForm initial={billing.billingDetails} />
           </div>
 
-          <InvoiceTable invoices={billing.invoices} />
+          <InvoiceTable invoices={billing.invoices} openRefundReceiptIds={billing.refundRequests.filter((request) => request.status === "OPEN" || request.status === "PROCESSING").map((request) => request.receiptId)} />
+
+          <RefundRequestList requests={billing.refundRequests} />
         </section> : null}
       </div>
       <DeveloperBottomNav />

@@ -14,7 +14,10 @@ export type BillingOverview = {
   paymentMethod: PaymentMethodSummary;
   paymentMethodUnavailable: boolean;
   balance: FundingBalanceSummary;
+  refundRequests: DeveloperRefundRequest[];
 };
+
+export type DeveloperRefundRequest = { id: string; receiptId: string; status: string; reason: string; requestedCents: number; approvedCents: number | null; resolution: string | null; adminNote: string | null; createdAt: string };
 
 export type FundingBalanceSummary = {
   balanceCents: number;
@@ -66,6 +69,7 @@ export async function getBillingOverview(userId: string, stripeCustomerId: strin
     prisma.walletTransaction.findMany({ where: { userId, type: TransactionType.BALANCE_WITHDRAWAL }, orderBy: { createdAt: "desc" }, take: 5, select: { id: true, amountCents: true, status: true, createdAt: true } }),
     prisma.appCampaign.findMany({ where: { developerId: userId, billingHoldCents: { gt: 0 } }, select: { id: true, title: true, billingHoldCents: true } }),
   ]);
+  const refundRequests = await prisma.refundRequest.findMany({ where: { developerId: userId }, orderBy: { createdAt: "desc" }, take: 20 });
 
   const approvedByCampaign = fundedCampaigns.length
     ? await prisma.submission.groupBy({ by: ["campaignId"], where: { status: SubmissionStatus.APPROVED, campaignId: { in: fundedCampaigns.map((campaign) => campaign.id) } }, _sum: { payoutCents: true } })
@@ -100,5 +104,9 @@ export async function getBillingOverview(userId: string, stripeCustomerId: strin
       withdrawals: withdrawals.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
       heldCampaigns,
     },
+    refundRequests: refundRequests.map((row) => ({
+      id: row.id, receiptId: row.walletTransactionId, status: row.status, reason: row.reason, requestedCents: row.requestedCents,
+      approvedCents: row.approvedCents, resolution: row.resolution, adminNote: row.status === "OPEN" ? null : row.adminNote, createdAt: row.createdAt.toISOString(),
+    })),
   };
 }

@@ -1,4 +1,5 @@
 import { GoogleGenAI, Type, type Content, type FunctionDeclaration } from "@google/genai";
+import { supportCategories } from "@/lib/enterprise-rules";
 import { faqGroups } from "@/lib/faq-content";
 import { prisma } from "@/lib/prisma";
 import { AUTO_RELOAD_OPTIONS_CENTS, COHORT_BUNDLES, COHORT_MIN_PLATFORM_FEE_CENTS, COHORT_PLATFORM_FEE_RATE, MIN_TOP_UP_CENTS } from "@/lib/pricing";
@@ -31,6 +32,8 @@ ${bundles}
 - Developer console: /console (Overview, New drop, Billing at /console?view=billing). Applications to review: /applications.
 - Testers: browse missions at /explore; account and payouts in /settings.
 - Public pages: /pricing, /faq, /docs, /status, /terms, /privacy, /contact, /launch-circle.
+- Developer refund requests: Console > Billing > Receipts > Refund. An admin reviews every request; policy at /terms#refund-policy.
+- Tester work standards (adequate work, appeals, paid-reward recovery): /terms#tester-work-standards.
 - Human support: the "Contact a human" tab in this panel, or email terimus@seedenv.com.
 
 # FAQ
@@ -61,7 +64,7 @@ const escalateTool: FunctionDeclaration = {
   parameters: {
     type: Type.OBJECT,
     properties: {
-      category: { type: Type.STRING, enum: ["Cohort Dispute", "Billing & Escrow", "Technical Bug", "General Support"] },
+      category: { type: Type.STRING, enum: [...supportCategories] },
       subject: { type: Type.STRING, description: "Short ticket subject, under 120 characters." },
       summary: { type: Type.STRING, description: "Neutral summary of the issue and what was already tried, written for the support team." },
     },

@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, BookOpen, GitBranch, Radar, ServerCog, ShieldAlert, TicketPercent, type LucideIcon } from "lucide-react";
+import { Activity, ArrowRight, BookOpen, GitBranch, Radar, ReceiptText, ServerCog, ShieldAlert, TicketPercent, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 type DeveloperResource = {
@@ -20,6 +20,7 @@ export const developerResources: ReadonlyArray<DeveloperResource> = [
 export const cohortRuleResources: ReadonlyArray<DeveloperResource> = [
   { title: "Cohort promo codes", description: "Create and manage private discount codes for cohort fees.", href: "/admin/promos", icon: TicketPercent, tag: "PROMOS" },
   { title: "Denied tester work", description: "Manually review denied tester proof against the assigned directions and evidence.", href: "/admin/proof-reviews", icon: ShieldAlert, tag: "APPEALS" },
+  { title: "Refunds & payout repair", description: "Decide developer refund requests and safely retry tester payouts stuck in Stripe.", href: "/admin/refunds", icon: ReceiptText, tag: "BILLING" },
 ];
 
 function ResourceGrid({ items, tone = "emerald" }: { items: ReadonlyArray<DeveloperResource>; tone?: "emerald" | "amber" }) {

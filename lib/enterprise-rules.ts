@@ -31,7 +31,7 @@ export function invoiceTotalMatches(snapshot: InvoiceSnapshot, amountCents: numb
   return Number.isSafeInteger(amountCents) && amountCents > 0 && snapshot.rewardPoolCents + snapshot.platformFeeCents + (snapshot.processingFeeCents ?? 0) + (snapshot.tax?.taxAmountCents ?? 0) === amountCents;
 }
 
-export const supportCategories = ["Cohort Dispute", "Billing & Escrow", "Technical Bug", "General Support"] as const;
+export const supportCategories = ["Cohort Dispute", "Billing & Escrow", "Refund Request", "Payout Issue", "Technical Bug", "General Support"] as const;
 export const supportRequestSchema = z.object({
   category: z.enum(supportCategories),
   subject: z.string().trim().min(4).max(150),

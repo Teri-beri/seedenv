@@ -86,6 +86,8 @@ enum TransactionType {
   BOUNTY_PAYOUT
   PLATFORM_FEE
   WITHDRAWAL
+  SUPPORT_REFUND
+  SUPPORT_CREDIT
 }
 
 enum CohortFundingModel {
@@ -932,6 +934,33 @@ model BillingProfile {
   postalCode   String   @db.VarChar(30)
   country      String   @db.VarChar(2)
   updatedAt    DateTime @updatedAt
+}
+
+// Exceptional developer refunds (beyond automatic unused-escrow returns); every request is decided by an admin.
+model RefundRequest {
+  id                  String    @id @default(cuid())
+  developerId         String
+  walletTransactionId String
+  campaignId          String?
+  reason              String    @db.VarChar(40)
+  details             String    @db.VarChar(4000)
+  requestedCents      Int
+  // OPEN, PROCESSING, APPROVED, DENIED, FAILED
+  status              String    @default("OPEN")
+  // CARD (Stripe refund to the original payment) or CREDIT (SeedEnv balance)
+  resolution          String?
+  approvedCents       Int?
+  adminId             String?
+  adminNote           String?   @db.VarChar(2000)
+  billingOperationId  String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  resolvedAt          DateTime?
+
+  @@index([developerId, createdAt])
+  @@index([status, createdAt])
+  @@index([walletTransactionId])
+  @@map("refund_requests")
 }
 
 model SupportTicket {

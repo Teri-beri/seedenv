@@ -181,7 +181,8 @@ async function refundSlotCharge(chargeId: string) {
     if (unusedPaidSlots(paid, charge.campaign.claimedSlots, holds) <= reservations) return null;
     if (charge.stripePaymentIntentId) await reconcileFundingPayment(tx, charge.stripePaymentIntentId);
     const reversal = charge.stripePaymentIntentId ? await tx.fundingReversal.findUnique({ where: { paymentId: charge.stripePaymentIntentId } }) : null;
-    const amountCents = Math.max(0, charge.stipendCents + charge.platformFeeCents - (reversal?.appliedCents ?? 0));
+    const supportRefunded = charge.stripePaymentIntentId ? (await tx.billingOperation.aggregate({ where: { paymentId: charge.stripePaymentIntentId, kind: "SUPPORT_REFUND", state: { in: ["RESERVED", "SUBMITTED", "SETTLED"] } }, _sum: { amountCents: true } }))._sum.amountCents ?? 0 : 0;
+    const amountCents = Math.max(0, charge.stipendCents + charge.platformFeeCents - (reversal?.appliedCents ?? 0) - supportRefunded);
     if (!amountCents) throw new Error("This slot's card funding is fully reversed. Resolve its funding hold before refunding.");
     // Updating the campaign makes all competing slot reservations conflict/retry.
     await tx.appCampaign.update({ where: { id: charge.campaignId }, data: { refundedCents: { increment: 0 } } });
@@ -226,7 +227,9 @@ async function refundPrepaidCampaign(campaignId: string) {
     const cardRefunds = await tx.billingOperation.findMany({ where: { campaignId, kind: "PREPAID_REFUND", state: "SETTLED" } });
     const balanceRefunds = await tx.billingOperation.findMany({ where: { campaignId, kind: "PREPAID_BALANCE_REFUND", state: "SETTLED" } });
     const balanceReturned = balanceRefunds.reduce((sum, row) => sum + row.amountCents, 0);
-    const cardReturned = Math.max(cardRefunds.reduce((sum, row) => sum + row.amountCents, 0), campaign.refundedCents - balanceReturned);
+    const supportRefunds = await tx.billingOperation.findMany({ where: { paymentId: deposit.stripePaymentId, kind: "SUPPORT_REFUND", state: { in: ["RESERVED", "SUBMITTED", "SETTLED"] } } });
+    // Admin-approved support refunds share this charge's Stripe refund capacity.
+    const cardReturned = Math.max(cardRefunds.reduce((sum, row) => sum + row.amountCents, 0), campaign.refundedCents - balanceReturned) + supportRefunds.reduce((sum, row) => sum + row.amountCents, 0);
     const cardAvailable = Math.max(0, deposit.amountCents - cardReturned - (reversal?.appliedCents ?? 0));
     const replacements = await tx.walletTransaction.findMany({ where: { campaignId, type: "ESCROW_DEPOSIT", status: "COMPLETED", stripePaymentId: null } });
     const replacementCents = replacements.reduce((sum, row) => sum + row.amountCents, 0);

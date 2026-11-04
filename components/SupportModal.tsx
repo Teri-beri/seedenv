@@ -52,6 +52,17 @@ export function SupportModal({ aiEnabled = false }: { aiEnabled?: boolean }) {
     <Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-50 bg-black/65" /><Dialog.Content className="fixed inset-y-0 right-0 z-50 w-full max-w-lg overflow-y-auto border-l border-white/10 bg-[#12161F] p-6 text-white focus:outline-none sm:p-8">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pr-12"><Dialog.Title className="text-xl font-semibold">Help &amp; Support</Dialog.Title><span className="hidden font-mono text-[11px] text-zinc-500 sm:inline">[Press <kbd className="rounded border border-zinc-700 bg-zinc-800/80 px-1 text-zinc-300">?</kbd> to toggle]</span></div>
       <Dialog.Description className="mt-3 text-sm leading-6 text-zinc-400">{aiEnabled ? "Get instant answers from the SeedEnv assistant, or reach the team for billing, cohort disputes and technical reports." : "Billing questions, cohort disputes, and technical reports. Account identity, current route, and browser/OS context accompany signed-in requests. Do not include passwords, API keys, or payment credentials."}</Dialog.Description>
+      <nav aria-label="Refunds and work policies" className="mt-5 rounded-xl border border-white/10 bg-[#0F1117] p-4">
+        <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">Refunds &amp; policies</p>
+        <ul className="mt-2 grid gap-1 text-sm">
+          {[
+            ["/console?view=billing", "Request a developer refund", "Billing → Receipts → Refund"],
+            ["/terms#refund-policy", "Developer refund policy", "What qualifies and how refunds are paid"],
+            ["/terms#tester-work-standards", "Tester work standards", "What counts as adequate work, appeals, payouts"],
+          ].map(([href, label, hint]) => <li key={href}><Link href={href} onClick={() => setOpen(false)} className="flex min-h-11 flex-col justify-center rounded-lg px-2 py-1.5 transition-colors hover:bg-white/[0.04]"><span className="text-zinc-100">{label}</span><span className="text-xs text-zinc-500">{hint}</span></Link></li>)}
+          {session?.user?.role === "ADMIN" ? <li><Link href="/admin/refunds" onClick={() => setOpen(false)} className="flex min-h-11 items-center rounded-lg px-2 text-amber-300 transition-colors hover:bg-white/[0.04]">Refund queue &amp; payout repair</Link></li> : null}
+        </ul>
+      </nav>
       {aiEnabled ? <div role="tablist" aria-label="Support options" className="mt-5 grid grid-cols-2 rounded-lg border border-zinc-800 bg-[#0F1117] p-1 text-sm">{([["ai", "Ask AI"], ["human", "Contact a human"]] as const).map(([value, label]) => <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => setTab(value)} className={`min-h-10 rounded-md font-medium ${tab === value ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"}`}>{label}</button>)}</div> : null}
       {aiEnabled ? <div hidden={tab !== "ai"}><SupportChat route={pathname} signedIn={status === "authenticated"} onEscalate={escalate} /></div> : null}
       <div hidden={tab !== "human"}>
