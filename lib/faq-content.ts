@@ -29,6 +29,7 @@ export const faqGroups = [
     items: [
       { q: "How do I sign in?", a: "Use an email magic link, GitHub, or Google. SeedEnv staff will never ask you for a password or sign-in link." },
       { q: "How do I delete my account or request my data?", a: "Email terimus@seedenv.com from your account email. Some payment and tax records must be kept for legal reasons; see the Privacy Policy for details." },
+      { q: "How do I report a bug or UI issue?", a: "Open Help & Support and choose Report issue. Describe what happened and, if possible, include steps to reproduce it and a screenshot or recording link. Signed-in reports go to the support queue; signed-out visitors can send an email draft to terimus@seedenv.com. The page path and viewport size are included, but URL query parameters are not. Signed-in reports also include account identity and browser/OS. Never include passwords, API keys, or payment details." },
       { q: "How do I report a security issue?", a: "Follow the security disclosure policy and email terimus@seedenv.com privately with the subject \"SeedEnv Security Disclosure\"." },
     ],
   },
