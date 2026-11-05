@@ -19,3 +19,8 @@ export function landingViewHref(view: LandingView) {
   if (view === "circle") return "/launch-circle";
   return `#${landingViews.find((item) => item.id === view)?.anchor || "top"}`;
 }
+
+export function landingSectionReached(top: number, scrollPadding: number, scrollMargin: number) {
+  // Fragment targets combine both offsets; allow for rounding and retain the prior minimum.
+  return top <= Math.max(130, scrollPadding + scrollMargin + 2);
+}

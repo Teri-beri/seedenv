@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { landingViews, landingViewHref, resolveLandingView } from "../lib/landing-views";
+import { landingSectionReached, landingViews, landingViewHref, resolveLandingView } from "../lib/landing-views";
 import { workspaceHome } from "../lib/workspace-navigation";
 
 test("production npm startup applies pending database migrations before serving traffic", async () => {
@@ -35,6 +35,14 @@ test("workspace navigation sends administrators and developers to the console", 
   assert.equal(workspaceHome("DEVELOPER"), "/console");
   assert.equal(workspaceHome("TESTER"), "/dashboard");
   assert.equal(workspaceHome(undefined), "/dashboard");
+});
+
+test("landing active sections account for scroll padding and anchor margins", () => {
+  assert.equal(landingSectionReached(168, 88, 80), true);
+  assert.equal(landingSectionReached(144, 88, 56), true);
+  assert.equal(landingSectionReached(171, 88, 80), false);
+  assert.equal(landingSectionReached(130, 0, 0), true);
+  assert.equal(landingSectionReached(131, 0, 0), false);
 });
 
 test("the landing Console link points to the correct workspace for each role", async () => {
@@ -71,6 +79,11 @@ test("the landing Console link points to the correct workspace for each role", a
     }
     const visitor = renderToStaticMarkup(createElement(PublicLanding, { missions: [], viewer: null }));
     const visitorActions = visitor.match(/<nav[^>]*aria-label="Landing actions"[^>]*>.*?<\/nav>/)?.[0] ?? "";
+    const desktopSections = visitor.match(/<nav[^>]*aria-label="Landing sections"[^>]*>.*?<\/nav>/)?.[0] ?? "";
+    for (const section of landingViews) {
+      assert.match(desktopSections, new RegExp(`href="${landingViewHref(section.id)}"[^>]*>${section.label}<\\/a>`));
+    }
+    assert.match(desktopSections, /href="#top"[^>]*aria-current="location"[^>]*>Overview<\/a>/);
     assert.match(visitorActions, /href="\/auth\/signin"[^>]*aria-label="Sign in or create an account"/);
     assert.doesNotMatch(visitorActions, /Deploy a Cohort/);
     assert.match(visitor, /href="#free-tools"/);

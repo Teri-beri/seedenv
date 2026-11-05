@@ -3,7 +3,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { StatusPill } from "@/components/status-pill";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { ArrowRight, CheckCircle2, CircleHelp, Code2, FileText, Fingerprint, Gamepad2, Globe, Layers, LockKeyhole, Menu, Search, ShieldCheck, Smartphone, Terminal, UserRound, X } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleDollarSign, CircleHelp, Code2, FileText, Fingerprint, Gamepad2, Globe, LayoutGrid, Layers, LockKeyhole, Menu, Search, ShieldCheck, Smartphone, Terminal, UserRound, Wrench, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -14,7 +14,7 @@ import { PublicFooter } from "@/components/public-footer";
 import { PricingCalculator } from "@/components/PricingCalculator";
 import { availableSlots, discoverMissions, type MissionFilter } from "@/lib/tester-console";
 import { formatCents } from "@/lib/utils";
-import { landingViews, landingViewHref } from "@/lib/landing-views";
+import { landingSectionReached, landingViews, landingViewHref } from "@/lib/landing-views";
 import TelemetryGridCanvas from "@/components/TelemetryGridCanvas";
 import { SandboxBadge, ScenarioCard, ScenarioDrawer, sandboxScenarios, useScenarioInspector, type SandboxScenario } from "@/components/telemetry-sandbox";
 import { LandingPlatformFeeOfferCard, type LandingPlatformFeeOffer } from "@/components/landing-platform-fee-offer";
@@ -46,8 +46,8 @@ type AuthRequest = { role: "DEVELOPER" | "TESTER"; callbackUrl: string; title: s
 
 const primaryAction = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-950 transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
 const secondaryAction = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/10 bg-[#171923] px-4 py-2 text-sm font-medium text-zinc-200 transition-colors hover:border-zinc-600 hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
-const headerTextLink = "inline-flex min-h-11 items-center gap-1 font-mono text-xs text-zinc-400 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 rounded";
-const headerProfileAction = "grid size-11 shrink-0 place-items-center rounded-full border border-white/[0.08] bg-[#171923] text-zinc-300 transition-colors hover:border-emerald-500/40 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
+const headerTextLink = "inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-lg border border-white/[0.07] bg-white/[0.025] px-2 text-xs font-medium text-zinc-400 transition-colors hover:border-white/15 hover:bg-white/[0.06] hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
+const headerProfileAction = "grid size-11 shrink-0 place-items-center rounded-full border border-white/10 bg-gradient-to-br from-zinc-800 to-zinc-900 text-zinc-300 shadow-sm transition-colors hover:border-emerald-500/40 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
 const sectionClass = "mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8";
 const sectionShell = "relative scroll-mt-14 border-t border-zinc-800/60 py-16 sm:py-24";
 const surfaceTint = "bg-[#12161F]/20";
@@ -57,6 +57,15 @@ const freeToolIcons = {
   "/tools/swarm-detector": ShieldCheck,
   "/tools/viewport-check": Smartphone,
   "/tools/qa-checklist": FileText,
+};
+const landingViewIcons = {
+  overview: LayoutGrid,
+  tools: Wrench,
+  cohorts: Layers,
+  developers: Code2,
+  validators: ShieldCheck,
+  pricing: CircleDollarSign,
+  mobile: Smartphone,
 };
 
 const reportPreview = (scenario: SandboxScenario) => JSON.stringify({
@@ -89,10 +98,13 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
       if (frameId !== null) return;
       frameId = window.requestAnimationFrame(() => {
         let current = "top";
+        const scrollPadding = Number.parseFloat(window.getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
         for (const item of landingViews) {
           if (item.anchor === "top") continue;
           const section = document.getElementById(item.anchor);
-          if (section && section.getBoundingClientRect().top <= 130) current = item.anchor;
+          if (!section) continue;
+          const scrollMargin = Number.parseFloat(window.getComputedStyle(section).scrollMarginTop) || 0;
+          if (landingSectionReached(section.getBoundingClientRect().top, scrollPadding, scrollMargin)) current = item.anchor;
         }
         setActiveAnchor(current);
         frameId = null;
@@ -136,30 +148,36 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
     <TelemetryGridCanvas />
     <div id="top" className="relative z-10 min-h-screen text-white [color-scheme:dark]">
       <AnalyticsTracker />
-      <header className="sticky top-0 z-50 w-full border-b border-zinc-800/80 bg-zinc-950/75 backdrop-blur-md">
+      <header className="sticky top-0 z-50 w-full border-b border-zinc-800/80 bg-[#090c11]/90 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-[1440px] items-center justify-between gap-3 px-4 sm:px-6">
           <Link href="/" className="flex min-h-11 shrink-0 items-center gap-2 sm:gap-3" aria-label="SeedEnv home">
             <Image src="/seedenv-logo-v3.png" alt="" width={36} height={36} className="size-8 shrink-0 object-contain sm:size-9" priority />
             <span className="text-base font-semibold sm:text-lg">SeedEnv</span>
             <span className="font-mono text-[10px] text-zinc-500 sm:text-xs lg:hidden xl:inline">v1.2</span>
           </Link>
-          <nav aria-label="Landing sections" className="hidden min-w-0 items-center justify-center gap-3 lg:flex xl:gap-4">
-            {landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => setActiveAnchor(item.anchor)} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 shrink-0 items-center rounded font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${activeAnchor === item.anchor ? "text-zinc-100" : "text-zinc-400 hover:text-zinc-100"}`}>{item.label}</Link>)}
+          <nav aria-label="Landing sections" className="hidden min-w-0 items-center rounded-xl border border-white/[0.07] bg-white/[0.025] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] lg:flex">
+            {landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => setActiveAnchor(item.anchor)} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border px-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 xl:px-2 ${activeAnchor === item.anchor ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : "border-transparent text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-100"}`}>{item.label}</Link>)}
           </nav>
-          <nav className="ml-auto flex shrink-0 items-center gap-2 md:gap-4 lg:ml-0" aria-label="Landing actions">
+          <nav className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0" aria-label="Landing actions">
             <StatusPill className="hidden xl:inline-flex" />
-            <div className="hidden items-center gap-4 md:flex">
+            <div className="hidden items-center gap-1.5 md:flex">
               <Link href="/launch-circle" className={headerTextLink}>Launch Circle</Link>
               {signedIn ? <Link href={workspaceHref} className={headerTextLink}>Console</Link> : null}
-              <div aria-hidden="true" className="h-4 w-px bg-zinc-800" />
             </div>
             <Link href={profileHref} aria-label={signedIn ? "Account profile" : "Sign in or create an account"} title={signedIn ? "Account profile" : "Sign in / Sign up"} className={headerProfileAction} onClick={signedIn ? undefined : () => trackAnalytics("signup_start", { role: "DEVELOPER", callbackUrl: "/auth/signin" })}>
               {signedIn && profileInitial ? <span aria-hidden="true" className="font-mono text-sm font-semibold text-emerald-300">{profileInitial}</span> : <UserRound aria-hidden="true" className="size-5" />}
             </Link>
-            <button type="button" aria-label={mobileNavigationOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileNavigationOpen} aria-controls="landing-mobile-navigation" className="grid size-11 place-items-center rounded-lg border border-white/10 text-zinc-300 lg:hidden" onClick={() => setMobileNavigationOpen((open) => !open)}>{mobileNavigationOpen ? <X className="size-5" /> : <Menu className="size-5" />}</button>
+            <button type="button" aria-label={mobileNavigationOpen ? "Close navigation" : "Open navigation"} aria-expanded={mobileNavigationOpen} aria-controls="landing-mobile-navigation" className="grid size-11 place-items-center rounded-lg border border-white/10 bg-zinc-900/60 text-zinc-300 transition-colors hover:border-emerald-500/40 hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 lg:hidden" onClick={() => setMobileNavigationOpen((open) => !open)}>{mobileNavigationOpen ? <X className="size-5" /> : <Menu className="size-5" />}</button>
           </nav>
         </div>
-        {mobileNavigationOpen ? <nav id="landing-mobile-navigation" aria-label="Mobile landing sections" className="grid grid-cols-2 gap-2 border-t border-white/10 px-4 py-3 sm:px-6 lg:hidden">{landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => { setMobileNavigationOpen(false); setActiveAnchor(item.anchor); }} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 items-center rounded-lg px-3 text-sm ${activeAnchor === item.anchor ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}>{item.label}</Link>)}{signedIn ? <Link href={workspaceHref} className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Console <ArrowRight className="size-4" /></Link> : <Link href="/auth/signin" className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Sign In <ArrowRight className="size-4" /></Link>}<Link href="/launch-circle" className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Launch Circle <ArrowRight className="size-4" /></Link></nav> : null}
+        {mobileNavigationOpen ? <nav id="landing-mobile-navigation" aria-label="Mobile landing sections" className="absolute inset-x-0 top-full grid max-h-[calc(100dvh-3.5rem)] grid-cols-2 gap-2 overflow-y-auto border-b border-white/10 bg-[#0b0f15]/95 px-4 py-3 shadow-[0_20px_40px_rgba(0,0,0,0.35)] backdrop-blur-md sm:px-6 lg:hidden">
+          {landingViews.map((item) => {
+            const Icon = landingViewIcons[item.id];
+            return <Link key={item.id} href={landingViewHref(item.id)} onClick={() => { setMobileNavigationOpen(false); setActiveAnchor(item.anchor); }} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 items-center gap-2.5 rounded-xl border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${activeAnchor === item.anchor ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : "border-white/[0.06] bg-white/[0.025] text-zinc-400 hover:border-white/10 hover:bg-white/[0.06] hover:text-zinc-100"}`}><Icon aria-hidden="true" className="size-4 shrink-0" />{item.label}</Link>;
+          })}
+          {signedIn ? <Link href={workspaceHref} className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Console <ArrowRight className="size-4" /></Link> : <Link href="/auth/signin" className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Sign In <ArrowRight className="size-4" /></Link>}
+          <Link href="/launch-circle" className={`${secondaryAction} md:hidden`} onClick={() => setMobileNavigationOpen(false)}>Launch Circle <ArrowRight className="size-4" /></Link>
+        </nav> : null}
       </header>
 
       <main id="main-content" className="terminal-grid">
