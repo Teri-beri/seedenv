@@ -6,7 +6,7 @@ import { rankForXp, xpForBounty } from "@/lib/rank";
 import { getStripe } from "@/lib/stripe";
 import { formatCents } from "@/lib/utils";
 import { AUTO_APPROVE_AFTER_MS, isAutoApprovalDue } from "@/lib/auto-approval-window";
-import { operationTransfer, reserveBillingOperation } from "@/lib/billing-operations";
+import { operationTransfer, reopenStalePayoutIfUnsent, reserveBillingOperation } from "@/lib/billing-operations";
 import { payoutSourceCandidates } from "@/lib/payout-funding-source";
 import { assertCampaignFunding } from "@/lib/funding-reversals";
 import { releaseBountyAndDeductFee } from "@/lib/billing/ledger";
@@ -114,7 +114,7 @@ export async function transferTesterPayout(testerId: string, transactionId: stri
 
   try {
     const stripe = getStripe();
-    const operation = await serializable(async (tx) => {
+    const reserved = await serializable(async (tx) => {
       let pending = await tx.billingOperation.findUnique({ where: { id: `seedenv-payout-${transactionId}` } });
       if (!pending) {
         if (transaction.type === TransactionType.REFERRAL_REWARD) throw new Error("Referral payout reservation is missing; reconciliation is required.");
@@ -125,7 +125,8 @@ export async function transferTesterPayout(testerId: string, transactionId: stri
       if (!pending.destinationId && !pending.firstAttemptAt && tester.stripeConnectAccountId) pending = await tx.billingOperation.update({ where: { id: pending.id }, data: { destinationId: tester.stripeConnectAccountId } });
       return pending;
     });
-    if (!operation?.destinationId) return false;
+    if (!reserved?.destinationId) return false;
+    const operation = await reopenStalePayoutIfUnsent(reserved);
     if (operation.userId !== testerId || operation.ledgerId !== transactionId || operation.amountCents !== transaction.amountCents) throw new Error("Payout operation does not match its immutable ledger.");
     const referralPayout = transaction.type === TransactionType.REFERRAL_REWARD;
     if (referralPayout !== (operation.kind === "REFERRAL_PAYOUT") || (referralPayout && (operation.campaignId || operation.sourceChargeId))) throw new Error("Payout funding provenance does not match its ledger type.");

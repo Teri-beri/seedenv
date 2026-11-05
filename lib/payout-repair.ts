@@ -1,6 +1,5 @@
-import type Stripe from "stripe";
 import { TransactionStatus, TransactionType } from "@prisma/client";
-import { SAFE_STRIPE_RETRY_MS } from "@/lib/billing-operations";
+import { SAFE_STRIPE_RETRY_MS, stripeTransfersForOperation } from "@/lib/billing-operations";
 import { prisma } from "@/lib/prisma";
 import { getStripe } from "@/lib/stripe";
 import { releaseTesterPayouts } from "@/lib/submission-approval";
@@ -41,15 +40,6 @@ export async function listStuckPayouts(now = new Date()): Promise<StuckPayout[]>
   }));
 }
 
-async function matchingTransfers(stripe: Stripe, operation: { id: string; destinationId: string; ledgerId: string | null }) {
-  const found = new Set<string>();
-  for await (const transfer of stripe.transfers.list({ transfer_group: operation.id, limit: 100 })) found.add(transfer.id);
-  for await (const transfer of stripe.transfers.list({ destination: operation.destinationId, limit: 100 })) {
-    if (transfer.metadata?.seedenvOperationId === operation.id || (operation.ledgerId && transfer.metadata?.seedenvLedgerTransactionId === operation.ledgerId)) found.add(transfer.id);
-  }
-  return [...found];
-}
-
 export type PayoutRepairResult = { reopened: boolean; existingTransfer: string | null; releasedCount: number; pendingCount: number; failures: string[] };
 
 // Operator repair: proves with Stripe that no transfer exists before reopening, so a retry can never pay twice.
@@ -69,7 +59,7 @@ export async function repairStuckPayout(operationId: string, operatorId: string,
   }
   if (!process.env.STRIPE_SECRET_KEY) throw new Error("Stripe is not configured on this server.");
 
-  const transfers = await matchingTransfers(getStripe(), { id: operation.id, destinationId: operation.destinationId, ledgerId: operation.ledgerId });
+  const transfers = await stripeTransfersForOperation(getStripe(), { id: operation.id, destinationId: operation.destinationId, ledgerId: operation.ledgerId });
   if (transfers.length > 1) throw new Error(`Stripe has multiple matching transfers (${transfers.join(", ")}). Reconcile them in Stripe before retrying.`);
   let reopened = false;
   if (!transfers.length) {

@@ -12,6 +12,36 @@ export function assertSafeRemoteRetry(firstAttemptAt: Date | null, now = new Dat
   }
 }
 
+// Every Stripe transfer that could belong to this payout, by transfer group or SeedEnv metadata.
+export async function stripeTransfersForOperation(stripe: Stripe, operation: Pick<BillingOperation, "id" | "destinationId" | "ledgerId">) {
+  const found = new Set<string>();
+  for await (const transfer of stripe.transfers.list({ transfer_group: operation.id, limit: 100 })) found.add(transfer.id);
+  if (operation.destinationId) {
+    for await (const transfer of stripe.transfers.list({ destination: operation.destinationId, limit: 100 })) {
+      if (transfer.metadata?.seedenvOperationId === operation.id || (operation.ledgerId && transfer.metadata?.seedenvLedgerTransactionId === operation.ledgerId)) found.add(transfer.id);
+    }
+  }
+  return [...found];
+}
+
+// A payout whose Stripe outcome went unknown past the idempotency window is reopened for a fresh attempt
+// only after Stripe proves no transfer exists, so the retry can never pay twice.
+export async function reopenStalePayoutIfUnsent(operation: BillingOperation, now = new Date()): Promise<BillingOperation> {
+  const stale = (operation.kind === "PAYOUT" || operation.kind === "REFERRAL_PAYOUT")
+    && (operation.state === "SUBMITTED" || operation.state === "FAILED")
+    && !operation.remoteId
+    && operation.firstAttemptAt
+    && now.getTime() - operation.firstAttemptAt.getTime() >= SAFE_STRIPE_RETRY_MS;
+  if (!stale) return operation;
+  const transfers = await stripeTransfersForOperation(getStripe(), operation);
+  if (transfers.length) return operation;
+  await prisma.billingOperation.updateMany({
+    where: { id: operation.id, state: operation.state, remoteId: null, attempt: operation.attempt },
+    data: { state: "RESERVED", firstAttemptAt: null, sourceChargeId: null, attempt: operation.attempt + 1, error: "Reopened automatically after Stripe showed no transfer for the previous attempt." },
+  });
+  return prisma.billingOperation.findUniqueOrThrow({ where: { id: operation.id } });
+}
+
 export async function reserveBillingOperation(tx: Prisma.TransactionClient, data: Prisma.BillingOperationUncheckedCreateInput) {
   return tx.billingOperation.upsert({ where: { id: data.id }, create: data, update: {} });
 }

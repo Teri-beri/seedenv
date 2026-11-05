@@ -21,7 +21,13 @@ async function* iterate<T>(rows: T[]) { for (const row of rows) yield row; }
 
 const mocks = [
   mock.module("server-only", { namedExports: {} }),
-  mock.module("@/lib/billing-operations", { namedExports: { SAFE_STRIPE_RETRY_MS: 23 * HOUR } }),
+  mock.module("@/lib/billing-operations", { namedExports: {
+    SAFE_STRIPE_RETRY_MS: 23 * HOUR,
+    stripeTransfersForOperation: async (_stripe: unknown, operation: { id: string; ledgerId: string | null }) => [...new Set([
+      ...state.transfersByGroup.map((transfer) => transfer.id),
+      ...state.transfersByDestination.filter((transfer) => transfer.metadata.seedenvOperationId === operation.id || (operation.ledgerId && transfer.metadata.seedenvLedgerTransactionId === operation.ledgerId)).map((transfer) => transfer.id),
+    ])],
+  } }),
   mock.module("@/lib/prisma", { namedExports: { prisma: {
     billingOperation: {
       findUnique: async () => state.operation,

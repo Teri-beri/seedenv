@@ -12,6 +12,7 @@
     "start": "prisma migrate deploy && tsx scripts/ensure-schema.ts && next start",
     "lint": "eslint",
     "growth": "tsx scripts/growth-runner.ts",
+    "test:payout-recovery": "node --experimental-test-module-mocks --import tsx --test --test-concurrency=1 scripts/payout-auto-reopen.test.ts scripts/payout-repair.test.ts",
     "test:swarm-api": "node --experimental-test-module-mocks --import tsx --test --test-concurrency=1 scripts/swarm-api.test.ts",
     "test:growth": "node --experimental-test-module-mocks --import tsx --test scripts/growth.test.ts",
     "test:tester": "node --import tsx --test scripts/tester-console.test.ts",
