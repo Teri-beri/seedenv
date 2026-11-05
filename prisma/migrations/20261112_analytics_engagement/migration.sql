@@ -1,0 +1,1 @@
+ALTER TABLE "AnalyticsEvent" ADD COLUMN IF NOT EXISTS "engagedMs" INTEGER;

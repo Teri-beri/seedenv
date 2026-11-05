@@ -18,8 +18,8 @@ export type AnalyticsSummaryData = {
   range: AnalyticsRange;
   trackingSince: string | null;
   activeNow: number;
-  totals: { visitors: number; pageViews: number; signupStarts: number; conversionRate: number; medianLoadMs: number | null };
-  changes: { visitors: number | null; pageViews: number | null; signupStarts: number | null; conversionRate: number | null; medianLoadMs: number | null };
+  totals: { visitors: number; pageViews: number; signupStarts: number; conversionRate: number; medianLoadMs: number | null; medianVisitMs: number | null; engagedVisits: number };
+  changes: { visitors: number | null; pageViews: number | null; signupStarts: number | null; conversionRate: number | null; medianLoadMs: number | null; medianVisitMs: number | null };
   series: Array<{ start: string; views: number; visitors: number }>;
   funnel: { visitors: number; ctaClicks: number; signupStarts: number };
   pages: AnalyticsBreakdownRow[];
@@ -40,8 +40,12 @@ type EventRow = {
   browser: string | null;
   os: string | null;
   loadMs: number | null;
+  sessionKey?: string | null;
+  engagedMs?: number | null;
   createdAt: Date;
 };
+
+const MAX_VISIT_MS = 4 * 60 * 60 * 1000;
 
 function percentChange(current: number, previous: number) {
   if (previous === 0) return current === 0 ? 0 : null;
@@ -75,8 +79,20 @@ function periodStats(events: EventRow[]) {
       signupVisitors.add(event.visitorId);
     }
   }
+  const visits = visitDurations(events);
   const conversionRate = visitors.size ? Math.round((signupVisitors.size / visitors.size) * 1000) / 10 : 0;
-  return { visitors: visitors.size, pageViews, signupStarts, conversionRate, medianLoadMs: median(loads), ctaVisitors: ctaVisitors.size, signupVisitors: signupVisitors.size };
+  return { visitors: visitors.size, pageViews, signupStarts, conversionRate, medianLoadMs: median(loads), medianVisitMs: median(visits), engagedVisits: visits.length, ctaVisitors: ctaVisitors.size, signupVisitors: signupVisitors.size };
+}
+
+// One visit = one browser tab session; falls back to the daily visitor hash when session storage is blocked.
+export function visitDurations(events: EventRow[]) {
+  const visits = new Map<string, number>();
+  for (const event of events) {
+    if (event.eventName !== "engagement" || !event.visitorId || !event.engagedMs || event.engagedMs <= 0) continue;
+    const key = event.sessionKey ? `s:${event.sessionKey}` : `v:${event.visitorId}`;
+    visits.set(key, Math.min(MAX_VISIT_MS, (visits.get(key) || 0) + event.engagedMs));
+  }
+  return [...visits.values()];
 }
 
 export function breakdown(events: EventRow[], key: (event: EventRow) => string | null, fallback: string, limit = 8): AnalyticsBreakdownRow[] {
@@ -107,7 +123,7 @@ export async function getAnalyticsSummary(rangeKey: AnalyticsRange = "7d", now =
   const [events, firstTracked] = await Promise.all([
     prisma.analyticsEvent.findMany({
       where: { createdAt: { gte: new Date(previousStart) }, visitorId: { not: null } },
-      select: { eventName: true, path: true, visitorId: true, source: true, country: true, device: true, browser: true, os: true, loadMs: true, createdAt: true },
+      select: { eventName: true, path: true, sessionKey: true, engagedMs: true, visitorId: true, source: true, country: true, device: true, browser: true, os: true, loadMs: true, createdAt: true },
       orderBy: { createdAt: "asc" },
       take: 200_000,
     }),
@@ -142,6 +158,8 @@ export async function getAnalyticsSummary(rangeKey: AnalyticsRange = "7d", now =
       signupStarts: currentStats.signupStarts,
       conversionRate: currentStats.conversionRate,
       medianLoadMs: currentStats.medianLoadMs,
+      medianVisitMs: currentStats.medianVisitMs,
+      engagedVisits: currentStats.engagedVisits,
     },
     changes: {
       visitors: percentChange(currentStats.visitors, previousStats.visitors),
@@ -149,6 +167,7 @@ export async function getAnalyticsSummary(rangeKey: AnalyticsRange = "7d", now =
       signupStarts: percentChange(currentStats.signupStarts, previousStats.signupStarts),
       conversionRate: percentChange(currentStats.conversionRate, previousStats.conversionRate),
       medianLoadMs: currentStats.medianLoadMs !== null && previousStats.medianLoadMs !== null ? percentChange(currentStats.medianLoadMs, previousStats.medianLoadMs) : null,
+      medianVisitMs: currentStats.medianVisitMs !== null && previousStats.medianVisitMs !== null ? percentChange(currentStats.medianVisitMs, previousStats.medianVisitMs) : null,
     },
     series: series.map((bucket) => ({ start: new Date(bucket.start).toISOString(), views: bucket.views, visitors: bucket.visitors.size })),
     funnel: { visitors: currentStats.visitors, ctaClicks: currentStats.ctaVisitors, signupStarts: currentStats.signupVisitors },

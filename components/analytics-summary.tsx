@@ -40,6 +40,15 @@ function formatMs(value: number | null) {
   return value >= 1000 ? `${(value / 1000).toFixed(2)}s` : `${value}ms`;
 }
 
+export function formatDuration(value: number | null) {
+  if (value === null) return "—";
+  const seconds = Math.round(value / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, "0")}s`;
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+}
+
 function bucketLabel(iso: string, range: AnalyticsRange) {
   const date = new Date(iso);
   return range === "24h"
@@ -75,11 +84,12 @@ export function AnalyticsSummary({ data, exclusion }: { data: AnalyticsSummaryDa
         </nav>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Visitors" value={data.totals.visitors.toLocaleString()} change={data.changes.visitors} detail="Unique visitors per day, counted with a privacy-safe hash of IP + browser that rotates every 24 hours. No IP addresses are stored." />
         <Stat label="Page views" value={data.totals.pageViews.toLocaleString()} change={data.changes.pageViews} detail="Every tracked page load from real visitors. Reloads count again." />
         <Stat label="Signup starts" value={data.totals.signupStarts.toLocaleString()} change={data.changes.signupStarts} detail="Clicks into the signup / sign-in flow." />
         <Stat label="Conversion" value={`${data.totals.conversionRate}%`} change={data.changes.conversionRate} detail="Share of visitors who started signup." />
+        <Stat label="Time on site" value={formatDuration(data.totals.medianVisitMs)} change={data.changes.medianVisitMs} detail={`Median engaged time per visit across ${data.totals.engagedVisits.toLocaleString()} measured visits. Only counts while a SeedEnv tab is visible and the visitor was active within the last minute. Visits under one second are not recorded.`} />
         <Stat label="Median load" value={formatMs(data.totals.medianLoadMs)} change={data.changes.medianLoadMs} lowerIsBetter detail="Median full page load time measured in visitors' browsers." />
       </div>
 

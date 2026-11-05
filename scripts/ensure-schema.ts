@@ -23,6 +23,7 @@ const statements = [
     ADD COLUMN IF NOT EXISTS "browser" TEXT,
     ADD COLUMN IF NOT EXISTS "os" TEXT,
     ADD COLUMN IF NOT EXISTS "loadMs" INTEGER`,
+  `ALTER TABLE "AnalyticsEvent" ADD COLUMN IF NOT EXISTS "engagedMs" INTEGER`,
   `CREATE INDEX IF NOT EXISTS "AnalyticsEvent_createdAt_idx" ON "AnalyticsEvent"("createdAt")`,
   `ALTER TABLE "Submission"
     ADD COLUMN IF NOT EXISTS "proofImageHash" TEXT,

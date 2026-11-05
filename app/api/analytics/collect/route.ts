@@ -14,7 +14,8 @@ import {
   visitorIdFor,
 } from "@/lib/analytics-context";
 
-const allowedEvents = new Set(["page_view", "cta_click", "mission_open", "signup_start"]);
+const allowedEvents = new Set(["page_view", "cta_click", "mission_open", "signup_start", "engagement"]);
+const MAX_ENGAGED_MS = 30 * 60 * 1000;
 const optOutMaxAge = 60 * 60 * 24 * 365 * 2;
 
 function skipped(reason: string, optOut = false) {
@@ -54,6 +55,8 @@ export async function POST(request: NextRequest) {
     const metadata = Object.fromEntries(Object.entries(rawMetadata).slice(0, 8).map(([key, value]) => [key.slice(0, 40), String(value).slice(0, 160)]));
     const { device, browser, os } = parseUserAgent(userAgent);
     const loadMs = typeof body.loadMs === "number" && Number.isFinite(body.loadMs) && body.loadMs > 0 && body.loadMs < 120_000 ? Math.round(body.loadMs) : null;
+    const engagedMs = typeof body.engagedMs === "number" && Number.isFinite(body.engagedMs) && body.engagedMs >= 1000 ? Math.min(Math.round(body.engagedMs), MAX_ENGAGED_MS) : null;
+    if (eventName === "engagement" && engagedMs === null) return skipped("too-short");
 
     await prisma.analyticsEvent.create({
       data: {
@@ -70,6 +73,7 @@ export async function POST(request: NextRequest) {
         browser,
         os,
         loadMs: eventName === "page_view" ? loadMs : null,
+        engagedMs: eventName === "engagement" ? engagedMs : null,
       },
     });
     return NextResponse.json({ ok: true, counted: true });
