@@ -1,24 +1,8 @@
-import type { Metadata } from "next";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  alternates: { canonical: "/tools/swarm-detector" },
-  title: "Swarm Detector // SeedEnv QA & Trust Suite",
-  description:
-    "Audit comment streams across TikTok, X, Reddit, and custom applications to detect synchronized bot swarms and astroturfing campaigns.",
-  openGraph: {
-    title: "SeedEnv Universal Swarm & Astroturf Detector",
-    description:
-      "Deterministic heuristic audit engine for detecting coordinated inauthentic behavior across social feeds and dev staging platforms.",
-    url: "https://seedenv.com/tools/swarm-detector",
-    siteName: "SeedEnv",
-    locale: "en_US",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "SeedEnv Universal Swarm & Astroturf Detector",
-    description: "Detect coordinated comment swarms and astroturfing across any platform.",
-  },
+export const metadata = {
+  ...publicPageMetadata("Free Swarm Detector & Comment Analysis", "Analyze pasted comments for repetition and coordination signals. Free browser-local SwarmForensics analysis without login. Heuristic results are not proof of bot activity.", "/tools/swarm-detector"),
+  robots: { index: true, follow: true },
 };
 
 export default function SwarmLayout({

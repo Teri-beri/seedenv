@@ -16,6 +16,9 @@ import { CopyFeedbackIcon } from "@/components/ui/copy-feedback-icon";
 import { COPY_FEEDBACK_MS } from "@/lib/use-copy-feedback";
 import { AdPlaybackError, isAdNetworkConfigured, playRewardedAd, resolveAdNetwork } from "@/lib/ad-network";
 import { ToolHandoff } from "@/components/tools/tool-handoff";
+import { ToolDiscovery } from "@/components/tools/tool-discovery";
+import { AnalyticsTracker } from "@/components/analytics-tracker";
+import { freeTools } from "@/lib/organic-growth";
 
 // Read as full literal member expressions so Next.js can inline them into the browser bundle.
 const adNetwork = resolveAdNetwork({
@@ -409,7 +412,8 @@ export default function SwarmDetectorPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#09090b] text-zinc-100">
+    <main id="main-content" className="min-h-screen bg-[#09090b] text-zinc-100">
+      <AnalyticsTracker />
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <button
           type="button"
@@ -601,6 +605,7 @@ export default function SwarmDetectorPage() {
           </>
         ) : null}
 
+        <ToolDiscovery tool={freeTools[0]} />
         <LegalDisclaimer />
       </div>
 

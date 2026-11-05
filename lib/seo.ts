@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const SITE_URL = "https://seedenv.com";
-export const SITE_DESCRIPTION = "Find beta testers for iOS, Android and web apps. Launch TestFlight or Google Play testing cohorts, collect structured bug reports and UX feedback with SeedEnv.";
+export const SITE_DESCRIPTION = "Find beta testers for iOS, Android and web apps. Collect QA reports, or use SeedEnv's free viewport checker, QA checklist and comment analysis tools.";
 
 export const siteMetadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -11,7 +11,7 @@ export const siteMetadata: Metadata = {
     template: "%s | SeedEnv",
   },
   description: SITE_DESCRIPTION,
-  keywords: ["beta testing", "TestFlight beta testers", "iOS app testing", "indie hackers", "app feedback", "user testing platform", "SeedEnv"],
+  keywords: ["beta testing", "TestFlight beta testers", "iOS app testing", "indie hackers", "app feedback", "user testing platform", "free viewport checker", "QA checklist generator", "comment coordination analysis", "SeedEnv"],
   alternates: { canonical: SITE_URL },
   openGraph: {
     title: "Find Beta Testers for iOS, Android & Web Apps | SeedEnv",

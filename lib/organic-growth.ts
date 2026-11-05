@@ -1,10 +1,29 @@
 import { z } from "zod";
 
 export const freeTools = [
-  { path: "/tools/swarm-detector", name: "SwarmForensics", description: "Audit pasted comment streams for coordinated activity.", tag: "Trust & safety" },
-  { path: "/tools/viewport-check", name: "Viewport Check", description: "Preview your site at real-world mobile and desktop sizes.", tag: "Responsive QA" },
-  { path: "/tools/qa-checklist", name: "QA Checklist", description: "Generate a practical release checklist for your next build.", tag: "Release readiness" },
+  {
+    path: "/tools/swarm-detector", name: "SwarmForensics",
+    description: "Analyze pasted comments for repetition and signals of coordinated activity.", tag: "Trust & safety",
+    input: "Paste comment text or load the sample demo. Direct-paste analysis needs no account.",
+    output: "Heuristic coordination metrics, visualizations and a shareable receipt.",
+    limitation: "Signals are not proof that an account is a bot. Paste analysis runs locally; optional post-URL imports have separate provider and availability limits.",
+  },
+  {
+    path: "/tools/viewport-check", name: "Viewport Check",
+    description: "Preview a website at mobile, tablet and desktop sizes, then copy its QA matrix.", tag: "Responsive QA",
+    input: "Enter a full HTTP or HTTPS website URL, or load the sample demo.",
+    output: "A sandboxed responsive preview and a copyable matrix from 360px mobile to 1920px desktop.",
+    limitation: "Some websites block embedding. Cross-origin pages cannot be automatically inspected; this tool does not certify that a layout passed QA.",
+  },
+  {
+    path: "/tools/qa-checklist", name: "QA Checklist",
+    description: "Generate a copy-ready release checklist for core flows, accounts, payments and mobile.", tag: "Release readiness",
+    input: "Select the flows you want to test. An app URL is optional.",
+    output: "A Markdown checklist you can copy into a repository, issue or release plan.",
+    limitation: "The checklist is a testing plan, not an automated scan. Its checks still need to be performed.",
+  },
 ] as const;
+export type FreeTool = (typeof freeTools)[number];
 
 export const toolUrlSchema = z.string().trim().max(2000).transform((value, ctx) => {
   try {

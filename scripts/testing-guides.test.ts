@@ -70,7 +70,7 @@ test("guide routes render one heading, canonical metadata, cross-links and accur
 
 test("sitemap includes every guide and retains published posts and developer profiles without a live database", async () => {
   const modules = [
-    mock.module("../lib/prisma.ts", { namedExports: { prisma: { user: { findMany: async () => [{ username: "sample_dev", updatedAt: new Date("2026-01-01") }] } } } }),
+    mock.module("../lib/prisma.ts", { namedExports: { prisma: { publicBugReport: { findMany: async () => [] }, user: { findMany: async () => [{ username: "sample_dev", updatedAt: new Date("2026-01-01") }] } } } }),
     mock.module("../lib/growth/blog.ts", { namedExports: { listPublishedPosts: async () => [{ slug: "published-test", updatedAt: new Date("2026-01-01") }] } }),
   ];
   try {
@@ -78,6 +78,7 @@ test("sitemap includes every guide and retains published posts and developer pro
     const entries = await sitemap();
     const urls = entries.map((entry) => entry.url);
     for (const path of ["/guides", ...testingGuides.map((guide) => `/guides/${guide.slug}`), "/blog/published-test", "/@sample_dev"]) assert.ok(urls.includes(`${SITE_URL}${path}`), path);
+    for (const path of ["/tools", "/tools/swarm-detector", "/tools/viewport-check", "/tools/qa-checklist"]) assert.ok(urls.includes(`${SITE_URL}${path}`), path);
     assert.equal(new Set(urls).size, urls.length);
   } finally {
     modules.reverse().forEach((item) => item.restore());

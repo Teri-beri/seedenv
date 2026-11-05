@@ -21,6 +21,7 @@ import { LandingPlatformFeeOfferCard, type LandingPlatformFeeOffer } from "@/com
 import { CohortBriefLink } from "@/components/cohort-brief-link";
 import { SegmentedTabs } from "@/components/ui/SegmentedTabs";
 import { workspaceHome } from "@/lib/workspace-navigation";
+import { freeTools } from "@/lib/organic-growth";
 
 type Mission = {
   id: string;
@@ -52,6 +53,11 @@ const sectionShell = "relative scroll-mt-14 border-t border-zinc-800/60 py-16 sm
 const surfaceTint = "bg-[#12161F]/20";
 const labelClass = "font-mono text-xs uppercase text-zinc-400";
 const platformLabels = { TESTFLIGHT: "iOS / TestFlight", PLAY_STORE: "Android / Play Console", WEB_STAGING: "Web / PWA", ROBLOX_EXPERIENCE: "Roblox / Experience" };
+const freeToolIcons = {
+  "/tools/swarm-detector": ShieldCheck,
+  "/tools/viewport-check": Smartphone,
+  "/tools/qa-checklist": FileText,
+};
 
 const reportPreview = (scenario: SandboxScenario) => JSON.stringify({
   device: scenario.device,
@@ -137,7 +143,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
             <span className="text-base font-semibold sm:text-lg">SeedEnv</span>
             <span className="font-mono text-[10px] text-zinc-500 sm:text-xs lg:hidden xl:inline">v1.2</span>
           </Link>
-          <nav aria-label="Landing sections" className="hidden min-w-0 items-center justify-center gap-5 lg:flex xl:gap-6">
+          <nav aria-label="Landing sections" className="hidden min-w-0 items-center justify-center gap-3 lg:flex xl:gap-4">
             {landingViews.map((item) => <Link key={item.id} href={landingViewHref(item.id)} onClick={() => setActiveAnchor(item.anchor)} aria-current={activeAnchor === item.anchor ? "location" : undefined} className={`inline-flex min-h-11 shrink-0 items-center rounded font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${activeAnchor === item.anchor ? "text-zinc-100" : "text-zinc-400 hover:text-zinc-100"}`}>{item.label}</Link>)}
           </nav>
           <nav className="ml-auto flex shrink-0 items-center gap-2 md:gap-4 lg:ml-0" aria-label="Landing actions">
@@ -173,6 +179,7 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
             <div className="mt-7 flex flex-wrap gap-3">
               <Link href={developerHref} className={primaryAction} onClick={() => trackAnalytics("signup_start", { role: "DEVELOPER", callbackUrl: "/console?view=new-drop" })}>Deploy a Cohort <ArrowRight className="size-4" /></Link>
               <Link href={landingViewHref("cohorts")} className={secondaryAction}>Explore Live Board</Link>
+              <Link href={landingViewHref("tools")} className="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-emerald-300 hover:bg-emerald-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">Try free developer tools <ArrowRight className="size-4" /></Link>
             </div>
             <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3 font-mono text-xs text-zinc-400">
               <span className="flex items-center gap-2"><Smartphone className="size-4 text-emerald-400" /> TestFlight / Play Console</span>
@@ -183,6 +190,29 @@ export function PublicLanding({ missions, viewer, directoryUnavailable = false, 
         </section>
 
         {launchOffer ? <div id="launch-offer" className="mx-auto w-full max-w-7xl px-4 pb-10 sm:px-6 sm:pb-12 lg:px-8"><LandingPlatformFeeOfferCard offer={launchOffer} /></div> : null}
+        <section id="free-tools" aria-labelledby="free-tools-heading" className="mx-auto w-full max-w-7xl scroll-mt-20 px-4 pb-10 pt-4 sm:px-6 sm:pb-12 lg:px-8">
+          <div className="rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-[#171923]/80 to-zinc-950/70 p-5 sm:p-7">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <p className="font-mono text-[11px] uppercase tracking-wider text-emerald-400">Free utilities / no login / no credit card</p>
+                <h2 id="free-tools-heading" className="mt-3 text-2xl font-semibold tracking-tight text-zinc-100">Free developer tools. Get results before you sign up.</h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-400">Preview responsive layouts, build a release checklist, or inspect pasted comments. Open a tool and start immediately.</p>
+              </div>
+              <Link href="/tools" className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-emerald-300 hover:text-emerald-200">Browse all free tools <ArrowRight className="size-4" /></Link>
+            </div>
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              {freeTools.map((tool) => {
+                const Icon = freeToolIcons[tool.path];
+                return <Link key={tool.path} href={tool.path} onClick={() => trackAnalytics("cta_click", { action: "open_free_tool", tool: tool.path })} className="group flex min-w-0 flex-col rounded-xl border border-white/[0.08] bg-[#09090b]/60 p-5 transition-colors hover:border-emerald-500/40 hover:bg-zinc-900/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
+                  <div className="flex items-center justify-between gap-3"><Icon className="size-5 text-emerald-400" aria-hidden="true" /><span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">No account needed</span></div>
+                  <h3 className="mt-4 text-lg font-semibold text-zinc-200">{tool.name}</h3>
+                  <p className="mt-2 flex-1 text-sm leading-6 text-zinc-400">{tool.description}</p>
+                  <span className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-emerald-300">Open {tool.name}<ArrowRight className="size-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none" /></span>
+                </Link>;
+              })}
+            </div>
+          </div>
+        </section>
         <section id="cohorts" className={sectionShell}>
           <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-zinc-700/50 to-transparent" />
           <div className={sectionClass}><div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 sm:p-8">

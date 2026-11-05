@@ -73,6 +73,13 @@ test("the landing Console link points to the correct workspace for each role", a
     const visitorActions = visitor.match(/<nav[^>]*aria-label="Landing actions"[^>]*>.*?<\/nav>/)?.[0] ?? "";
     assert.match(visitorActions, /href="\/auth\/signin"[^>]*aria-label="Sign in or create an account"/);
     assert.doesNotMatch(visitorActions, /Deploy a Cohort/);
+    assert.match(visitor, /href="#free-tools"/);
+    const toolsSection = visitor.match(/<section[^>]*id="free-tools"[\s\S]*?<\/section>/)?.[0] || "";
+    assert.match(toolsSection, /Free utilities \/ no login \/ no credit card/);
+    for (const path of ["/tools/swarm-detector", "/tools/viewport-check", "/tools/qa-checklist"]) {
+      assert.ok(toolsSection.includes(`href="${path}"`), path);
+    }
+    assert.doesNotMatch(toolsSection, /href="\/auth\/|dashboard\/projects/);
   } finally {
     for (const moduleMock of modules.reverse()) moduleMock.restore();
   }

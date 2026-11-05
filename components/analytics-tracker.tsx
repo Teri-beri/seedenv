@@ -5,19 +5,35 @@ import { useEffect } from "react";
 type AnalyticsEventName = "page_view" | "cta_click" | "mission_open" | "signup_start";
 
 function sessionKey() {
-  const key = "seedenv-analytics-session";
-  const existing = window.sessionStorage.getItem(key);
-  if (existing) return existing;
-  const created = crypto.randomUUID();
-  window.sessionStorage.setItem(key, created);
-  return created;
+  try {
+    const key = "seedenv-analytics-session";
+    const existing = window.sessionStorage.getItem(key);
+    if (existing) return existing;
+    const created = crypto.randomUUID();
+    window.sessionStorage.setItem(key, created);
+    return created;
+  } catch (error) {
+    console.warn("SeedEnv analytics session storage is unavailable:", error);
+    return undefined;
+  }
+}
+
+type NavigationLoad = Pick<PerformanceNavigationTiming, "name" | "loadEventEnd" | "domContentLoadedEventEnd">;
+const reportedLoads = new WeakSet<PerformanceEntry>();
+
+export function navigationLoadMs(entry: NavigationLoad | undefined, pathname: string) {
+  if (!entry) return undefined;
+  if (new URL(entry.name).pathname !== pathname) return undefined;
+  const value = entry.loadEventEnd || entry.domContentLoadedEventEnd;
+  return value > 0 ? Math.round(value) : undefined;
 }
 
 function pageLoadMs() {
   const entry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
-  if (!entry) return undefined;
-  const value = entry.loadEventEnd || entry.domContentLoadedEventEnd;
-  return value > 0 ? Math.round(value) : undefined;
+  if (!entry || reportedLoads.has(entry)) return undefined;
+  const value = navigationLoadMs(entry, window.location.pathname);
+  if (value !== undefined) reportedLoads.add(entry);
+  return value;
 }
 
 function send(eventName: AnalyticsEventName, metadata?: Record<string, string>, extra?: Record<string, unknown>) {

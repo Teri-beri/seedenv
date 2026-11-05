@@ -1,5 +1,6 @@
 export const landingViews = [
   { id: "overview", label: "Overview", title: "SeedEnv", anchor: "top" },
+  { id: "tools", label: "Free tools", title: "Free Developer Tools", anchor: "free-tools" },
   { id: "cohorts", label: "Cohorts", title: "Active Cohorts", anchor: "cohorts" },
   { id: "developers", label: "Developers", title: "Developer Platform", anchor: "engine" },
   { id: "validators", label: "Validators", title: "Validator Protocol", anchor: "validators" },

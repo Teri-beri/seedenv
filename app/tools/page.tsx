@@ -4,7 +4,7 @@ import { freeTools } from "@/lib/organic-growth";
 import { publicPageMetadata } from "@/lib/seo";
 import { ToolShell } from "@/components/tools/tool-shell";
 
-export const metadata = publicPageMetadata("Free Developer Tools", "Free responsive viewport checker, QA release checklist and bot swarm detector. Instant browser-local results with no signup or credit card.", "/tools");
+export const metadata = { ...publicPageMetadata("Free Developer Tools", "Free responsive viewport checker, QA release checklist and comment coordination detector. Instant free utility results with no signup or credit card.", "/tools"), robots: { index: true, follow: true } };
 
 export default function ToolsPage() {
   return <ToolShell title="Small tools. Better releases." description="Practical, free utilities for your next shipping decision. No signup, no credit card, and no server-side scans.">
