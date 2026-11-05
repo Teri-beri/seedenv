@@ -11,7 +11,12 @@ export const dynamic = "force-dynamic";
 async function developerProfiles(): Promise<MetadataRoute.Sitemap> {
   try {
     const users = await prisma.user.findMany({
-      where: { NOT: { email: { endsWith: SEED_ACCOUNT_EMAIL_SUFFIX } } },
+      where: {
+        AND: [
+          { NOT: { email: { endsWith: SEED_ACCOUNT_EMAIL_SUFFIX } } },
+          { NOT: { username: { equals: "qa_seedenv_tester", mode: "insensitive" } } },
+        ],
+      },
       select: { username: true, updatedAt: true },
       take: 5000,
     });
@@ -55,7 +60,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/tools`, changeFrequency: "monthly", priority: 0.8 },
     ...freeTools.map((tool) => ({ url: `${SITE_URL}${tool.path}`, changeFrequency: "monthly" as const, priority: 0.7 })),
     ...(await publicReports()),
-    { url: `${SITE_URL}/auth/signin`, changeFrequency: "yearly", priority: 0.5 },
     { url: `${SITE_URL}/faq`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/about`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/docs`, changeFrequency: "monthly", priority: 0.6 },
