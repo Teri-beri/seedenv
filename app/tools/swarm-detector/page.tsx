@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Clipboard, ClipboardPaste, Copy, Download, Grid2x2, Link2, Loader2, Megaphone, Play, Radar, ScanSearch, ShieldCheck, Siren, Sparkles, Upload } from "lucide-react";
 import {
@@ -605,6 +606,7 @@ export default function SwarmDetectorPage() {
           </>
         ) : null}
 
+        <p className="mt-10 text-center text-sm text-zinc-500">Need this running automatically on your app&apos;s comments? <Link href="/swarm-api" className="text-emerald-300 underline-offset-4 hover:underline">Get the SwarmForensics API →</Link></p>
         <ToolDiscovery tool={freeTools[0]} />
         <LegalDisclaimer />
       </div>

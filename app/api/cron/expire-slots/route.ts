@@ -3,10 +3,11 @@ import { expireSlots } from "@/app/actions/submissionActions";
 import { sweepCampaignFunding } from "@/lib/slot-funding";
 import { sweepFillGuarantees } from "@/lib/fill-guarantee";
 import { reconcileReferralCredits } from "@/lib/services/referral-worker";
+import { purgeExpiredFingerprints } from "@/lib/swarm-api/service";
 
 async function run() {
   const slots = await expireSlots();
-  return { ...slots, funding: await sweepCampaignFunding(), fillGuarantee: await sweepFillGuarantees(), referrals: await reconcileReferralCredits() };
+  return { ...slots, funding: await sweepCampaignFunding(), fillGuarantee: await sweepFillGuarantees(), referrals: await reconcileReferralCredits(), ...await purgeExpiredFingerprints() };
 }
 
 function authorized(request: NextRequest) {

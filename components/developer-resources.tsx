@@ -12,6 +12,7 @@ type DeveloperResource = {
 export const developerResources: ReadonlyArray<DeveloperResource> = [
   { title: "Telemetry Monitor", description: "Live validator nodes, device sessions, and incident streams for your active cohorts.", href: "/console/monitor", icon: Activity, tag: "LIVE" },
   { title: "SwarmForensics Bot Detector", description: "Paste comments or a post URL to flag coordinated bot swarms and export forensic receipts.", href: "/tools/swarm-detector", icon: Radar, tag: "TOOL" },
+  { title: "SwarmForensics API", description: "API keys, usage, and webhooks for real-time comment swarm screening inside your own app.", href: "/account?tab=swarm-api", icon: Radar, tag: "API" },
   { title: "Free Developer Tools", description: "Responsive viewport previews and copy-ready release QA checklists. No signup required.", href: "/tools", icon: BookOpen, tag: "FREE" },
   { title: "Documentation", description: "Cohort setup, editing directions, reviews, payouts, and platform rules.", href: "/docs", icon: BookOpen, tag: "DOCS" },
   { title: "GitHub Integration", description: "Export tester submissions as GitHub issues with a scoped access token.", href: "/account?tab=security", icon: GitBranch, tag: "SETUP" },

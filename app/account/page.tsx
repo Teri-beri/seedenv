@@ -33,6 +33,9 @@ import { formatCents } from "@/lib/utils";
 import { workspaceHome } from "@/lib/workspace-navigation";
 import { getTesterReferralStats } from "@/lib/tester-referrals";
 import { TesterReferralCard } from "@/components/tester-referral-card";
+import { SwarmApiConsole } from "@/components/swarm-api/swarm-api-console";
+import { syncSwarmCheckoutSession } from "@/lib/swarm-api/billing";
+import { getSwarmApiDashboard } from "@/lib/swarm-api/service";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +50,7 @@ const accountTabs = [
 ] as const;
 
 type AccountTab = (typeof accountTabs)[number]["id"];
-type VisibleAccountTab = AccountTab | "resources" | "site-performance";
+type VisibleAccountTab = AccountTab | "resources" | "swarm-api" | "site-performance";
 
 function normalizeNotificationPreferences(value: unknown): NotificationPreferences {
   const saved = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -60,7 +63,7 @@ function normalizeNotificationPreferences(value: unknown): NotificationPreferenc
   };
 }
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string; draft?: string; stripePayment?: string; stripeConnect?: string; referralError?: string; range?: string; devref?: string; developerReferralError?: string; box?: string; thread?: string; to?: string; page?: string; before?: string }> }) {
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ tab?: string; draft?: string; stripePayment?: string; stripeConnect?: string; referralError?: string; range?: string; devref?: string; developerReferralError?: string; box?: string; thread?: string; to?: string; page?: string; before?: string; swarmCheckout?: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) redirect("/auth/signin?callbackUrl=/account");
   const params = await searchParams;
@@ -106,11 +109,27 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const visibleTabs: ReadonlyArray<{ id: VisibleAccountTab; label: string }> = [
     ...accountTabs,
     ...(canViewDeveloperResources ? [{ id: "resources" as const, label: "Developer Resources" }] : []),
+    { id: "swarm-api" as const, label: "SwarmForensics API" },
     ...(canViewSitePerformance ? [{ id: "site-performance" as const, label: "Site Performance" }] : []),
   ];
   const activeTab: VisibleAccountTab = visibleTabs.some((tab) => tab.id === params.tab)
     ? params.tab as VisibleAccountTab
     : "profile";
+  let swarmCheckoutNotice: { tone: "ok" | "error"; text: string } | null = null;
+  if (activeTab === "swarm-api" && params.swarmCheckout) {
+    if (params.swarmCheckout === "cancelled") swarmCheckoutNotice = { tone: "error", text: "Checkout was cancelled. You're still on your current plan." };
+    else if (/^cs_[A-Za-z0-9_]{8,250}$/.test(params.swarmCheckout)) {
+      // The webhook is authoritative, but syncing on return makes the upgrade visible immediately.
+      const synced = await syncSwarmCheckoutSession(params.swarmCheckout, user.id).catch((error) => {
+        console.error("SwarmForensics checkout sync failed:", error);
+        return null;
+      });
+      swarmCheckoutNotice = synced && "synced" in synced
+        ? { tone: "ok", text: "Subscription active. Your new limits apply to every existing key." }
+        : { tone: "ok", text: "Payment received. Your plan updates as soon as Stripe confirms it, usually within a minute." };
+    }
+  }
+  const swarmDashboard = activeTab === "swarm-api" ? await getSwarmApiDashboard(user.id) : null;
   const blocks = activeTab === "message-settings" ? await prisma.userBlock.findMany({ where: { blockerId: user.id }, include: { blocked: { select: { id: true, username: true } } }, orderBy: { createdAt: "desc" } }) : [];
 
   const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
@@ -251,6 +270,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               </div>
             ) : null}
             {activeTab === "resources" ? <DeveloperResources showCohortRules={canManageCohortPromos({ id: user.id, role: user.role })} /> : null}
+            {activeTab === "swarm-api" && swarmDashboard ? <SwarmApiConsole dashboard={swarmDashboard} checkoutNotice={swarmCheckoutNotice} /> : null}
             {activeTab === "messages" ? <MessageInbox memberId={user.id} params={params} /> : null}
             {activeTab === "message-settings" ? <MessageSettings enabled={user.messageRequestsEnabled} blocks={blocks.map(block => block.blocked)} /> : null}
             {activeTab === "connections" ? <ConnectionSettings memberId={user.id} page={Math.max(1, Math.min(10000, Number.parseInt(params.page || "1", 10) || 1))} /> : null}

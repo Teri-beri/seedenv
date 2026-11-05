@@ -172,6 +172,7 @@ model User {
   referrals                 User[]                  @relation("UserReferrals")
   feeCredits                FeeCredit[]
   firstCohortBenefit        FirstCohortBenefit?
+  swarmApiAccount           SwarmApiAccount?
   testFlightBuilds          TestFlightBuild[]
   developerReferralCode     String?                 @unique @map("developer_referral_code")
   developerReferralsSent    DeveloperReferral[]     @relation("DeveloperReferrer")
@@ -1380,4 +1381,84 @@ model OwnerPayout {
 
   @@index([status, createdAt])
   @@map("owner_payouts")
+}
+
+// SwarmForensics API: paid comment-moderation access for developer apps.
+model SwarmApiAccount {
+  id                   String                @id @default(cuid())
+  userId               String                @unique
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // SANDBOX, STARTER, GROWTH, SCALE
+  plan                 String                @default("SANDBOX") @db.VarChar(20)
+  // Mirrors the Stripe subscription status; null while on the free sandbox.
+  subscriptionStatus   String?               @db.VarChar(40)
+  stripeSubscriptionId String?               @unique
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean               @default(false)
+  // Random per-account salt so fingerprints cannot be correlated across customers.
+  fingerprintSalt      String
+  webhookUrl           String?               @db.VarChar(500)
+  webhookSecret        String?
+  webhookLastStatus    Int?
+  webhookLastAt        DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  keys                 SwarmApiKey[]
+  usage                SwarmApiUsage[]
+  fingerprints         SwarmApiFingerprint[]
+
+  @@map("swarm_api_accounts")
+}
+
+model SwarmApiKey {
+  id         String          @id @default(cuid())
+  accountId  String
+  account    SwarmApiAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name       String          @db.VarChar(60)
+  // Display-only prefix; the full key is shown once and stored as a SHA-256 hash.
+  prefix     String          @db.VarChar(20)
+  keyHash    String          @unique
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime        @default(now())
+
+  @@index([accountId, createdAt])
+  @@map("swarm_api_keys")
+}
+
+model SwarmApiUsage {
+  accountId   String
+  account     SwarmApiAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  // UTC calendar month, e.g. 2026-11
+  period      String          @db.VarChar(7)
+  checks      Int             @default(0)
+  reviewCount Int             @default(0)
+  holdCount   Int             @default(0)
+  updatedAt   DateTime        @updatedAt
+
+  @@id([accountId, period])
+  @@map("swarm_api_usage")
+}
+
+// Short-lived, text-free comment fingerprints used to spot coordination; purged after 24 hours.
+model SwarmApiFingerprint {
+  id          String          @id @default(cuid())
+  accountId   String
+  account     SwarmApiAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  commentId   String?         @db.VarChar(128)
+  threadHash  String?         @db.VarChar(32)
+  authorHash  String          @db.VarChar(32)
+  textHash    String          @db.VarChar(32)
+  tokenHashes String[]
+  linkCount   Int             @default(0)
+  postedAt    DateTime
+  score       Int
+  action      String          @db.VarChar(10)
+  signals     String[]
+  createdAt   DateTime        @default(now())
+
+  @@index([accountId, postedAt])
+  @@index([accountId, action, createdAt])
+  @@index([createdAt])
+  @@map("swarm_api_fingerprints")
 }

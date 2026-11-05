@@ -13,6 +13,7 @@ import { queueFollowerEmails } from "@/lib/social-connections";
 import { recordCampaignFeeBenefits, reconcileReferralMilestone } from "@/lib/services/billing.service";
 import { releaseExpiredCampaignCheckout } from "@/lib/services/checkout-reconciliation";
 import { handleInvoiceEvent, linkCheckoutInvoice } from "@/lib/stripe/invoicing";
+import { isSwarmSubscriptionEvent, SWARM_API_CHECKOUT_TYPE, syncSwarmCheckoutSession, syncSwarmSubscription } from "@/lib/swarm-api/billing";
 
 const stripeId = (value: string | { id: string } | null) => typeof value === "string" ? value : value?.id;
 
@@ -33,6 +34,10 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     if (!event.data.object.id) throw new Error("Stripe reversal event has no object ID.");
     return handleFundingReversal(event.type, event.data.object.id);
   }
+  if (isSwarmSubscriptionEvent(event.type)) {
+    if (!event.data.object.id) throw new Error("Subscription event has no subscription ID.");
+    return syncSwarmSubscription(event.data.object.id);
+  }
   if (!["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type)) return { ignored: true };
   if (!event.data.object.id) throw new Error("Checkout event has no session ID.");
   const stripe = getStripe();
@@ -52,6 +57,7 @@ export async function handleStripeWebhook(event: CampaignPaymentEvent) {
     await stripe.customers.update(customerId, { invoice_settings: { default_payment_method: paymentMethod } });
     return { paymentMethodSaved: true, userId: user.id };
   }
+  if (metadata.type === SWARM_API_CHECKOUT_TYPE) return syncSwarmCheckoutSession(session.id);
   if (metadata.type === "SEEDENV_BALANCE_TOPUP") {
     const credited = await handleTopUpCheckout(session);
     if (!("awaitingPayment" in credited)) await linkCheckoutInvoice(session, stripeId(session.payment_intent));
